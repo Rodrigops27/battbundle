@@ -1,0 +1,5 @@
+/bin/
+*.asv
+*.autosave
+*.tmp
+*.log

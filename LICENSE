@@ -1,0 +1,24 @@
+ROM ESTIMATOR LICENSE NOTICE (CC BY-SA 4.0)
+
+Scope:
+This notice applies to the ROM estimator implementation files adapted from
+Gregory L. Plett and M. Scott Trimboli material, including:
+- utility/initKF.m
+- utility/iterEKF.m
+- utility/iterSPKF.m
+
+License:
+Creative Commons Attribution-ShareAlike 4.0 International
+https://creativecommons.org/licenses/by-sa/4.0/
+
+Attribution text:
+This code is provided as a supplement to: Gregory L. Plett and M. Scott
+Trimboli, "Battery Management Systems, Volume III, Physics-Based
+Methods," Artech House, 2024. It is provided "as is", without express or
+implied warranty. Attribution should be given by citing: Gregory L. Plett
+and M. Scott Trimboli, Battery Management Systems, Volume III:
+Physics-Based Methods, Artech House, 2024.
+
+Other files:
+Other files in this repository may have different terms (or file-level
+notices). Check individual file headers where applicable.
