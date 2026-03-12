@@ -26,7 +26,8 @@ addpath(genpath(fullfile(repoRoot, "ESC_Id")));
 
 Notes:
 - Scripts already search several fallback locations for model files.
-- If `models/NMC30model.mat` is missing, regenerate from `ESC_Id/createNMC30Model.m`.
+- If `models/NMC30model.mat` is missing, regenerate via `ESC_Id/createNMC30Model.m` then `ESC_Id/fullParameterIdentificationNMC30.m`.
+- `ESC_Id/createNMC30Model.m` loads ROM from `models/ROM_NMC30_HRA12.mat` (with local fallbacks).
 
 ## How to Run Validation
 Run either script from MATLAB command window:
@@ -48,6 +49,13 @@ Both print:
   - Mean SOC Bias Error
   - NIS (Normalized Innovation Squared)
   - Innovation autocorrelation (lag-1) with 95% block-bootstrap CI
+
+## Additional Tools
+- `createROMSyntheticDataset.m`: builds/saves a reusable ROM synthetic dataset in `datasets/`.
+- `KFEval.m`: evaluates selected estimators on a saved dataset.
+- `studyInnovationNoiseSweep.m`: sweeps process/measurement noise and reports innovation behavior.
+- `plotInnovationAcfPacf.m`: helper to plot innovation ACF/PACF.
+- `SOCnVeval.m`: shared SOC/voltage evaluation helper.
 
 ## Reproduce a "Validated Bundle" Result
 Use this checklist to reproduce and freeze a validated result set:
@@ -86,13 +94,6 @@ save(fullfile(repoRoot, "validation_workspace.mat"));
    - script name + commit/version tag
 5. Compare future runs against archived SOC metrics + bias/innovation diagnostics.
 
-## Scaffold Review Note
-Recommendation: keep `bnchmrk` as the repository root name (do not rename to `source`).
-
-Reason:
-- Existing script-relative path logic already assumes this folder is the bundle root.
-- Renaming to `source` adds churn without improving execution or reproducibility.
-- If desired, use `source/` as a parent container and keep this folder unchanged inside it.
 
 ## License
 See [`LICENSE`](./LICENSE) for ROM estimator license scope and attribution requirements.
