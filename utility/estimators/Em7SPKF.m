@@ -120,6 +120,8 @@ U = Ad * V + Bb;
 S = Cd * U + Cb;
 V = U - L * S;
 
+SigmaB_prior = SigmaB;
+SigmaR0_prior = SigmaR0;
 innovLin = Cd * SigmaX * Cd' + sigmaV + S * SigmaB * S';
 innovLin = max(real(innovLin), eps);
 SigmaB = SigmaB - (SigmaB * S' / innovLin) * S * SigmaB;
@@ -127,6 +129,9 @@ SigmaB = (SigmaB + SigmaB') / 2;
 
 Lb = SigmaB * (V' * Cd' + Cb') / max(real(sigmaV), eps);
 r = yk - yhat;
+Sk_pre = SigmaY + S * SigmaB_prior * S' + (iEffNow ^ 2) * SigmaR0_prior;
+esckfData.lastInnovationPre = r;
+esckfData.lastSk = max(real(Sk_pre), eps);
 bhat = (eye(nb) - Lb * S) * bhat + Lb * r;
 
 % Step 2b: State update + bias correction

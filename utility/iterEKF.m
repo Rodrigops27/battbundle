@@ -123,24 +123,30 @@ switch ekfData.method
     case 'OB'
         [ChatV,C0] = getChatV(Xind,Z,Tk);
         SigmaVtilde = cell(4,1); L = SigmaVtilde; % reserve space
+        Sk = 0;
         for theModel = 1:4
             SigmaX = ekfData.M(Xind.theT(1),Xind.theZ(1)).SigmaX;
             SigmaVtilde{theModel} = ChatV{theModel}*SigmaX*ChatV{theModel}' ...
                 + ekfData.SigmaV;
             L{theModel} = SigmaX*ChatV{theModel}'/SigmaVtilde{theModel};
+            Sk = Sk + max(real(SigmaVtilde{theModel} - ekfData.SigmaV), 0);
         end
         SigmaX0 = ekfData.SigmaX0;
         SigmaVtilde0 = (C0*SigmaX0*C0' + ekfData.SigmaV);
         L0 = SigmaX0*C0/SigmaVtilde0;
+        Sk = Sk + max(real(SigmaVtilde0 - ekfData.SigmaV), 0) + max(real(ekfData.SigmaV), eps);
     case 'MB'
         ChatV = getChatV(Xind,Z,Tk);
         SigmaVtilde = ChatV*ekfData.SigmaX*ChatV' + ekfData.SigmaV;
         L = ekfData.SigmaX*ChatV'/SigmaVtilde;
+        Sk = SigmaVtilde;
 end
 
 % ----------------------------------------------------------------------
 % Steps 2b and 2c... operate only on four nearest neighbors
 residual = vk - vhat;
+ekfData.lastInnovationPre = residual;
+ekfData.lastSk = max(real(Sk), eps);
 switch ekfData.method
     case 'OB'
         for theModel = 1:4

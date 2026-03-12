@@ -4,9 +4,9 @@
 %   2. ROM-based EKF (physics-based model)
 %   3. ESC-SPKF (electrical circuit model)
 %   4. EDUKF (dual ESC-SPKF with online R0 estimation)
-%   5. EsSPKF (ESC model with simplified online R0 estimation) 2be tested
+%   5. EsSPKF (ESC model with simplified online R0 estimation)
 %   6. EBiSPKF (ESC-SPKF with external bias tracking)
-%   7. Em7SPKF (EBiSPKF + simplified R0-SPKF branch)
+%   7. Em7SPKF (ESC-SPKF with external bias tracking + simplified R0-SPKF branch)
 
 clear; 
 % clc; close all;
@@ -33,6 +33,7 @@ tc = 25;                          % Temperature [°C]
 ts = 1;                           % Sampling time [s]
 SOCfigs = false;                   % Plot per-estimator SOC error + bounds figures.
 Vfigs = false;                     % Plot per-estimator voltage error + bounds figures.
+InnovationACFPACFfigs = true;      % Plot pre-fit innovation ACF/PACF diagnostics.
 
 % Initial conditions
 soc_init = 100;                   % Initial SOC [%]
@@ -168,9 +169,17 @@ v_ekf = NaN(n_samples, 1);
 v_ekf(1) = rom_voltage(1);
 soc_ekf_bnd = NaN(n_samples, 1);
 v_ekf_bnd = NaN(n_samples, 1);
+innov_pre_ekf = NaN(n_samples, 1);
+sk_ekf = NaN(n_samples, 1);
 
 for k = 2:n_samples
     [z_ekf, bound_ekf, ekf_data] = iterEKF(rom_voltage(k), i_profile(k), tc, ekf_data);
+    if isfield(ekf_data, 'lastInnovationPre')
+        innov_pre_ekf(k) = ekf_data.lastInnovationPre;
+    end
+    if isfield(ekf_data, 'lastSk')
+        sk_ekf(k) = ekf_data.lastSk;
+    end
     % iterEKF packages SOC as the final element of zk.
     if ~isnan(z_ekf(end))
         soc_ekf(k) = z_ekf(end);
@@ -187,7 +196,7 @@ end
 
 % -------------------------------------------------------------------------
 % ESC Methods:
-% sigma_w  = 1e-3;    % 1e2 process/current noise, big = "trust the sensor"
+sigma_w  = 1e-3;    % 1e2 process/current noise, big = "trust the sensor"
 SigmaX0 = diag([1e-6 * ones(1, n_rc), 1e-6, 1e-3]);
 % soc_init = SOCfromOCVtemp(v0, T0, model)]; % Potential SOC0 guess
 
@@ -201,10 +210,18 @@ v_spkf = NaN(n_samples, 1);
 v_spkf(1) = OCVfromSOCtemp(soc_spkf(1), tc, nmc30_esc);
 soc_spkf_bnd = NaN(n_samples, 1);
 v_spkf_bnd = NaN(n_samples, 1);
+innov_pre_spkf = NaN(n_samples, 1);
+sk_spkf = NaN(n_samples, 1);
 
 for k = 2:n_samples
     [soc_spkf(k), v_spkf(k), soc_spkf_bnd(k), spkf_esc, v_spkf_bnd(k)] = iterESCSPKF(rom_voltage(k), ...
         i_profile(k), tc, ts, spkf_esc);
+    if isfield(spkf_esc, 'lastInnovationPre')
+        innov_pre_spkf(k) = spkf_esc.lastInnovationPre;
+    end
+    if isfield(spkf_esc, 'lastSk')
+        sk_spkf(k) = spkf_esc.lastSk;
+    end
     
     % Ensure SOC stays in valid range
     soc_spkf(k) = max(0, min(1, soc_spkf(k)));
@@ -228,10 +245,18 @@ v_edukf_bnd = NaN(n_samples, 1);
 r0_edukf = NaN(n_samples, 1);
 r0_edukf(1) = edukf_esc.R0hat;
 r0_edukf_bnd = NaN(n_samples, 1);
+innov_pre_edukf = NaN(n_samples, 1);
+sk_edukf = NaN(n_samples, 1);
 
 for k = 2:n_samples
     [soc_edukf(k), v_edukf(k), soc_edukf_bnd(k), edukf_esc, v_edukf_bnd(k), ...
         r0_edukf(k), r0_edukf_bnd(k)] = iterEDUKF(rom_voltage(k), i_profile(k), tc, ts, edukf_esc);
+    if isfield(edukf_esc, 'lastInnovationPre')
+        innov_pre_edukf(k) = edukf_esc.lastInnovationPre;
+    end
+    if isfield(edukf_esc, 'lastSk')
+        sk_edukf(k) = edukf_esc.lastSk;
+    end
 
     soc_edukf(k) = max(0, min(1, soc_edukf(k)));
 end
@@ -249,17 +274,25 @@ v_esspkf_bnd = NaN(n_samples, 1);
 r0_esspkf = NaN(n_samples, 1);
 r0_esspkf(1) = esspkf_esc.R0hat;
 r0_esspkf_bnd = NaN(n_samples, 1);
+innov_pre_esspkf = NaN(n_samples, 1);
+sk_esspkf = NaN(n_samples, 1);
 
 for k = 2:n_samples
     [soc_esspkf(k), v_esspkf(k), soc_esspkf_bnd(k), esspkf_esc, v_esspkf_bnd(k), ...
         r0_esspkf(k), r0_esspkf_bnd(k)] = iterEsSPKF(rom_voltage(k), i_profile(k), tc, ts, esspkf_esc);
+    if isfield(esspkf_esc, 'lastInnovationPre')
+        innov_pre_esspkf(k) = esspkf_esc.lastInnovationPre;
+    end
+    if isfield(esspkf_esc, 'lastSk')
+        sk_esspkf(k) = esspkf_esc.lastSk;
+    end
 
     soc_esspkf(k) = max(0, min(1, soc_esspkf(k)));
 end
 
 % -------------------------------------------------------------------------
 % Method 6: EBiSPKF (external bias-tracking branch)
-% sigma_v  = 1e2;    % 1e-3 voltage noise, big = "trust the model more than the sensor"
+sigma_v  = 1e2;    % 1e-3 voltage noise, big = "trust the model more than the sensor"
 % sigma_w  = 1e2;    % 1e2 process/current noise, big = "trust the sensor"
 % sigma_v  = 1e-3;    % 1e-3 voltage noise, big = "trust the model more than the sensor"
 
@@ -323,6 +356,8 @@ bias_ebispkf = NaN(n_samples, nb_bias);
 bias_ebispkf_bnd = NaN(n_samples, nb_bias);
 bias_ebispkf(1, :) = ebispkf_esc.bhat(:).';
 bias_ebispkf_bnd(1, :) = (3 * sqrt(max(diag(ebispkf_esc.SigmaB), 0))).';
+innov_pre_ebispkf = NaN(n_samples, 1);
+sk_ebispkf = NaN(n_samples, 1);
 current_bias_idx = ebispkf_esc.currentBiasInd;
 other_bias_idx = setdiff(1:nb_bias, current_bias_idx, 'stable');
 output_bias_idx = other_bias_idx(1);
@@ -330,6 +365,12 @@ output_bias_idx = other_bias_idx(1);
 for k = 2:n_samples
     [soc_ebispkf(k), v_ebispkf(k), soc_ebispkf_bnd(k), ebispkf_esc, v_ebispkf_bnd(k), ...
         bhat_k, bbnd_k] = iterEBiSPKF(rom_voltage(k), i_profile(k), tc, ts, ebispkf_esc);
+    if isfield(ebispkf_esc, 'lastInnovationPre')
+        innov_pre_ebispkf(k) = ebispkf_esc.lastInnovationPre;
+    end
+    if isfield(ebispkf_esc, 'lastSk')
+        sk_ebispkf(k) = ebispkf_esc.lastSk;
+    end
 
     soc_ebispkf(k) = max(0, min(1, soc_ebispkf(k)));
     bias_ebispkf(k, :) = bhat_k(:).';
@@ -358,6 +399,8 @@ bias_em7_bnd(1, :) = (3 * sqrt(max(diag(em7_esc.SigmaB), 0))).';
 r0_em7 = NaN(n_samples, 1);
 r0_em7(1) = em7_esc.R0hat;
 r0_em7_bnd = NaN(n_samples, 1);
+innov_pre_em7 = NaN(n_samples, 1);
+sk_em7 = NaN(n_samples, 1);
 em7_current_bias_idx = em7_esc.currentBiasInd;
 em7_output_bias_idx = setdiff(1:nb_bias, em7_current_bias_idx, 'stable');
 em7_output_bias_idx = em7_output_bias_idx(1);
@@ -366,6 +409,12 @@ for k = 2:n_samples
     [soc_em7(k), v_em7(k), soc_em7_bnd(k), em7_esc, v_em7_bnd(k), ...
         bhat_em7_k, bbnd_em7_k, r0_em7(k), r0_em7_bnd(k)] = Em7SPKF( ...
         rom_voltage(k), i_profile(k), tc, ts, em7_esc);
+    if isfield(em7_esc, 'lastInnovationPre')
+        innov_pre_em7(k) = em7_esc.lastInnovationPre;
+    end
+    if isfield(em7_esc, 'lastSk')
+        sk_em7(k) = em7_esc.lastSk;
+    end
 
     soc_em7(k) = max(0, min(1, soc_em7(k)));
     bias_em7(k, :) = bhat_em7_k(:).';
@@ -426,13 +475,21 @@ fprintf('  EBiSPKF:               RMSE = %.4f, Max Error = %.4f\n', rmse_ebispkf
 fprintf('  Em7SPKF:               RMSE = %.4f, Max Error = %.4f\n', rmse_em7, max_error_em7);
 
 fprintf('\nBias / Innovation Diagnostics (error = ROM truth - estimate):\n');
-diag_cc = printEstimatorBiasMetrics('Coulomb Counting', error_cc, [], []);
-diag_ekf = printEstimatorBiasMetrics('ROM-EKF', error_ekf, v_error_ekf, v_ekf_bnd);
-diag_spkf = printEstimatorBiasMetrics('ESC-SPKF', error_spkf, v_error_spkf, v_spkf_bnd);
-diag_edukf = printEstimatorBiasMetrics('EDUKF', error_edukf, v_error_edukf, v_edukf_bnd);
-diag_esspkf = printEstimatorBiasMetrics('EsSPKF', error_esspkf, v_error_esspkf, v_esspkf_bnd);
-diag_ebispkf = printEstimatorBiasMetrics('EBiSPKF', error_ebispkf, v_error_ebispkf, v_ebispkf_bnd);
-diag_em7 = printEstimatorBiasMetrics('Em7SPKF', error_em7, v_error_em7, v_em7_bnd);
+diag_cc = printEstimatorBiasMetrics('Coulomb Counting', error_cc, [], [], []);
+diag_ekf = printEstimatorBiasMetrics('ROM-EKF', error_ekf, v_error_ekf, innov_pre_ekf, sk_ekf);
+diag_spkf = printEstimatorBiasMetrics('ESC-SPKF', error_spkf, v_error_spkf, innov_pre_spkf, sk_spkf);
+diag_edukf = printEstimatorBiasMetrics('EDUKF', error_edukf, v_error_edukf, innov_pre_edukf, sk_edukf);
+diag_esspkf = printEstimatorBiasMetrics('EsSPKF', error_esspkf, v_error_esspkf, innov_pre_esspkf, sk_esspkf);
+diag_ebispkf = printEstimatorBiasMetrics('EBiSPKF', error_ebispkf, v_error_ebispkf, innov_pre_ebispkf, sk_ebispkf);
+diag_em7 = printEstimatorBiasMetrics('Em7SPKF', error_em7, v_error_em7, innov_pre_em7, sk_em7);
+
+if InnovationACFPACFfigs
+    plotInnovationAcfPacf( ...
+        {innov_pre_ekf, innov_pre_spkf, innov_pre_edukf, innov_pre_esspkf, innov_pre_ebispkf, innov_pre_em7}, ...
+        {'ROM-EKF', 'ESC-SPKF', 'EDUKF', 'EsSPKF', 'EBiSPKF', 'Em7SPKF'}, ...
+        60, ...
+        'Pre-fit Innovation ACF/PACF (SOCestimatorsEval)');
+end
 
 %% STEP 6: Plotting
 % fprintf('\n===== STEP 6: Plotting =====\n');

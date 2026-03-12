@@ -83,6 +83,8 @@ L = SigmaXY / SigmaY;
 % PART 2: Measurement (Correction) update
 % State S2b: State estimate measurement update
 r = vk - yhat;
+esckfData.lastInnovationPre = r;
+esckfData.lastSk = max(real(SigmaY), eps);
 if r^2 > 100 * SigmaY
     L(:, 1) = 0;
     warning('10 std dev outlier');

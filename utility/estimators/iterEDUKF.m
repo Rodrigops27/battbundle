@@ -112,6 +112,8 @@ Lx = SigmaXZ / SigmaZ_state;
 % State filter:
 % State S2b: State estimate measurement update
 res_state = vk - zhat_state;
+esckfData.lastInnovationPre = res_state;
+esckfData.lastSk = max(real(SigmaZ_state), eps);
 if res_state^2 > 100 * SigmaZ_state
     Lx(:, 1) = 0;
     warning('10 std dev outlier');

@@ -45,6 +45,8 @@ L = SigmaX * Chat' / SigmaY;
 
 % Step 2b: Measurement update
 mu = yk - yhat;
+eaekfData.lastInnovationPre = mu;
+eaekfData.lastSk = max(real(SigmaY), eps);
 xhat = xminus + L * mu;
 xhat(hkInd) = min(1, max(-1, xhat(hkInd)));
 xhat(socInd) = min(1.05, max(-0.05, xhat(socInd)));
