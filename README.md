@@ -53,7 +53,6 @@ Both print:
 ## Additional Tools
 - `createROMSyntheticDataset.m`: builds/saves a reusable ROM synthetic dataset in `datasets/`.
 - `KFEval.m`: evaluates selected estimators on a saved dataset.
-- `studyInnovationNoiseSweep.m`: sweeps process/measurement noise and reports innovation behavior.
 - `plotInnovationAcfPacf.m`: helper to plot innovation ACF/PACF.
 - `SOCnVeval.m`: shared SOC/voltage evaluation helper.
 
