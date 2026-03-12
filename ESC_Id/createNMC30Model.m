@@ -8,7 +8,12 @@
 clear; clc; close all;
 
 script_dir = fileparts(mfilename('fullpath'));
-project_root = fileparts(fileparts(fileparts(fileparts(script_dir))));
+repo_root = fileparts(script_dir);
+
+% Use bnchmrk path setup (root + selected folders and subfolders).
+addpath(repo_root);
+addpath(genpath(fullfile(repo_root, 'utility')));
+addpath(genpath(fullfile(repo_root, 'ESC_Id')));
 
 fprintf('\n');
 fprintf('================================================================\n');
@@ -18,12 +23,30 @@ fprintf('================================================================\n\n');
 %% SETTINGS
 tc_ref = 25;                      % Temperature [°C]
 nmc30_capacity = 30;              % Capacity [Ah]
-rom_file = fullfile(project_root, 'src', 'MPC-EKF4FastCharge', 'ROM_NMC30_HRA12.mat');
+rom_candidates = {
+    fullfile(repo_root, 'models', 'ROM_NMC30_HRA12.mat')
+    fullfile(repo_root, 'models', 'ROM_NMC30_HRA.mat')
+    fullfile(script_dir, 'ROM_NMC30_HRA12.mat')
+    fullfile(script_dir, 'ROM_NMC30_HRA.mat')
+};
+rom_file = '';
+for i = 1:numel(rom_candidates)
+    if exist(rom_candidates{i}, 'file')
+        rom_file = rom_candidates{i};
+        break;
+    end
+end
+if isempty(rom_file)
+    error(['ROM file not found. Expected one of:\n  %s\n', ...
+           'Tip: in MATLAB use "Set Path > Add with Subfolders" on bnchmrk root.'], ...
+          strjoin(rom_candidates, '\n  '));
+end
 
 %% STEP 1: Load ROM and extract NMC30 OCV at 25°C
 fprintf('Step 1: Load ROM and extract NMC30 OCV\n');
 rom_data = load(rom_file, 'ROM');
 ROM = rom_data.ROM;
+fprintf('  Loaded ROM from: %s\n', rom_file);
 Tk = tc_ref + 273.15;
 
 % Create SOC grid
