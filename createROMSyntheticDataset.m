@@ -1,5 +1,5 @@
 function dataset = createROMSyntheticDataset(savePath, cfg)
-% createROMSyntheticDataset Build and optionally save ROM synthetic signals.
+% createROMSyntheticDataset Build and optionally save the legacy 90-10 ROM dataset.
 % Signals saved for reusable KF evaluation:
 %   time_s, current_a, voltage_v, temperature_c, soc_true, soc_cc
 %
@@ -10,8 +10,10 @@ function dataset = createROMSyntheticDataset(savePath, cfg)
 
 script_fullpath = mfilename('fullpath');
 script_dir = fileparts(script_fullpath);
-project_root = fileparts(fileparts(fileparts(script_dir)));
-esc_id_root = fullfile(script_dir, 'ESC_Id');
+synthm_dir = fullfile(script_dir, 'Synthm');
+if exist(synthm_dir, 'dir') == 7
+    addpath(synthm_dir);
+end
 
 if nargin < 1 || isempty(savePath)
     savePath = fullfile(script_dir, 'datasets', 'rom_script1_dataset.mat');
@@ -24,86 +26,36 @@ if ~isfield(cfg, 'soc_init'), cfg.soc_init = 100; end
 if ~isfield(cfg, 'tc'), cfg.tc = 25; end
 if ~isfield(cfg, 'ts'), cfg.ts = 1; end
 
-rom_file = firstExistingFile({ ...
-    fullfile(script_dir, 'models', 'ROM_NMC30_HRA12.mat'), ...
-    fullfile(script_dir, 'ROM_NMC30_HRA12.mat'), ...
-    fullfile(project_root, 'models', 'ROM_NMC30_HRA12.mat'), ...
-    fullfile(project_root, 'src', 'MPC-EKF4FastCharge', 'ROM_NMC30_HRA12.mat')}, ...
-    'createROMSyntheticDataset:MissingROMFile', ...
-    'No ROM model file found.');
-
-esc_model_file = firstExistingFile({ ...
-    fullfile(script_dir, 'models', 'NMC30model.mat'), ...
-    fullfile(script_dir, 'NMC30model.mat'), ...
-    fullfile(esc_id_root, 'NMC30model.mat'), ...
-    fullfile(project_root, 'models', 'NMC30model.mat')}, ...
-    'createROMSyntheticDataset:MissingESCModel', ...
-    'No NMC30 full ESC model found.');
-
-rom_data = load(rom_file);
-ROM = rom_data.ROM;
-
-esc_data = load(esc_model_file);
-model = esc_data.nmc30_model;
-if ~isfield(model, 'RCParam')
-    error('createROMSyntheticDataset:MissingRCParam', ...
-        'Loaded ESC model is not full: RCParam is missing.');
-end
-
-capacity_ah = model.QParam;
+capacity_ah = loadNMC30Capacity(script_dir);
 i_1c = capacity_ah;
 [current_a, step_id] = buildScript1Profile(i_1c, capacity_ah, cfg.ts);
 current_a = current_a(:);
 time_s = (0:numel(current_a)-1).' * cfg.ts;
-temperature_c = cfg.tc * ones(numel(current_a), 1);
 
-voltage_v = NaN(numel(time_s), 1);
-soc_true = NaN(numel(time_s), 1);
-soc_true(1) = cfg.soc_init / 100;
-rom_state = [];
-init_cfg = struct('SOC0', cfg.soc_init, 'warnOff', true);
+sim_cfg = struct( ...
+    'dataset_name', 'ROM script-1 synthetic dataset', ...
+    'soc_init', cfg.soc_init, ...
+    'tc', cfg.tc, ...
+    'ts', cfg.ts, ...
+    'time_s', time_s, ...
+    'step_id', step_id(:), ...
+    'savePath', savePath);
 
-for k = 1:numel(time_s)
-    if k == 1
-        [voltage_v(k), ~, rom_state] = OB_step(current_a(k), cfg.tc, [], ROM, init_cfg);
-        soc_true(k) = cfg.soc_init / 100;
-    else
-        [voltage_v(k), ~, rom_state] = OB_step(current_a(k), cfg.tc, rom_state, ROM, []);
-        soc_true(k) = soc_true(k-1) - (current_a(k) * cfg.ts) / (3600 * capacity_ah);
-        soc_true(k) = max(0, min(1, soc_true(k)));
-    end
+dataset = simulateROMProfile(current_a, sim_cfg);
 end
 
-soc_cc = NaN(size(soc_true));
-soc_cc(1) = cfg.soc_init / 100;
-for k = 2:numel(soc_cc)
-    soc_cc(k) = soc_cc(k-1) - (current_a(k) * cfg.ts) / (3600 * capacity_ah);
-    soc_cc(k) = max(0, min(1, soc_cc(k)));
-end
+function capacity_ah = loadNMC30Capacity(script_dir)
+esc_id_root = fullfile(script_dir, 'ESC_Id');
+esc_model_file = firstExistingFile({ ...
+    fullfile(script_dir, 'models', 'NMC30model.mat'), ...
+    fullfile(script_dir, 'NMC30model.mat'), ...
+    fullfile(esc_id_root, 'NMC30model.mat')}, ...
+    'createROMSyntheticDataset:MissingESCModel', ...
+    'No NMC30 full ESC model found.');
 
-dataset = struct();
-dataset.name = 'ROM script-1 synthetic dataset';
-dataset.created_on = datestr(now, 'yyyy-mm-dd HH:MM:SS');
-dataset.soc_init_percent = cfg.soc_init;
-dataset.ts = cfg.ts;
-dataset.time_s = time_s;
-dataset.current_a = current_a;
-dataset.voltage_v = voltage_v;
-dataset.temperature_c = temperature_c;
-dataset.soc_true = soc_true;
-dataset.soc_cc = soc_cc;
-dataset.capacity_ah = capacity_ah;
-dataset.step_id = step_id(:);
-dataset.rom_file = rom_file;
-dataset.esc_model_file = esc_model_file;
-
-if ~isempty(savePath)
-    out_dir = fileparts(savePath);
-    if ~isempty(out_dir) && ~exist(out_dir, 'dir')
-        mkdir(out_dir);
-    end
-    save(savePath, 'dataset');
-end
+esc_data = load(esc_model_file);
+model = esc_data.nmc30_model;
+capacity_ah = model.QParam;
 end
 
 function file_path = firstExistingFile(candidates, error_id, error_msg)

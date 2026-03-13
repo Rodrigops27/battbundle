@@ -52,9 +52,31 @@ Both print:
 
 ## Additional Tools
 - `createROMSyntheticDataset.m`: builds/saves a reusable ROM synthetic dataset in `datasets/`.
+- `Synthm/simulateROMProfile.m`: shared ROM playback engine for synthetic profile simulation.
+- `Synthm/createBusCoreBatterySyntheticDataset.m`: builds the bus-coreBattery-driven ROM dataset.
 - `KFEval.m`: evaluates selected estimators on a saved dataset.
 - `plotInnovationAcfPacf.m`: helper to plot innovation ACF/PACF.
 - `SOCnVeval.m`: shared SOC/voltage evaluation helper.
+
+## ROM / KF Conventions
+The ROM simulator and Kalman-filter evaluation scripts currently use the same external convention:
+
+- Current sign: `+I = discharge`, `-I = charge`.
+- SOC behavior: positive current reduces SOC.
+- SOC units: script inputs such as `soc_init` and `SOC0` are in percent, while most internal estimator/model SOC states are normalized to `[0, 1]`.
+- Temperature at script/filter interfaces is in `degC`; lower-level ROM/physics code converts to Kelvin internally where needed.
+- Voltage is terminal cell voltage in volts.
+
+This convention is consistent across the main ROM/ESC paths used in this repo, including:
+
+- `utility/OB_step.m`
+- `utility/NB_step.m`
+- `ESC_Id/ModelMgmt/simCell.m`
+- `utility/ESCmgmt/simCell.m`
+- `utility/iterEKF.m`
+- `utility/iterSPKF.m`
+
+For imported source datasets, `Synthm/createBusCoreBatterySyntheticDataset.m` explicitly reorients/scales the profile so the generated ROM dataset also follows the same convention.
 
 ## Reproduce a "Validated Bundle" Result
 Use this checklist to reproduce and freeze a validated result set:
