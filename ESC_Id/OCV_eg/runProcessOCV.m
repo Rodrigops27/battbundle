@@ -13,6 +13,7 @@
 % Management Systems, Volume I, Battery Modeling," Artech House, 2015.
 
 clear all
+ocvMethod = 'resistanceBlend'; % Alternatives: 'resistanceBlend', 'diagAverage'
 cellIDs = {'A123','ATL','E1','E2','P14','SAM'}; % Identifiers for each cell
 % data files for each cell available at these temperatures
 temps = {[-25 -15 -5 5 15 25 35 45], ... % A123
@@ -59,7 +60,17 @@ for theID = 1:length(cellIDs), % loop over all cells
     data(k).script4 = OCVData.script4;
   end
 
-  % then, call "processOCV" to do the actual data processing
-  model = processOCV(data,cellID,minV(theID),maxV(theID),1);
-  save(sprintf('%smodel-ocv.mat',cellID),'model'); % save model file
+  % then, call the selected OCV processor to do the actual data processing
+  switch lower(ocvMethod)
+    case 'resistanceblend'
+      model = processOCV(data,cellID,minV(theID),maxV(theID),1);
+      outputFile = sprintf('%smodel-ocv.mat',cellID);
+    case 'diagaverage'
+      model = DiagProcessOCV(data,cellID,minV(theID),maxV(theID),1);
+      outputFile = sprintf('%smodel-ocv-diag.mat',cellID);
+    otherwise
+      error('Unsupported ocvMethod "%s". Use "resistanceBlend" or "diagAverage".', ...
+        ocvMethod);
+  end
+  save(outputFile,'model'); % save model file
 end

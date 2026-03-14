@@ -58,6 +58,23 @@ Both print:
 - `plotInnovationAcfPacf.m`: helper to plot innovation ACF/PACF.
 - `SOCnVeval.m`: shared SOC/voltage evaluation helper.
 
+## OMTLIFE 8 Ah ESC Identification
+The repo now includes a first-pass ESC identification path for the `OMTLIFE8AHC-HP` dataset under `ESC_Id/Datasets/OMTLIFE8AHC-HP`.
+
+- `ESC_Id/patchLfpOcvInterpTail.m`: patches the high-SOC tail of `LFP_OCV_interp.mat` before OCV fitting.
+- `ESC_Id/OCV_eg/DiagProcessOCV.m`: alternate OCV characterization method based on diagonal averaging of charge and discharge curves.
+- `ESC_Id/OMTLIFEocv.m`: builds a 25 degC OCV-only ESC model from the patched `LFP_OCV_interp.mat` and saves `ESC_Id/OMTLIFEmodel-ocv-diag.mat`.
+- `ESC_Id/OMTdynId.m`: performs dynamic ESC identification directly on `Bus_CoreBatteryData_Data.mat`, fitting `R0`, two RC pairs, and hysteresis at 25 degC, and saves `ESC_Id/OMTLIFEmodel.mat`.
+
+Current assumptions for this path:
+
+- single-temperature identification at `25 degC`
+- nominal capacity `8 Ah` unless explicitly overridden
+- direct use of measured current and voltage from the bus-core battery dataset
+- current reoriented to the repo convention `+I = discharge`, `-I = charge`
+
+This OMTLIFE workflow is separate from the NMC30 ROM-based identification path and does not require a ROM model.
+
 ## ROM / KF Conventions
 The ROM simulator and Kalman-filter evaluation scripts currently use the same external convention:
 
