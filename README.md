@@ -1,137 +1,115 @@
-# SOC Estimator Validation Bundle (NMC30)
+# SOC ESC Identification and Benchmark Toolchain
 
-Validated estimator/model bundle tied to this benchmark suite version.
+This repository is a MATLAB toolchain for ESC battery-model identification, validation, and estimator benchmarking.
 
-## Repository Layout
-- `SOCestimatorsEval.m`: main validation run (ROM-EKF, ESC-SPKF, EDUKF, EsSPKF, EBiSPKF, Em7SPKF).
-- `runNMC30SOCComparison.m`: alternate validation run (EaEKF variant instead of EDUKF).
-- `utility/`: estimator/core MATLAB functions.
-- `models/`: required ROM and ESC model bundles (`.mat`).
-- `ESC_Id/`: model identification/regeneration workflow scripts.
-- `assets/`: saved figures.
+The workflow is:
 
-## Dependencies and Setup
-1. MATLAB (recommended: R2023a or newer).
-2. Required model files must exist:
-   - `models/ROM_NMC30_HRA12.mat`
-   - `models/NMC30model.mat`
-3. Start MATLAB in repo root and set paths:
+1. Identify ESC model parameters from OCV data and dynamic current-voltage data.
+2. Validate the model with voltage-focused metrics such as RMSE and mean error.
+3. Pair the model with several estimators and benchmark them on representative datasets.
+4. Use the benchmark results to promote the best model and estimator combination for the target application.
 
-```matlab
-repoRoot = pwd;  % run from bnchmrk root
-addpath(repoRoot);
-addpath(genpath(fullfile(repoRoot, "utility")));
-addpath(genpath(fullfile(repoRoot, "ESC_Id")));
-```
+The evaluation layer also supports robustness studies such as different SOC initialization, sensor-noise injection, and sensor-fault injection.
 
-Notes:
-- Scripts already search several fallback locations for model files.
-- If `models/NMC30model.mat` is missing, regenerate via `ESC_Id/createNMC30Model.m` then `ESC_Id/fullParameterIdentificationNMC30.m`.
-- `ESC_Id/createNMC30Model.m` loads ROM from `models/ROM_NMC30_HRA12.mat` (with local fallbacks).
+## Project Aim
 
-## How to Run Validation
-Run either script from MATLAB command window:
+The toolchain is intended to support:
 
-```matlab
-SOCestimatorsEval
-```
+1. ESC parameter identification
+   - Prefer OCV data plus dynamic datasets spanning diverse C-rates.
+   - Prefer charge and discharge coverage, ideally across roughly 10% to 90% SOC.
+2. Model validation
+   - Validate the identified model before estimator benchmarking.
+   - Focus on voltage RMSE and mean voltage bias error.
+3. Model-estimator pairing and benchmarking
+   - Evaluate which estimator works best for a given ESC model and dataset.
+   - Support both diverse-C-rate datasets and application-specific duty cycles.
+   - Study sensitivity to SOC initialization error.
+   - Run additional injected-noise and injected-fault tests in the evaluation layer.
+4. Selection for deployment
+   - Promote the best model (chemestry) and estimator for the required application.
 
-or
+## Repository Structure
 
-```matlab
-runNMC30SOCComparison
-```
+- `ESC_Id/`: ESC identification and regeneration scripts.
+  - OCV processing and dynamic parameter identification live here.
+  - Includes NMC30 and OMTLIFE-oriented identification flows.
+- `estimators/`: estimator implementations and initializers.
+  - EKF, SPKF, adaptive, bias-aware, and R0-tracking variants.
+- `Evaluation/`: model validation, estimator benchmarking, and robustness studies.
+  - Structured benchmark runner, initial-SOC sweeps, injected-noise/fault studies, and plotting helpers.
+- `models/`: released ESC and ROM model artifacts (`.mat`).
+- `utility/`: shared helper functions used by the identification and estimator layers.
+- `ESC Modelling Data/`: source data and supporting modelling assets.
+- `assets/`: saved figures and report artifacts.
 
-Both print:
-- SOC RMSE and max error per estimator.
-- Bias/innovation diagnostics:
-  - Mean Voltage Bias Error
-  - Mean SOC Bias Error
-  - NIS (Normalized Innovation Squared)
-  - Innovation autocorrelation (lag-1) with 95% block-bootstrap CI
+## Toolchain Stages
 
-## Additional Tools
-- `createROMSyntheticDataset.m`: builds/saves a reusable ROM synthetic dataset in `datasets/`.
-- `Synthm/simulateROMProfile.m`: shared ROM playback engine for synthetic profile simulation.
-- `Synthm/createBusCoreBatterySyntheticDataset.m`: builds the bus-coreBattery-driven ROM dataset.
-- `KFEval.m`: evaluates selected estimators on a saved dataset.
-- `plotInnovationAcfPacf.m`: helper to plot innovation ACF/PACF.
-- `SOCnVeval.m`: shared SOC/voltage evaluation helper.
+### 1. ESC Identification
 
-## OMTLIFE 8 Ah ESC Identification
-The repo now includes a first-pass ESC identification path for the `OMTLIFE8AHC-HP` dataset under `ESC_Id/Datasets/OMTLIFE8AHC-HP`.
+The identification layer builds ESC models from OCV and dynamic data.
 
-- `ESC_Id/patchLfpOcvInterpTail.m`: patches the high-SOC tail of `LFP_OCV_interp.mat` before OCV fitting.
-- `ESC_Id/OCV_eg/DiagProcessOCV.m`: alternate OCV characterization method based on diagonal averaging of charge and discharge curves.
-- `ESC_Id/OMTLIFEocv.m`: builds a 25 degC OCV-only ESC model from the patched `LFP_OCV_interp.mat` and saves `ESC_Id/OMTLIFEmodel-ocv-diag.mat`.
-- `ESC_Id/OMTdynId.m`: performs dynamic ESC identification directly on `Bus_CoreBatteryData_Data.mat`, fitting `R0`, two RC pairs, and hysteresis at 25 degC, and saves `ESC_Id/OMTLIFEmodel.mat`.
+Relevant parametrization tools:
+- `ESC_Id/DiagProcessOCV.m`
+- `ESC_Id/processDynamic.m`
 
-Current assumptions for this path:
+#### 1.1 Model Validation
 
-- single-temperature identification at `25 degC`
-- nominal capacity `8 Ah` unless explicitly overridden
-- direct use of measured current and voltage from the bus-core battery dataset
-- current reoriented to the repo convention `+I = discharge`, `-I = charge`
+Model validation should happen before estimator benchmarking. In this repo, validation is primarily voltage-oriented and uses metrics such as:
+- Voltage RMSE
+- Mean voltage error / bias
 
-This OMTLIFE workflow is separate from the NMC30 ROM-based identification path and does not require a ROM model.
+### 2. Estimator Pairing and Benchmarking
 
-## ROM / KF Conventions
-The ROM simulator and Kalman-filter evaluation scripts currently use the same external convention:
+The ESC model is paired with multiple estimators and evaluated on a common dataset so the best estimator for that model/configuration can be identified.
+
+Current benchmark entry points:
+
+- `Evaluation/mainEval.m`
+  - Main structured benchmark entry point.
+  - Uses `Evaluation/xKFeval.m` as the generic evaluation engine.
+- `Evaluation/xKFeval.m`
+  - Core reusable evaluation runner for datasets plus initialized estimators.
+- `Evaluation/initSOCs/sweepInitSocStudy.m`
+  - Initial-SOC sensitivity study for the ESC estimator family.
+  - `Evaluation/initSOCs/runInitSocStudy.m`: convenience wrapper around `sweepInitSocStudy.m` with fixed defaults.
+- `Evaluation/tests/runInjTest.m`
+  - Noise-injection and fault-injection benchmark wrapper.
+
+### 3. Promotion of the Best Configuration
+
+The intended output of the toolchain is not just a fitted model or a single estimator result. The goal is to identify the best model-estimator pair for the required application profile and cell chemistry, then carry that pair forward.
+
+## Main Evaluation Entry Points
+
+- `Evaluation/mainEval.m`: primary estimator benchmark tested on the NMC30 ROM-based bus_coreBattery dataset.
+- `Evaluation/initSOCs/sweepInitSocStudy.m`: configurable SOC-initialization sweep.
+- `Evaluation/tests/runInjTest.m`: configurable injected-noise or injected-fault benchmark.
+- `Evaluation/plotInnovationAcfPacf.m`: innovation ACF/PACF plotting helper.
+- `Evaluation/printEstimatorBiasMetrics.m`: bias and innovation summary helper.
+
+## Dependencies
+
+1. MATLAB, recommended `R2023a` or newer.
+
+## Conventions
 
 - Current sign: `+I = discharge`, `-I = charge`.
-- SOC behavior: positive current reduces SOC.
-- SOC units: script inputs such as `soc_init` and `SOC0` are in percent, while most internal estimator/model SOC states are normalized to `[0, 1]`.
-- Temperature at script/filter interfaces is in `degC`; lower-level ROM/physics code converts to Kelvin internally where needed.
+- Positive current reduces SOC.
+- Script-level SOC inputs are often in percent, while internal ESC states typically use normalized SOC in `[0, 1]`.
+- Temperatures at the evaluation-layer interface are in `degC`.
 - Voltage is terminal cell voltage in volts.
 
-This convention is consistent across the main ROM/ESC paths used in this repo, including:
+## NMC30 Dynamic-Data Note
 
-- `utility/OB_step.m`
-- `utility/NB_step.m`
-- `ESC_Id/ModelMgmt/simCell.m`
-- `utility/ESCmgmt/simCell.m`
-- `utility/iterEKF.m`
-- `utility/iterSPKF.m`
+For the NMC30 ESC parameter identification flow, the dynamic dataset was generated from a ROM-based simulation path. That is a practical source of dynamic data, but it is not the only possible one.
 
-For imported source datasets, `Synthm/createBusCoreBatterySyntheticDataset.m` explicitly reorients/scales the profile so the generated ROM dataset also follows the same convention.
+In principle, the same identification procedure could be driven by an external model or higher-fidelity source, for example:
 
-## Reproduce a "Validated Bundle" Result
-Use this checklist to reproduce and freeze a validated result set:
-
-1. Freeze environment:
-   - MATLAB release
-   - OS version
-   - benchmark suite commit/version tag
-2. Freeze model artifacts by hashing:
-
-```powershell
-Get-FileHash .\models\ROM_NMC30_HRA12.mat -Algorithm SHA256
-Get-FileHash .\models\NMC30model.mat -Algorithm SHA256
-```
-
-3. Run a clean MATLAB session and capture logs:
-
-```matlab
-restoredefaultpath;
-repoRoot = "C:\Users\RodrigoPS\Documents\Prjcts\SOC\bnchmrk";
-cd(repoRoot);
-addpath(repoRoot);
-addpath(genpath(fullfile(repoRoot, "utility")));
-addpath(genpath(fullfile(repoRoot, "ESC_Id")));
-rng(0, "twister");  % keeps bootstrap-CI output deterministic
-diary(fullfile(repoRoot, "validation.log"));
-SOCestimatorsEval
-diary off;
-save(fullfile(repoRoot, "validation_workspace.mat"));
-```
-
-4. Archive together:
-   - `validation.log`
-   - `validation_workspace.mat`
-   - model hashes
-   - script name + commit/version tag
-5. Compare future runs against archived SOC metrics + bias/innovation diagnostics.
-
+- PyBaMM
+- COMSOL
+- another FOM or experimentally derived dynamic dataset
 
 ## License
-See [`LICENSE`](./LICENSE) for ROM estimator license scope and attribution requirements.
+
+See [`LICENSE`](./LICENSE) for license scope and attribution requirements.
