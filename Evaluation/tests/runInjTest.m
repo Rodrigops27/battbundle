@@ -9,6 +9,8 @@ function results = runInjTest(cfg)
 %   5. EbSPKF
 %   6. EsSPKF
 %
+% Summary figures include all listed filters, including ROM-EKF.
+%
 % Default saved test datasets:
 %   1. NMC30_noisInj_15mV_5pctA.mat
 %   2. NMC30_FaultInj_volt30mVG1mVO_curr1.1G0.1O.mat
@@ -74,6 +76,7 @@ estimators = buildEstimators(evalDataset.soc_init_kf, cfg, ROM, nmc30_esc);
 flags = struct();
 flags.SOCfigs = cfg.SOCfigs;
 flags.Vfigs = cfg.Vfigs;
+flags.Summaryfigs = cfg.Summaryfigs;
 flags.Biasfigs = cfg.Biasfigs;
 flags.R0figs = cfg.R0figs;
 flags.InnovationACFPACFfigs = cfg.InnovationACFPACFfigs;
@@ -94,6 +97,7 @@ cfg.soc_init_scale = getCfg(cfg, 'soc_init_scale', 1.05);
 
 cfg.SOCfigs = getCfg(cfg, 'SOCfigs', false);
 cfg.Vfigs = getCfg(cfg, 'Vfigs', false);
+cfg.Summaryfigs = getCfg(cfg, 'Summaryfigs', true);
 cfg.Biasfigs = getCfg(cfg, 'Biasfigs', true);
 cfg.R0figs = getCfg(cfg, 'R0figs', true);
 cfg.InnovationACFPACFfigs = getCfg(cfg, 'InnovationACFPACFfigs', true);
@@ -151,7 +155,7 @@ function tuning = defaultRunTuning()
 tuning = struct();
 tuning.nx_rom = 12;
 tuning.sigma_x0_rom_tail = 2e6;
-tuning.sigma_w_ekf = 1e2;
+tuning.sigma_w_ekf = 2e-2;
 tuning.sigma_v_ekf = 1e-3;
 tuning.SigmaX0_rc = 1e-6;
 tuning.SigmaX0_hk = 1e-6;
