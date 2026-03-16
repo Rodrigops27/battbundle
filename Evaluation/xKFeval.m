@@ -71,6 +71,7 @@ for idx = 1:n_estimators
     est_result.rmse_voltage = sqrt(mean(est_result.error_voltage(~isnan(est_result.error_voltage)).^2));
     est_result.me_soc = mean(est_result.error_soc(~isnan(est_result.error_soc)));
     est_result.me_voltage = mean(est_result.error_voltage(~isnan(est_result.error_voltage)));
+    est_result.kfDataFinal = est.kfData;
 
     estimators(idx) = est;
     results.estimators(idx) = est_result; %#ok<AGROW>
@@ -269,6 +270,7 @@ est_result.bias = NaN(n_samples, estimator.bias_dim);
 est_result.bias_bnd = NaN(n_samples, estimator.bias_dim);
 
 est_result.has_r0 = false;
+est_result.kfDataFinal = struct();
 if isfield(estimator, 'tracksR0') && estimator.tracksR0
     est_result.has_r0 = true;
 end
