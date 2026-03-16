@@ -2,8 +2,8 @@
 % Structured NMC30 benchmark entry point using the ROM bus_coreBattery dataset.
 
 clear;
-clear iterEKF iterESCSPKF iterESCEKF iterEaEKF iterEnacrSPKF;
-clear iterEsSPKF iterEbSPKF;
+clear iterEKF iterESCSPKF iterESCEKF iterEaEKF iterEacrSPKF iterEnacrSPKF;
+clear iterEDUKF iterEsSPKF iterEbSPKF iterEBiSPKF;
 
 if ~isdeployed
     here = fileparts(which(mfilename));
@@ -83,7 +83,7 @@ current_bias_var0 = 1e-5;
 single_bias_process_var = 1e-8;
 
 %% Estimator initialization
-estimators = repmat(estimatorTemplate(), 7, 1);
+estimators = repmat(estimatorTemplate(), 10, 1);
 
 estimators(1) = makeEstimator( ...
     'ROM-EKF', ...
@@ -106,26 +106,47 @@ estimators(4) = makeEstimator( ...
     @stepEaEkf, soc_init_kf, [0.93 0.69 0.13], '-.');
 
 estimators(5) = makeEstimator( ...
+    'EacrSPKF', ...
+    initESCSPKF(soc_init_kf, tc, SigmaX0, sigma_v_esc, sigma_w_esc, nmc30_esc), ...
+    @stepEacrSpkf, soc_init_kf, [0.49 0.18 0.56], '-');
+
+estimators(6) = makeEstimator( ...
     'EnacrSPKF', ...
     initESCSPKF(soc_init_kf, tc, SigmaX0, sigma_v_esc, sigma_w_esc, nmc30_esc), ...
     @stepEnacrSpkf, soc_init_kf, [0.47 0.67 0.19], '--');
 
-estimators(6) = makeEstimator( ...
+estimators(7) = makeEstimator( ...
+    'EDUKF', ...
+    initEDUKF(soc_init_kf, R0init, tc, SigmaX0, sigma_v_esc, sigma_w_esc, ...
+    SigmaR0, SigmaWR0, nmc30_esc), ...
+    @stepEdukf, soc_init_kf, [0.30 0.75 0.93], '-');
+estimators(7).tracksR0 = true;
+estimators(7).r0_init = estimators(7).kfData.R0hat;
+
+estimators(8) = makeEstimator( ...
     'EsSPKF', ...
     initEDUKF(soc_init_kf, R0init, tc, SigmaX0, sigma_v_esc, sigma_w_esc, ...
     SigmaR0, SigmaWR0, nmc30_esc), ...
     @stepEsSpkf, soc_init_kf, [0.13 0.55 0.13], '--');
-estimators(6).tracksR0 = true;
-estimators(6).r0_init = estimators(6).kfData.R0hat;
+estimators(8).tracksR0 = true;
+estimators(8).r0_init = estimators(8).kfData.R0hat;
 
-estimators(7) = makeEstimator( ...
+estimators(9) = makeEstimator( ...
     'EbSPKF', ...
     initEbSpkf(soc_init_kf, tc, SigmaX0, sigma_v_esc, sigma_w_esc, ...
     single_bias_process_var, current_bias_var0, nmc30_esc), ...
     @stepEbSpkf, soc_init_kf, [0.25 0.25 0.25], ':');
-estimators(7).bias_dim = 1;
-estimators(7).bias_init = estimators(7).kfData.xhat(estimators(7).kfData.ibInd);
-estimators(7).bias_bnd_init = 3 * sqrt(max(estimators(7).kfData.SigmaX(estimators(7).kfData.ibInd, estimators(7).kfData.ibInd), 0));
+estimators(9).bias_dim = 1;
+estimators(9).bias_init = estimators(9).kfData.xhat(estimators(9).kfData.ibInd);
+estimators(9).bias_bnd_init = 3 * sqrt(max(estimators(9).kfData.SigmaX(estimators(9).kfData.ibInd, estimators(9).kfData.ibInd), 0));
+
+estimators(10) = makeEstimator( ...
+    'EBiSPKF', ...
+    initEbiSpkf(soc_init_kf, tc, SigmaX0, sigma_v_esc, sigma_w_esc, current_bias_var0, nmc30_esc), ...
+    @stepEbiSpkf, soc_init_kf, [0.64 0.08 0.18], '-.');
+estimators(10).bias_dim = 1;
+estimators(10).bias_init = estimators(10).kfData.bhat(:).';
+estimators(10).bias_bnd_init = 3 * sqrt(max(diag(estimators(10).kfData.SigmaB), 0)).';
 
 %% Flags
 flags = struct();
@@ -184,9 +205,21 @@ function step = stepEaEkf(vk, ik, Tk, dt, kfData)
 step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
 end
 
+function step = stepEacrSpkf(vk, ik, Tk, dt, kfData)
+[soc, v_pred, soc_bnd, kfData, v_bnd] = iterEacrSPKF(vk, ik, Tk, dt, kfData);
+step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
+end
+
 function step = stepEnacrSpkf(vk, ik, Tk, dt, kfData)
 [soc, v_pred, soc_bnd, kfData, v_bnd] = iterEnacrSPKF(vk, ik, Tk, dt, kfData);
 step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
+end
+
+function step = stepEdukf(vk, ik, Tk, dt, kfData)
+[soc, v_pred, soc_bnd, kfData, v_bnd, r0_est, r0_bnd] = iterEDUKF(vk, ik, Tk, dt, kfData);
+step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
+step.r0 = r0_est;
+step.r0_bnd = r0_bnd;
 end
 
 function step = stepEsSpkf(vk, ik, Tk, dt, kfData)
@@ -198,6 +231,13 @@ end
 
 function step = stepEbSpkf(vk, ik, Tk, dt, kfData)
 [soc, v_pred, soc_bnd, kfData, v_bnd, ib_est, ib_bnd] = iterEbSPKF(vk, ik, Tk, dt, kfData);
+step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
+step.bias = ib_est;
+step.bias_bnd = ib_bnd;
+end
+
+function step = stepEbiSpkf(vk, ik, Tk, dt, kfData)
+[soc, v_pred, soc_bnd, kfData, v_bnd, ib_est, ib_bnd] = iterEBiSPKF(vk, ik, Tk, dt, kfData);
 step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
 step.bias = ib_est;
 step.bias_bnd = ib_bnd;
@@ -237,6 +277,15 @@ weight1 = (h * h - kfData.Na) / (h * h);
 weight2 = 1 / (2 * h * h);
 kfData.Wm = [weight1; weight2 * ones(2 * kfData.Na, 1)];
 kfData.Wc = kfData.Wm;
+end
+
+function kfData = initEbiSpkf(soc0, T0, SigmaX0, SigmaV, SigmaW, sigma_ib0, model)
+biasCfg = struct();
+biasCfg.nb = 1;
+biasCfg.bhat0 = 0;
+biasCfg.SigmaB0 = sigma_ib0;
+biasCfg.currentBiasInd = 1;
+kfData = initESCSPKF(soc0, T0, SigmaX0, SigmaV, SigmaW, model, biasCfg);
 end
 
 function dataset = loadOrBuildRomDataset(dataset_file, profile_file, tc)
