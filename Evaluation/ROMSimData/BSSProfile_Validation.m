@@ -261,10 +261,12 @@ if validation.has_voltage
     rom_voltage = dataset.voltage_v(:);
     voltage_error = source_voltage - rom_voltage;
     valid_voltage = isfinite(source_voltage) & isfinite(rom_voltage);
+    source_voltage_norm = normalizeFiniteSignal(source_voltage);
+    rom_voltage_norm = normalizeFiniteSignal(rom_voltage);
 
     figure('Name', sprintf('Profile Validation - Voltage - %s', cfg.validation_name), ...
         'NumberTitle', 'off');
-    tiledlayout(3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+    tiledlayout(4, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
 
     nexttile;
     plot(t, source_voltage, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Source voltage');
@@ -274,6 +276,16 @@ if validation.has_voltage
     xlabel('Time [s]');
     ylabel('Voltage [V]');
     title(sprintf('Voltage overlay (RMSE %.2f mV)', 1000 * validation.voltage_rmse));
+    legend('Location', 'best');
+
+    nexttile;
+    plot(t, source_voltage_norm, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Source voltage (normalized)');
+    hold on;
+    plot(t, rom_voltage_norm, 'r--', 'LineWidth', 1.3, 'DisplayName', 'ROM voltage (normalized)');
+    grid on;
+    xlabel('Time [s]');
+    ylabel('Normalized V [-]');
+    title('Normalized voltage overlay');
     legend('Location', 'best');
 
     nexttile;
@@ -393,4 +405,24 @@ end
 rmse_val = sqrt(mean(error_vec.^2));
 mean_val = mean(error_vec);
 max_abs_val = max(abs(error_vec));
+end
+
+function normalized = normalizeFiniteSignal(signal)
+normalized = NaN(size(signal));
+valid = isfinite(signal);
+if ~any(valid)
+    return;
+end
+
+signal_valid = signal(valid);
+signal_min = min(signal_valid);
+signal_max = max(signal_valid);
+scale = signal_max - signal_min;
+
+if scale <= eps(max(1, abs(signal_max)))
+    normalized(valid) = 0;
+    return;
+end
+
+normalized(valid) = (signal_valid - signal_min) / scale;
 end

@@ -3,10 +3,11 @@ function dataset = createBusCoreBatterySyntheticDataset(savePath, cfg)
 
 script_fullpath = mfilename('fullpath');
 script_dir = fileparts(script_fullpath);
-project_root = fileparts(script_dir);
+evaluation_root = fileparts(script_dir);
+repo_root = fileparts(evaluation_root);
 
 if nargin < 1 || isempty(savePath)
-    savePath = fullfile(project_root, 'datasets', 'rom_bus_coreBattery_dataset.mat');
+    savePath = fullfile(script_dir, 'datasets', 'rom_bus_coreBattery_dataset.mat');
 end
 if nargin < 2 || isempty(cfg)
     cfg = struct();
@@ -15,7 +16,7 @@ end
 if ~isfield(cfg, 'tc') || isempty(cfg.tc), cfg.tc = 25; end
 if ~isfield(cfg, 'soc_init'), cfg.soc_init = []; end
 if ~isfield(cfg, 'profile_file') || isempty(cfg.profile_file)
-    cfg.profile_file = fullfile(project_root, 'ESC_Id', 'Datasets', 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat');
+    cfg.profile_file = fullfile(evaluation_root, 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat');
 end
 if ~isfield(cfg, 'source_capacity_ah'), cfg.source_capacity_ah = []; end
 if ~isfield(cfg, 'original_capacity_ah'), cfg.original_capacity_ah = []; end
@@ -34,8 +35,8 @@ profile = loadBusCoreBatteryProfile(cfg.profile_file);
     profile.current_a, profile.time_s, profile.soc_ref, cfg);
 profile.current_a = source_current_a(:);
 
-target_capacity_ah = loadNMC30Capacity(project_root);
-target_ts = loadROMSampleTime(project_root);
+target_capacity_ah = loadNMC30Capacity(repo_root);
+target_ts = loadROMSampleTime(repo_root);
 profile = resampleProfile(profile, target_ts);
 source_current_a = profile.current_a(:);
 
@@ -96,11 +97,11 @@ sim_cfg = struct( ...
 dataset = simulateROMProfile(target_current_a(:), sim_cfg);
 end
 
-function capacity_ah = loadNMC30Capacity(project_root)
-esc_id_root = fullfile(project_root, 'ESC_Id');
+function capacity_ah = loadNMC30Capacity(repo_root)
+esc_id_root = fullfile(repo_root, 'ESC_Id');
 esc_model_file = firstExistingFile({ ...
-    fullfile(project_root, 'models', 'NMC30model.mat'), ...
-    fullfile(project_root, 'NMC30model.mat'), ...
+    fullfile(repo_root, 'models', 'NMC30model.mat'), ...
+    fullfile(repo_root, 'NMC30model.mat'), ...
     fullfile(esc_id_root, 'NMC30model.mat')}, ...
     'createBusCoreBatterySyntheticDataset:MissingESCModel', ...
     'No NMC30 full ESC model found.');
@@ -110,10 +111,10 @@ model = esc_data.nmc30_model;
 capacity_ah = double(model.QParam);
 end
 
-function ts = loadROMSampleTime(project_root)
+function ts = loadROMSampleTime(repo_root)
 rom_file = firstExistingFile({ ...
-    fullfile(project_root, 'models', 'ROM_NMC30_HRA12.mat'), ...
-    fullfile(project_root, 'ROM_NMC30_HRA12.mat')}, ...
+    fullfile(repo_root, 'models', 'ROM_NMC30_HRA12.mat'), ...
+    fullfile(repo_root, 'ROM_NMC30_HRA12.mat')}, ...
     'createBusCoreBatterySyntheticDataset:MissingROMFile', ...
     'No ROM model file found.');
 
@@ -185,13 +186,21 @@ if exist(input_path, 'file') == 2
 end
 script_fullpath = mfilename('fullpath');
 script_dir = fileparts(script_fullpath);
-project_root = fileparts(script_dir);
-candidate = fullfile(project_root, input_path);
-if exist(candidate, 'file') == 2
-    local_path = candidate;
-else
-    local_path = input_path;
+evaluation_root = fileparts(script_dir);
+repo_root = fileparts(evaluation_root);
+
+candidates = { ...
+    fullfile(script_dir, input_path), ...
+    fullfile(evaluation_root, input_path), ...
+    fullfile(repo_root, input_path)};
+
+for idx = 1:numel(candidates)
+    if exist(candidates{idx}, 'file') == 2
+        local_path = candidates{idx};
+        return;
+    end
 end
+local_path = input_path;
 end
 
 function primary = choosePrimaryNode(raw)
