@@ -11,7 +11,8 @@ function sweepResults = sweepNoiseStudy(sigmaWRange, sigmaVRange, stepMultiplier
 %   sigmaVRange     Two-element [min max] sensor-noise range. Default [1e-3 1e1].
 %   stepMultiplier  Multiplicative step between sweep points. Default 5.
 %   cfg             Optional struct. Useful fields:
-%                     tc, ts, dataset_mode, NoiseSummaryfigs,
+%                     tc, ts, dataset_mode, sweep_mode,
+%                     fixed_sigma_w, fixed_sigma_v, NoiseSummaryfigs,
 %                     PlotSocRmsefigs, PlotVoltageRmsefigs,
 %                     rom_dataset_file, raw_bus_file, rom_file,
 %                     esc_model_file, tuning
@@ -50,8 +51,7 @@ repo_root = fileparts(fileparts(here));
 addpath(genpath(repo_root));
 
 cfg = normalizeStudyConfig(cfg, repo_root);
-sigma_w_values = buildLogLikeSweep(sigmaWRange, stepMultiplier);
-sigma_v_values = buildLogLikeSweep(sigmaVRange, stepMultiplier);
+[sigma_w_values, sigma_v_values] = buildSweepAxes(cfg, sigmaWRange, sigmaVRange, stepMultiplier);
 
 rom_src = load(cfg.rom_file);
 esc_src = load(cfg.esc_model_file);
@@ -105,6 +105,7 @@ end
 summary_table = buildSummaryTable(estimator_names, sigma_w_values, sigma_v_values, soc_rmse, voltage_rmse, soc_me, voltage_me);
 
 fprintf('\nNoise-covariance sweep summary (%s dataset)\n', upper(cfg.dataset_mode));
+fprintf('Sweep mode: %s\n', upper(cfg.sweep_mode));
 fprintf('sigma_w range: %s\n', formatSweepVector(sigma_w_values));
 fprintf('sigma_v range: %s\n', formatSweepVector(sigma_v_values));
 disp(summary_table);
@@ -120,17 +121,18 @@ for est_idx = 1:n_estimators
 end
 
 if cfg.NoiseSummaryfigs
-    plotAggregateNoiseFigures(sigma_w_values, sigma_v_values, soc_rmse, voltage_rmse, estimator_names);
+    plotAggregateNoiseFigures(sigma_w_values, sigma_v_values, soc_rmse, voltage_rmse, estimator_names, cfg.sweep_mode);
 end
 if cfg.PlotSocRmsefigs
-    plotPerEstimatorHeatmaps(sigma_w_values, sigma_v_values, soc_rmse, estimator_names, 'SOC RMSE [%]', 'SOC');
+    plotPerEstimatorPerformanceFigures(sigma_w_values, sigma_v_values, soc_rmse, estimator_names, 'SOC RMSE [%]', 'SOC', cfg.sweep_mode);
 end
 if cfg.PlotVoltageRmsefigs
-    plotPerEstimatorHeatmaps(sigma_w_values, sigma_v_values, voltage_rmse, estimator_names, 'Voltage RMSE [mV]', 'Voltage');
+    plotPerEstimatorPerformanceFigures(sigma_w_values, sigma_v_values, voltage_rmse, estimator_names, 'Voltage RMSE [mV]', 'Voltage', cfg.sweep_mode);
 end
 
 sweepResults = struct();
 sweepResults.dataset_mode = cfg.dataset_mode;
+sweepResults.sweep_mode = cfg.sweep_mode;
 sweepResults.sigma_w_values = sigma_w_values(:);
 sweepResults.sigma_v_values = sigma_v_values(:);
 sweepResults.estimator_names = estimator_names;
@@ -155,6 +157,9 @@ tuning_defaults = defaultNoiseTuning();
 cfg.tc = getCfg(cfg, 'tc', 25);
 cfg.ts = getCfg(cfg, 'ts', 1);
 cfg.dataset_mode = getCfg(cfg, 'dataset_mode', 'rom');
+cfg.sweep_mode = lower(getCfg(cfg, 'sweep_mode', 'grid'));
+cfg.fixed_sigma_w = getCfg(cfg, 'fixed_sigma_w', 1e-3);
+cfg.fixed_sigma_v = getCfg(cfg, 'fixed_sigma_v', 1e-3);
 cfg.NoiseSummaryfigs = getCfg(cfg, 'NoiseSummaryfigs', false);
 cfg.PlotSocRmsefigs = getCfg(cfg, 'PlotSocRmsefigs', true);
 cfg.PlotVoltageRmsefigs = getCfg(cfg, 'PlotVoltageRmsefigs', true);
@@ -176,6 +181,23 @@ cfg.esc_model_file = getCfg(cfg, 'esc_model_file', ...
     'No NMC30 ESC model file found.'));
 cfg.tuning = getCfg(cfg, 'tuning', tuning_defaults);
 cfg.tuning = mergeStructDefaults(cfg.tuning, tuning_defaults);
+end
+
+function [sigma_w_values, sigma_v_values] = buildSweepAxes(cfg, sigmaWRange, sigmaVRange, stepMultiplier)
+switch cfg.sweep_mode
+    case 'sigma_w'
+        sigma_w_values = buildLogLikeSweep(sigmaWRange, stepMultiplier);
+        sigma_v_values = cfg.fixed_sigma_v;
+    case 'sigma_v'
+        sigma_w_values = cfg.fixed_sigma_w;
+        sigma_v_values = buildLogLikeSweep(sigmaVRange, stepMultiplier);
+    case 'grid'
+        sigma_w_values = buildLogLikeSweep(sigmaWRange, stepMultiplier);
+        sigma_v_values = buildLogLikeSweep(sigmaVRange, stepMultiplier);
+    otherwise
+        error('sweepNoiseStudy:BadSweepMode', ...
+            'cfg.sweep_mode must be "sigma_w", "sigma_v", or "grid".');
+end
 end
 
 function tuning = defaultNoiseTuning()
@@ -791,36 +813,59 @@ else
 end
 end
 
-function plotAggregateNoiseFigures(sigma_w_values, sigma_v_values, soc_rmse, voltage_rmse, estimator_names)
+function plotAggregateNoiseFigures(sigma_w_values, sigma_v_values, soc_rmse, voltage_rmse, estimator_names, sweep_mode)
 palette = lines(numel(estimator_names));
+
+if strcmp(sweep_mode, 'sigma_v')
+    x_values = sigma_v_values;
+    x_label = '\sigma_v';
+    soc_source = @() squeeze(meanOverDim1OmitNan(soc_rmse(:, :, :)));
+    v_source = @() squeeze(meanOverDim1OmitNan(voltage_rmse(:, :, :)));
+else
+    x_values = sigma_w_values;
+    x_label = '\sigma_w';
+    soc_source = @() squeeze(meanOverDim2OmitNan(soc_rmse(:, :, :)));
+    v_source = @() squeeze(meanOverDim2OmitNan(voltage_rmse(:, :, :)));
+end
+
+soc_curves = soc_source();
+v_curves = v_source();
 
 figure('Name', 'Noise Sweep - Mean SOC RMSE', 'NumberTitle', 'off');
 hold on;
 for est_idx = 1:numel(estimator_names)
-    curve = squeeze(meanOverDim2OmitNan(soc_rmse(:, :, est_idx)));
-    semilogx(sigma_w_values, curve, '-o', ...
+    semilogx(x_values, soc_curves(:, est_idx), '-o', ...
         'LineWidth', 1.4, 'Color', palette(est_idx, :), ...
         'DisplayName', estimator_names{est_idx});
 end
 grid on;
-xlabel('\sigma_w');
+xlabel(x_label);
 ylabel('Mean SOC RMSE [%]');
-title('Noise Sweep Mean SOC RMSE vs \sigma_w');
+title(sprintf('Noise Sweep Mean SOC RMSE vs %s', x_label));
 legend('Location', 'best');
 
 figure('Name', 'Noise Sweep - Mean Voltage RMSE', 'NumberTitle', 'off');
 hold on;
 for est_idx = 1:numel(estimator_names)
-    curve = squeeze(meanOverDim2OmitNan(voltage_rmse(:, :, est_idx)));
-    semilogx(sigma_w_values, curve, '-o', ...
+    semilogx(x_values, v_curves(:, est_idx), '-o', ...
         'LineWidth', 1.4, 'Color', palette(est_idx, :), ...
         'DisplayName', estimator_names{est_idx});
 end
 grid on;
-xlabel('\sigma_w');
+xlabel(x_label);
 ylabel('Mean Voltage RMSE [mV]');
-title('Noise Sweep Mean Voltage RMSE vs \sigma_w');
+title(sprintf('Noise Sweep Mean Voltage RMSE vs %s', x_label));
 legend('Location', 'best');
+end
+
+function plotPerEstimatorPerformanceFigures(sigma_w_values, sigma_v_values, data_cube, estimator_names, colorbar_label, figure_prefix, sweep_mode)
+if numel(sigma_w_values) > 1 && numel(sigma_v_values) > 1
+    plotPerEstimatorHeatmaps(sigma_w_values, sigma_v_values, data_cube, estimator_names, colorbar_label, figure_prefix);
+elseif strcmp(sweep_mode, 'sigma_v')
+    plotPerEstimatorCurves(sigma_v_values, squeeze(data_cube(1, :, :)), estimator_names, colorbar_label, figure_prefix, '\sigma_v');
+else
+    plotPerEstimatorCurves(sigma_w_values, squeeze(data_cube(:, 1, :)), estimator_names, colorbar_label, figure_prefix, '\sigma_w');
+end
 end
 
 function plotPerEstimatorHeatmaps(sigma_w_values, sigma_v_values, data_cube, estimator_names, colorbar_label, figure_prefix)
@@ -838,6 +883,17 @@ for est_idx = 1:numel(estimator_names)
     xticklabels(formatTickLabels(sigma_v_values));
     yticks(log10(sigma_w_values));
     yticklabels(formatTickLabels(sigma_w_values));
+end
+end
+
+function plotPerEstimatorCurves(x_values, data_matrix, estimator_names, y_label, figure_prefix, x_label)
+for est_idx = 1:numel(estimator_names)
+    figure('Name', sprintf('%s - %s', figure_prefix, estimator_names{est_idx}), 'NumberTitle', 'off');
+    semilogx(x_values, data_matrix(:, est_idx), '-o', 'LineWidth', 1.4);
+    grid on;
+    xlabel(x_label);
+    ylabel(y_label);
+    title(sprintf('%s Sweep - %s', figure_prefix, estimator_names{est_idx}));
 end
 end
 
@@ -861,6 +917,13 @@ function values = meanOverDim2OmitNan(data)
 valid_counts = sum(isfinite(data), 2);
 data(~isfinite(data)) = 0;
 values = sum(data, 2) ./ max(valid_counts, 1);
+values(valid_counts == 0) = NaN;
+end
+
+function values = meanOverDim1OmitNan(data)
+valid_counts = sum(isfinite(data), 1);
+data(~isfinite(data)) = 0;
+values = sum(data, 1) ./ max(valid_counts, 1);
 values(valid_counts == 0) = NaN;
 end
 
