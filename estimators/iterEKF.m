@@ -746,7 +746,11 @@ ekfData.priorI = ik;
         elseif strcmpi(msg,'off')
             warnState = 1;
         elseif isempty(warnState)
-            cprintf([1,1/2,0],[' - Warning: ' msg '\n']);
+            try
+                cprintf([1,1/2,0],[' - Warning: ' msg '\n']);
+            catch
+                fprintf(' - Warning: %s\n', msg);
+            end
             warnCount = warnCount + 1;
         end
     end
