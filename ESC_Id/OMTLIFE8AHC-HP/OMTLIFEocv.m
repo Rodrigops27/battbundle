@@ -8,15 +8,27 @@ close all
 clc
 
 script_dir = fileparts(mfilename('fullpath'));
-repo_root = fileparts(script_dir);
+omtlife_parent = fileparts(script_dir);  % ESC_Id/OMTLIFE8AHC-HP/ -> ESC_Id/
+repo_root = fileparts(omtlife_parent);    % ESC_Id/ -> bnchmrk/
+ocv_output_dir = fullfile(omtlife_parent,'OCV_Files','OMTLIFE8AHC-HP');
 
 addpath(repo_root);
-addpath(genpath(fullfile(script_dir,'OCV_eg')));
-addpath(genpath(fullfile(script_dir,'ModelMgmt')));
 addpath(genpath(fullfile(repo_root,'utility')));
+addpath(genpath(fullfile(repo_root,'ESC_Id')));
 
-dataset_file = fullfile(script_dir,'Datasets','OMTLIFE8AHC-HP','LFP_OCV_interp.mat');
-output_file = fullfile(script_dir,'OMTLIFEmodel-ocv-diag.mat');
+% Look for OCV data in ESC_Id/OCV_Files/OMTLIFE8AHC-HP/ (correct location)
+dataset_file = fullfile(omtlife_parent,'OCV_Files','OMTLIFE8AHC-HP','LFP_OCV_interp.mat');
+if ~exist(dataset_file,'file')
+    error('OMTLIFEocv:MissingData', ...
+        'OCV interpolation data not found: %s\nExpected file in ESC_Id/OCV_Files/OMTLIFE8AHC-HP/', ...
+        dataset_file);
+end
+
+if exist(ocv_output_dir,'dir') ~= 7
+    mkdir(ocv_output_dir);
+end
+
+output_file = fullfile(ocv_output_dir,'OMTLIFEmodel-ocv-diag.mat');
 
 temp_degC = 25;
 capacity_ah = 8;

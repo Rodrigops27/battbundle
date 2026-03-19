@@ -47,7 +47,7 @@ case_results = [case_results_list{:}]';
 results = struct();
 results.name = 'ESC model validation';
 results.created_on = datestr(now, 'yyyy-mm-dd HH:MM:SS');
-results.model_file = model_file;
+results.model_file = model_name;
 results.model_name = model_name;
 results.enabled_plot = logical(enabledPlot);
 results.case_count = numel(case_results);
@@ -82,7 +82,7 @@ case_result = struct();
 case_result.name = case_spec.name;
 case_result.source_type = case_spec.source_type;
 case_result.source_file = case_spec.source_file;
-case_result.model_file = model_file;
+case_result.model_file = model_name;
 case_result.model_name = model_name;
 case_result.ts = case_spec.ts;
 case_result.tc = case_spec.tc;
@@ -201,15 +201,17 @@ if ischar(data_input) || (isstring(data_input) && isscalar(data_input))
         cases = normalizeValidationCases(raw.dataset, model, repo_root);
         for idx = 1:numel(cases)
             if isempty(cases(idx).source_file)
-                cases(idx).source_file = data_file;
+                cases(idx).source_file = displayNameFromPath(data_file);
             end
+            cases(idx).name = displayCaseName(cases(idx).name, data_file, idx, numel(cases));
         end
         return;
     end
     if isfield(raw, 'DYNData')
         cases = normalizeValidationCases(raw.DYNData, model, repo_root);
         for idx = 1:numel(cases)
-            cases(idx).source_file = data_file;
+            cases(idx).source_file = displayNameFromPath(data_file);
+            cases(idx).name = displayCaseName(cases(idx).name, data_file, idx, numel(cases));
         end
         return;
     end
@@ -292,7 +294,7 @@ for idx = 1:numel(data_input)
     cases_list{idx} = makeCaseSpec( ...
         sprintf('legacy_script1_case_%d', idx), ...
         'legacy_script1', ...
-        '', ...
+        sprintf('legacy_case_%d', idx), ...
         time_s, ...
         current_a(:), ...
         voltage_v(:), ...
@@ -353,7 +355,7 @@ z0 = determineInitialSoc(profile.voltage_v, profile.current_a, profile.soc_ref, 
 notes = profileNotes(profile, tc);
 
 case_name = fieldOr(profile, 'profile_name', source_type);
-source_file = fieldOr(profile, 'profile_file', '');
+source_file = fieldOr(profile, 'profile_name', '');
 cases = makeCaseSpec(case_name, source_type, source_file, ...
     profile.time_s, profile.current_a, profile.voltage_v, profile.soc_ref, ...
     tc, temperatureSpan(profile.temperature_c), z0, sign_multiplier, sign_source, notes);
@@ -397,6 +399,7 @@ end
 profile = struct();
 profile.profile_name = fieldOr(data_input, 'name', 'normalized_dataset');
 profile.profile_file = fieldOr(data_input, 'source_profile_file', '');
+profile.profile_name = fieldOr(data_input, 'source_profile_name', profile.profile_name);
 profile.current_a = current_a(:);
 profile.voltage_v = voltage_v(:);
 profile.time_s = time_s(:);
@@ -471,7 +474,7 @@ end
 
 function printSummary(results)
 fprintf('\n%s\n', results.name);
-fprintf('  Model: %s\n', results.model_file);
+fprintf('  Model: %s\n', results.model_name);
 fprintf('  Cases: %d\n', results.case_count);
 for idx = 1:numel(results.cases)
     case_result = results.cases(idx);
@@ -534,6 +537,7 @@ if nargin < 1 || isempty(model_input)
     model_file = firstExistingFile({ ...
         fullfile(repo_root, 'models', 'ATLmodel.mat'), ...
         fullfile(repo_root, 'ESC_Id', 'FullESCmodels', 'LFP', 'ATLmodel.mat'), ...
+        fullfile(repo_root, 'models', 'OMTLIFEmodel.mat'), ...
         fullfile(repo_root, 'ESC_Id', 'OMTLIFE8AHC-HP', 'OMTLIFEmodel.mat')}, ...
         'ESCvalidation:MissingDefaultModel', ...
         'No default ATL-family ESC model file was found.');
@@ -550,7 +554,7 @@ else
 end
 
 model = extractEscModelStruct(raw);
-model_name = modelDisplayName(model_file);
+model_name = displayNameFromPath(model_file);
 
 required = {'QParam', 'RCParam', 'RParam', 'R0Param', 'MParam', 'M0Param', 'GParam', 'etaParam'};
 for idx = 1:numel(required)
@@ -582,13 +586,22 @@ error('ESCvalidation:AmbiguousModelStruct', ...
     'Could not infer an ESC model struct from the provided input.');
 end
 
-function name = modelDisplayName(model_file)
+function name = displayNameFromPath(model_file)
 if strcmp(model_file, '<struct>')
     name = 'struct_model';
     return;
 end
 [~, name, ext] = fileparts(model_file);
 name = [name, ext];
+end
+
+function case_name = displayCaseName(default_name, data_file, idx, count)
+case_name = displayNameFromPath(data_file);
+if count > 1
+    case_name = sprintf('%s_%d', case_name, idx);
+elseif isempty(case_name)
+    case_name = default_name;
+end
 end
 
 function path_out = resolveLocalPath(input_path, repo_root)

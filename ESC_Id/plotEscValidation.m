@@ -30,8 +30,9 @@ end
 for idx = 1:numel(results.cases)
     case_result = results.cases(idx);
     t = case_result.time_s(:);
+    plot_title = buildEscPlotTitle(results, case_result);
     
-    figure('Name', sprintf('ESCvalidation - %s', case_result.name), 'Color', 'w');
+    figure('Name', plot_title, 'Color', 'w');
     tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 
     % Voltage overlay plot
@@ -40,7 +41,7 @@ for idx = 1:numel(results.cases)
     hold on
     plot(t, case_result.voltage_est_v, 'LineWidth', 1.0);
     ylabel('Voltage (V)');
-    title(sprintf('%s | RMSE %.2f mV', case_result.name, case_result.metrics.voltage_rmse_mv));
+    title(plot_title);
     legend('Measured', 'simCell', 'Location', 'best');
     grid on
 
@@ -83,5 +84,74 @@ for idx = 1:numel(results.cases)
         text(0.1, 0.5, 'No finite voltage pairs available', 'Units', 'normalized');
         axis off;
     end
+end
+end
+
+function plot_title = buildEscPlotTitle(results, case_result)
+model_label = normalizeEscModelLabel(results, case_result);
+dataset_label = normalizeDatasetLabel(case_result.name, case_result.source_file, case_result.source_type);
+plot_title = sprintf('%s %s | RMSE %.2f mV', model_label, dataset_label, case_result.metrics.voltage_rmse_mv);
+plot_title = strtrim(regexprep(plot_title, '\s+', ' '));
+end
+
+function model_label = normalizeEscModelLabel(results, case_result)
+model_label = '';
+if isfield(case_result, 'model_name') && ~isempty(case_result.model_name)
+    model_label = normalizeModelToken(case_result.model_name);
+end
+if isempty(model_label) && isfield(results, 'model_name') && ~isempty(results.model_name)
+    model_label = normalizeModelToken(results.model_name);
+end
+if isempty(model_label)
+    model_label = 'ESC';
+end
+end
+
+function dataset_label = normalizeDatasetLabel(case_name, source_file, source_type)
+search_text = lower(strjoin({charOrEmpty(case_name), charOrEmpty(source_file), charOrEmpty(source_type)}, ' '));
+if contains(search_text, 'legacy_script1') || contains(search_text, 'script1') || contains(search_text, 'dyn')
+    dataset_label = 'Dyn';
+elseif contains(search_text, 'bus_corebattery') || contains(search_text, 'bus corebattery') || ...
+        contains(search_text, 'bus core battery') || contains(search_text, 'bss')
+    dataset_label = 'BSS';
+else
+    dataset_label = cleanupLabel(case_name);
+end
+end
+
+function label = normalizeModelToken(raw_label)
+label = cleanupLabel(raw_label);
+label_upper = upper(label);
+if contains(label_upper, 'OMTLIFE') || contains(label_upper, 'OMT8')
+    label = 'OMT8';
+elseif contains(label_upper, 'ATL20')
+    label = 'ATL20';
+elseif contains(label_upper, 'ATL')
+    label = 'ATL';
+elseif contains(label_upper, 'NMC30')
+    label = 'NMC30';
+elseif startsWith(label_upper, 'ROM ')
+    label = strtrim(extractAfter(label, 4));
+end
+end
+
+function label = cleanupLabel(raw_label)
+label = charOrEmpty(raw_label);
+[~, label, ~] = fileparts(label);
+label = strrep(label, 'ROM_', '');
+label = strrep(label, 'model', '');
+label = strrep(label, 'Model', '');
+label = strrep(label, '_beta', '');
+label = strrep(label, '_', ' ');
+label = strtrim(regexprep(label, '\s+', ' '));
+end
+
+function out = charOrEmpty(value)
+if isempty(value)
+    out = '';
+elseif isstring(value)
+    out = char(value);
+else
+    out = value;
 end
 end

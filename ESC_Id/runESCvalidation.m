@@ -110,21 +110,21 @@ end
 
 function summary_table = buildBatchTable(entries)
 job_name = cell(numel(entries), 1);
-model_file = cell(numel(entries), 1);
+model_name = cell(numel(entries), 1);
 case_count = NaN(numel(entries), 1);
 mean_rmse_mv = NaN(numel(entries), 1);
 max_rmse_mv = NaN(numel(entries), 1);
 
 for idx = 1:numel(entries)
     job_name{idx} = entries(idx).name;
-    model_file{idx} = entries(idx).result.model_file;
+    model_name{idx} = entries(idx).result.model_name;
     case_count(idx) = entries(idx).result.case_count;
     mean_rmse_mv(idx) = entries(idx).result.metrics.mean_voltage_rmse_mv;
     max_rmse_mv(idx) = entries(idx).result.metrics.max_voltage_rmse_mv;
 end
 
-summary_table = table(job_name, model_file, case_count, mean_rmse_mv, max_rmse_mv, ...
-    'VariableNames', {'job_name', 'model_file', 'case_count', 'mean_voltage_rmse_mv', 'max_voltage_rmse_mv'});
+summary_table = table(job_name, model_name, case_count, mean_rmse_mv, max_rmse_mv, ...
+    'VariableNames', {'job_name', 'model_name', 'case_count', 'mean_voltage_rmse_mv', 'max_voltage_rmse_mv'});
 end
 
 function printBatchSummary(batch)

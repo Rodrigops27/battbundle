@@ -11,12 +11,38 @@
 clear; clc; close all;
 
 script_dir = fileparts(mfilename('fullpath'));
-project_root = fileparts(fileparts(fileparts(fileparts(script_dir))));
+nmc30_parent = fileparts(script_dir);  % ESC_Id/NMC30 -> ESC_Id/
+repo_root = fileparts(nmc30_parent);    % ESC_Id/ -> bnchmrk/
+models_output_dir = fullfile(repo_root, 'models');
+
+addpath(repo_root);
+addpath(genpath(fullfile(repo_root, 'utility')));
+addpath(genpath(fullfile(repo_root, 'ESC_Id')));
 
 fprintf('\n');
 fprintf('================================================================\n');
 fprintf('  NMC30 Full Parameter Identification via processDynamic\n');
 fprintf('================================================================\n\n');
+
+%% ROM File Resolution (defensive pattern)
+rom_candidates = {
+    fullfile(repo_root, 'models', 'ROM_NMC30_HRA12.mat')
+    fullfile(repo_root, 'models', 'ROM_NMC30_HRA.mat')
+    fullfile(script_dir, 'ROM_NMC30_HRA12.mat')
+    fullfile(script_dir, 'ROM_NMC30_HRA.mat')
+};
+ROMfile = '';
+for idx = 1:numel(rom_candidates)
+    if exist(rom_candidates{idx}, 'file')
+        ROMfile = rom_candidates{idx};
+        break;
+    end
+end
+if isempty(ROMfile)
+    error('NMC30DynParIdROMsim:MissingROM', ...
+        'ROM file not found. Expected one of:\n  %s\n', ...
+        strjoin(rom_candidates, '\n  '));
+end
 
 %% SETTINGS
 tc_test = 25;                     % Test temperature [°C]
@@ -27,9 +53,10 @@ do_hysteresis = 1;                % Include hysteresis model
 
 % Load OCV model (from previous step)
 fprintf('Step 1: Load NMC30 OCV model\n');
-ocv_file = fullfile(script_dir, 'NMC30model-ocv.mat');
+ocv_file = fullfile(nmc30_parent, 'OCV_Files', 'NMC30', 'NMC30model-ocv.mat');
 if ~exist(ocv_file, 'file')
-    error('NMC30 OCV model not found. Run createNMC30Model first.');
+    error('NMC30DynParIdROMsim:MissingOCV', ...
+        'NMC30 OCV model not found: %s\nRun OCVNMC30fromROM.m first.', ocv_file);
 end
 ocv_data = load(ocv_file);
 model_ocv = ocv_data.nmc30_model;
@@ -37,10 +64,9 @@ fprintf('  ✓ Loaded NMC30 OCV model with capacity = %.1f Ah\n', model_ocv.QPar
 
 % Load ROM (for ground truth test data generation)
 fprintf('\nStep 2: Load ROM for synthetic test data generation\n');
-ROMfile = fullfile(project_root, 'src', 'MPC-EKF4FastCharge', 'ROM_NMC30_HRA12.mat');
 rom_data = load(ROMfile);
 ROM = rom_data.ROM;
-fprintf('  ✓ ROM loaded\n');
+fprintf('  ✓ ROM loaded from: %s\n', ROMfile);
 
 %% STEP 1: Generate synthetic test data at 25°C using OB_step
 fprintf('\nStep 3: Generate synthetic test data via OB_step\n');
@@ -244,15 +270,12 @@ rmserr = sqrt(mean(verr(N1:N2).^2));
 fprintf('  RMS error of simCell @ %d degC = %0.2f mV\n', tc_test, rmserr * 1000);
 
 % Save
-output_file = fullfile(script_dir, 'NMC30model.mat');
+if exist(models_output_dir, 'dir') ~= 7
+    mkdir(models_output_dir);
+end
+output_file = fullfile(models_output_dir, 'NMC30model.mat');
 save(output_file, 'nmc30_model');
 fprintf('  Saved to: %s\n', output_file);
-
-% Also save a backup with timestamp
-timestamp = datetime('now', 'Format', 'yyyyMMdd_HHmmss');
-backup_file = fullfile(script_dir, sprintf('NMC30model_backup_%s.mat', timestamp));
-save(backup_file, 'nmc30_model');
-fprintf('  Backup: %s\n', backup_file);
 
 fprintf('\n');
 fprintf('================================================================\n');
@@ -265,11 +288,10 @@ fprintf('  Capacity: %.1f Ah\n', nmc30_model.QParam);
 fprintf('  R0: %.6f Ω\n', nmc30_model.R0Param);
 fprintf('  RC poles: %d\n', length(nmc30_model.RCParam));
 fprintf('\nFiles created:\n');
-fprintf('  - %s (main model)\n', output_file);
-fprintf('  - %s (backup)\n\n', backup_file);
+fprintf('  - %s\n\n', output_file);
 
 fprintf('Next:\n');
-fprintf('  1. Review %s in runNMC30SOCComparison\n', output_file);
+fprintf('  1. Validate %s with ESCvalidation.m\n', output_file);
 fprintf('  2. For extended temperature range, repeat at T = 5, 15, 35, 45°C\n');
 fprintf('  3. Merge multi-temperature models into single struct\n\n');
 function [time_s, voltage_v, chg_ah, dis_ah] = simulateDynScript(current_a, soc0, tc_test, ROM, ts)

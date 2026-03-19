@@ -161,14 +161,14 @@ addpath(genpath('.'));
 results = ESCvalidation([], [], true);
 ```
 
-Validate the OMTLIFE ESC model on the measured OMTLIFE/Bus-CoreBattery profile:
+Validate the OMT8 ESC model on the saved DYN dataset:
 
 ```matlab
 addpath(genpath('.'));
 
 results = ESCvalidation( ...
     fullfile('ESC_Id', 'OMTLIFE8AHC-HP', 'OMTLIFEmodel.mat'), ...
-    fullfile('Evaluation', 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat'), ...
+    fullfile('ESC_Id', 'DYN_Files', 'OMT8_DYN', 'OMT8_DYN_P25.mat'), ...
     true);
 ```
 
@@ -179,7 +179,7 @@ addpath(genpath('.'));
 
 batch = runESCvalidation( ...
     {fullfile('models', 'ATLmodel.mat'), fullfile('ESC_Id', 'OMTLIFE8AHC-HP', 'OMTLIFEmodel.mat')}, ...
-    {fullfile('Evaluation', 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat')}, ...
+    {fullfile('ESC_Id', 'DYN_Files', 'OMT8_DYN', 'OMT8_DYN_P25.mat')}, ...
     false);
 ```
 
@@ -229,7 +229,7 @@ clear
 cd ESC_Id
 load('ESC_validation_results.mat');
 
-models_to_plot = {'ATL', 'NMC30', 'OMTLIFE'};
+models_to_plot = {'ATL', 'NMC30', 'OMT8'};
 results = {result_atl, result_nmc, result_omt};
 
 for idx = 1:numel(results)
@@ -256,8 +256,8 @@ Comprehensive ESC model validation was performed on March 19, 2026 against multi
 | Model | Dataset | Temperature | RMSE (mV) | Mean Error (mV) | MAE (mV) | Max Error (mV) | Samples |
 |-------|---------|-------------|-----------|-----------------|----------|----------------|---------|
 | ATL | ESC_Id/DYN_Files/ATL_DYN/ATL_DYN_40_P25.mat | 25.0°C | 24.97 | -11.18 | 19.90 | 175.26 | 35,560 |
-| NMC30 | ESC_Id/NMC30/ROMSimData/rom_script1_dataset.mat | 25.0°C | 12.39 | -9.95 | 9.95 | 49.88 | 8,250 |
-| OMTLIFE | Evaluation/OMTLIFE8AHC-HP/Bus_CoreBatteryData_Data.mat | 25.0°C | 6.94 | 1.08 | 5.39 | 27.09 | 576,001 |
+| NMC30 | NMC30_DYN_P25.mat | 25.0°C | 12.39 | -9.95 | 9.95 | 49.88 | 8,250 |
+| OMT8 | OMT8_DYN_P25.mat | 25.0°C | 6.94 | 1.08 | 5.39 | 27.09 | 576,001 |
 
 ### Detailed Results
 
@@ -274,7 +274,7 @@ Comprehensive ESC model validation was performed on March 19, 2026 against multi
 
 #### NMC30 Model
 - **Model File:** `models/NMC30model.mat`
-- **Test Data:** `ESC_Id/NMC30/ROMSimData/rom_script1_dataset.mat` (synthetic ROM dataset)
+- **Test Data:** `ESC_Id/DYN_Files/NMC30_DYN/NMC30_DYN_P25.mat`
 - **Validation Temperature:** 25.0°C
 - **Voltage RMSE:** 12.39 mV
 - **Voltage Mean Error:** -9.95 mV (bias toward overestimation)
@@ -283,9 +283,9 @@ Comprehensive ESC model validation was performed on March 19, 2026 against multi
 - **Data Points Analyzed:** 8,250 samples
 - **Notes:** Synthetic dataset from ROM simulations. Better fit compared to ATL model with tighter error distribution.
 
-#### OMTLIFE Model
+#### OMT8 Model
 - **Model File:** `ESC_Id/OMTLIFE8AHC-HP/OMTLIFEmodel.mat`
-- **Test Data:** `Evaluation/OMTLIFE8AHC-HP/Bus_CoreBatteryData_Data.mat` (real measured data)
+- **Test Data:** `ESC_Id/DYN_Files/OMT8_DYN/OMT8_DYN_P25.mat`
 - **Validation Temperature:** 25.0°C
 - **Voltage RMSE:** 6.94 mV
 - **Voltage Mean Error:** 1.08 mV (minimal bias)

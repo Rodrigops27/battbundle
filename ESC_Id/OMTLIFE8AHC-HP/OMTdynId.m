@@ -11,11 +11,13 @@ close all
 clc
 
 script_dir = fileparts(mfilename('fullpath'));
-repo_root = fileparts(script_dir);
+esc_root = fileparts(script_dir);
+repo_root = fileparts(esc_root);
+models_output_dir = fullfile(repo_root,'models');
 
 addpath(repo_root);
-addpath(genpath(fullfile(script_dir,'ModelMgmt')));
 addpath(genpath(fullfile(repo_root,'utility')));
+addpath(genpath(fullfile(repo_root,'ESC_Id')));
 
 fprintf('\n');
 fprintf('================================================================\n');
@@ -29,10 +31,10 @@ numpoles = 2;                      % Two RC pairs
 do_hysteresis = true;              % Fit hysteresis
 save_plots = false;
 
-profile_file = fullfile(script_dir,'Datasets','OMTLIFE8AHC-HP', ...
+profile_file = fullfile(repo_root,'Evaluation','OMTLIFE8AHC-HP', ...
     'Bus_CoreBatteryData_Data.mat');
-ocv_model_file = fullfile(script_dir,'OMTLIFEmodel-ocv-diag.mat');
-output_file = fullfile(script_dir,'OMTLIFEmodel.mat');
+ocv_model_file = fullfile(esc_root,'OCV_Files','OMTLIFE8AHC-HP','OMTLIFEmodel-ocv-diag.mat');
+output_file = fullfile(models_output_dir,'OMTLIFEmodel.mat');
 
 cfg = struct();
 cfg.current_sign = [];             % Set to +1 or -1 to override auto orientation
@@ -132,6 +134,9 @@ fprintf('  simCell RMS check = %.2f mV\n', rmse_check * 1000);
 
 %% SAVE MODEL
 fprintf('\nStep 5: Save model\n');
+if exist(models_output_dir,'dir') ~= 7
+    mkdir(models_output_dir);
+end
 fit_summary = struct();
 fit_summary.profile_file = profile.profile_file;
 fit_summary.profile_name = profile.profile_name;

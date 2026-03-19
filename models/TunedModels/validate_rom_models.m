@@ -1,13 +1,14 @@
 % ROM validation harness - validates retuned ROM models against their source ESC models
 % Follows the same pattern as ESC_Id/validate_models.m
 
-addpath(genpath('.'));
-
-fprintf('Starting ROM Model Validation...\n\n');
-
 script_dir = fileparts(mfilename('fullpath'));
 models_dir = fileparts(script_dir);
 repo_root = fileparts(models_dir);
+results_file = fullfile(script_dir, 'ROM_validation_results.mat');
+
+addpath(genpath(repo_root));
+
+fprintf('Starting ROM Model Validation...\n\n');
 
 % Validation 1: ROM_OMT8_beta
 fprintf('Validating ROM_OMT8_beta.mat against OMTLIFEmodel.mat...\n');
@@ -50,5 +51,5 @@ catch ME
 end
 
 % Save results
-save('ROM_validation_results.mat', 'result_omt', 'result_atl');
-fprintf('\nValidation complete. Results saved to ROM_validation_results.mat\n');
+save(results_file, 'result_omt', 'result_atl');
+fprintf('\nValidation complete. Results saved to %s\n', results_file);

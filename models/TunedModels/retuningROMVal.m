@@ -25,16 +25,12 @@ repo_root = fileparts(models_dir);
 addpath(genpath(repo_root));
 
 cfg = normalizeConfig(cfg, models_dir);
-[ROM, rom_file] = loadRomModel(cfg.rom_file);
-[esc_model, esc_model_file] = loadEscModel(cfg.esc_model_file);
-
-if isempty(cfg.ts)
-    cfg.ts = double(ROM.xraData.Tsamp);
-end
+[ROM, rom_file, rom_name] = loadRomModel(cfg.rom_file);
+[esc_model, esc_model_file, esc_model_name] = loadEscModel(cfg.esc_model_file);
 
 capacity_ah = abs(double(getParamESC('QParam', cfg.tc, esc_model)));
-[current_c_rate, step_id, time_s] = buildScript1NormalizedProfile(cfg.ts);
-current_a = capacity_ah * current_c_rate;
+[current_a, current_c_rate, step_id, time_s, cfg] = ...
+    resolveValidationProfile(cfg, repo_root, esc_model_name, capacity_ah, ROM);
 if ~any(abs(current_a) > sqrt(eps))
     error('retuningROMVal:ZeroCurrentProfile', ...
         'The script-1 current profile is zero after scaling. Capacity = %.6g Ah.', capacity_ah);
@@ -45,7 +41,7 @@ rom_sim = simulateRomReference(current_a, cfg, ROM);
 
 validation = buildValidationStruct( ...
     time_s, current_a, current_c_rate, step_id, cfg, ...
-    esc_sim, rom_sim, rom_file, esc_model_file, capacity_ah);
+    esc_sim, rom_sim, rom_file, rom_name, esc_model_file, esc_model_name, capacity_ah);
 
 printSummary(validation);
 if cfg.show_plots
@@ -64,9 +60,10 @@ cfg.tc = fieldOr(cfg, 'tc', 25);
 cfg.ts = fieldOr(cfg, 'ts', []);
 cfg.soc_init = fieldOr(cfg, 'soc_init', 100);
 cfg.show_plots = fieldOr(cfg, 'show_plots', true);
+cfg.dyn_file = fieldOr(cfg, 'dyn_file', '');
 end
 
-function [ROM, rom_file] = loadRomModel(rom_file)
+function [ROM, rom_file, rom_name] = loadRomModel(rom_file)
 if exist(rom_file, 'file') ~= 2
     error('retuningROMVal:MissingROM', 'ROM file not found: %s', rom_file);
 end
@@ -76,6 +73,7 @@ if ~isfield(raw, 'ROM')
         'Expected variable "ROM" in %s.', rom_file);
 end
 ROM = raw.ROM;
+rom_name = displayNameFromPath(rom_file);
 required = {'ROMmdls', 'xraData', 'cellData'};
 for idx = 1:numel(required)
     if ~isfield(ROM, required{idx})
@@ -85,13 +83,14 @@ for idx = 1:numel(required)
 end
 end
 
-function [model, model_file] = loadEscModel(model_file)
+function [model, model_file, model_name] = loadEscModel(model_file)
 if exist(model_file, 'file') ~= 2
     error('retuningROMVal:MissingESCModel', ...
         'ESC model file not found: %s', model_file);
 end
 raw = load(model_file);
 model = extractEscModelStruct(raw);
+model_name = displayNameFromPath(model_file);
 required = {'QParam', 'RCParam', 'RParam', 'R0Param', 'MParam', 'M0Param', 'GParam', 'etaParam'};
 for idx = 1:numel(required)
     if ~isfield(model, required{idx})
@@ -140,16 +139,21 @@ sim.soc = soc_rom(:);
 sim.mssd_voltage_v2 = computeMssd(sim.voltage_v);
 end
 
-function validation = buildValidationStruct(time_s, current_a, current_c_rate, step_id, cfg, esc_sim, rom_sim, rom_file, esc_model_file, capacity_ah)
+function validation = buildValidationStruct(time_s, current_a, current_c_rate, step_id, cfg, esc_sim, rom_sim, rom_file, rom_name, esc_model_file, esc_model_name, capacity_ah)
 validation = struct();
-validation.name = 'ROM ATL20 beta validation';
+validation.name = sprintf('%s validation', shortChemistryLabel(rom_name));
 validation.created_on = datestr(now, 'yyyy-mm-dd HH:MM:SS');
 validation.tc = cfg.tc;
 validation.ts = cfg.ts;
 validation.soc_init_percent = cfg.soc_init;
 validation.capacity_ah = capacity_ah;
-validation.rom_file = rom_file;
-validation.esc_model_file = esc_model_file;
+validation.rom_file = rom_name;
+validation.rom_name = rom_name;
+validation.esc_model_file = esc_model_name;
+validation.esc_model_name = esc_model_name;
+validation.profile_name = cfg.profile_name;
+validation.profile_source = cfg.profile_source;
+validation.profile_file = cfg.profile_file;
 validation.time_s = time_s(:);
 validation.current_a = current_a(:);
 validation.current_c_rate = current_c_rate(:);
@@ -263,4 +267,133 @@ if isfield(s, field_name) && ~isempty(s.(field_name))
 else
     value = default_value;
 end
+end
+
+function name = displayNameFromPath(path_in)
+[~, name, ext] = fileparts(path_in);
+name = [name, ext];
+end
+
+function label = shortChemistryLabel(raw_label)
+label = upper(displayNameFromPath(raw_label));
+label = strrep(label, '.MAT', '');
+label = strrep(label, 'ROM_', '');
+label = strrep(label, '_BETA', '');
+label = strrep(label, 'MODEL', '');
+if contains(label, 'OMTLIFE') || contains(label, 'OMT8')
+    label = 'OMT8';
+elseif contains(label, 'ATL20')
+    label = 'ATL20';
+elseif contains(label, 'ATL')
+    label = 'ATL';
+elseif contains(label, 'NMC30')
+    label = 'NMC30';
+else
+    label = strtrim(strrep(label, '_', ' '));
+end
+end
+
+function [current_a, current_c_rate, step_id, time_s, cfg] = ...
+        resolveValidationProfile(cfg, repo_root, esc_model_name, capacity_ah, ROM)
+if isempty(cfg.ts)
+    cfg.ts = double(ROM.xraData.Tsamp);
+end
+
+dyn_file = resolveDynProfileFile(cfg, repo_root, esc_model_name);
+if ~isempty(dyn_file)
+    [current_a, step_id, time_s, cfg.ts, cfg.profile_name] = ...
+        loadDynScript1Profile(dyn_file, cfg.ts);
+    cfg.profile_source = 'dyn_script1';
+    cfg.profile_file = displayNameFromPath(dyn_file);
+else
+    [current_c_rate, step_id, time_s] = buildScript1NormalizedProfile(cfg.ts);
+    current_a = capacity_ah * current_c_rate;
+    cfg.profile_name = sprintf('%s_Dyn.mat', shortChemistryLabel(esc_model_name));
+    cfg.profile_source = 'synthetic_script1';
+    cfg.profile_file = '';
+end
+
+current_a = current_a(:);
+time_s = time_s(:);
+step_id = step_id(:);
+current_c_rate = current_a / max(capacity_ah, eps);
+end
+
+function dyn_file = resolveDynProfileFile(cfg, repo_root, esc_model_name)
+dyn_file = '';
+if ~isempty(cfg.dyn_file)
+    dyn_file = cfg.dyn_file;
+    if exist(dyn_file, 'file') ~= 2
+        dyn_file = fullfile(repo_root, dyn_file);
+    end
+    if exist(dyn_file, 'file') ~= 2
+        error('retuningROMVal:MissingDynFile', ...
+            'DYN profile file not found: %s', cfg.dyn_file);
+    end
+    return;
+end
+
+label = shortChemistryLabel(esc_model_name);
+switch label
+    case 'NMC30'
+        candidates = {fullfile(repo_root, 'ESC_Id', 'DYN_Files', 'NMC30_DYN', 'NMC30_DYN_P25.mat')};
+    case 'OMT8'
+        candidates = {fullfile(repo_root, 'ESC_Id', 'DYN_Files', 'OMT8_DYN', 'OMT8_DYN_P25.mat')};
+    case 'ATL'
+        candidates = { ...
+            fullfile(repo_root, 'ESC_Id', 'DYN_Files', 'ATL_DYN', 'ATL_DYN_P25.mat'), ...
+            fullfile(repo_root, 'ESC_Id', 'DYN_Files', 'ATL_DYN', 'ATL_DYN_40_P25.mat')};
+    otherwise
+        candidates = {};
+end
+
+for idx = 1:numel(candidates)
+    if exist(candidates{idx}, 'file') == 2
+        dyn_file = candidates{idx};
+        return;
+    end
+end
+end
+
+function [current_a, step_id, time_s, ts, profile_name] = ...
+        loadDynScript1Profile(dyn_file, default_ts)
+raw = load(dyn_file);
+if ~isfield(raw, 'DYNData') || ~isstruct(raw.DYNData) || ~isfield(raw.DYNData, 'script1')
+    error('retuningROMVal:BadDynFile', ...
+        'Expected variable DYNData.script1 in %s.', dyn_file);
+end
+
+script1 = raw.DYNData.script1;
+required = {'current', 'time'};
+for idx = 1:numel(required)
+    if ~isfield(script1, required{idx})
+        error('retuningROMVal:IncompleteDynScript', ...
+            'DYNData.script1 is missing field %s in %s.', required{idx}, dyn_file);
+    end
+end
+
+current_a = double(script1.current(:));
+if isfield(script1, 'step') && ~isempty(script1.step)
+    step_id = double(script1.step(:));
+else
+    step_id = ones(size(current_a));
+end
+time_s = double(script1.time(:));
+if numel(time_s) ~= numel(current_a)
+    error('retuningROMVal:BadDynTimebase', ...
+        'DYNData.script1.time and current size mismatch in %s.', dyn_file);
+end
+
+time_s = time_s - time_s(1);
+dt = diff(time_s);
+dt = dt(isfinite(dt) & dt > 0);
+if isempty(dt)
+    ts = default_ts;
+    time_s = (0:numel(current_a)-1).' * ts;
+else
+    ts = median(dt);
+end
+
+[~, name, ext] = fileparts(dyn_file);
+profile_name = [name, ext];
 end

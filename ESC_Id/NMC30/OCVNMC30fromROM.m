@@ -8,7 +8,9 @@
 clear; clc; close all;
 
 script_dir = fileparts(mfilename('fullpath'));
-repo_root = fileparts(script_dir);
+nmc30_parent = fileparts(script_dir);  % NMC30/ -> ESC_Id/
+repo_root = fileparts(nmc30_parent);    % ESC_Id/ -> bnchmrk/
+ocv_output_dir = fullfile(nmc30_parent, 'OCV_Files', 'NMC30');
 
 % Use bnchmrk path setup (root + selected folders and subfolders).
 addpath(repo_root);
@@ -100,7 +102,10 @@ fprintf('  ✓ OCV points: %d\n', length(nmc30_model.SOC));
 %% STEP 3: Save model
 fprintf('\nStep 3: Save NMC30 model\n');
 
-output_file = fullfile(script_dir, 'NMC30model-ocv.mat');
+if exist(ocv_output_dir, 'dir') ~= 7
+    mkdir(ocv_output_dir);
+end
+output_file = fullfile(ocv_output_dir, 'NMC30model-ocv.mat');
 save(output_file, 'nmc30_model');
 fprintf('  ✓ Saved to: %s\n', output_file);
 
