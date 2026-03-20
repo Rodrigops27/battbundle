@@ -1,0 +1,261 @@
+# ESC_Id
+
+## 1. Purpose
+
+- This layer builds ESC models from OCV and dynamic data and validates fitted ESC models against measured current-voltage traces.
+- It exists so model identification and model validation happen before estimator benchmarking.
+
+## 2. Scope
+
+- In scope: OCV processing, chemistry-specific ESC fitting scripts, reusable dynamic-identification helpers, ESC validation, and ESC validation plotting.
+- Out of scope: estimator benchmarking, injected-noise studies, ROM benchmarking, and benchmark dataset comparison tables. Those belong in `Evaluation/`.
+
+## 3. Directory structure
+
+- `DiagProcessOCV.m`
+  - Generic OCV-processing entry point.
+- `processDynamic.m`
+  - Generic dynamic ESC parameter-identification routine for lab-style `DYNData`.
+- `ESCvalidation.m`
+  - Main ESC validation harness.
+- `runESCvalidation.m`
+  - Batch wrapper around `ESCvalidation.m`.
+- `validate_models.m`
+  - Convenience validation script for the repo's main ESC models.
+- `plotEscValidation.m`
+  - Plot saved ESC validation results.
+- `extract_results.m`
+  - Prints selected values from saved ESC validation results.
+- `OCV_Files/`
+  - OCV source files and OCV-model intermediate artifacts.
+- `DYN_Files/`
+  - Dynamic identification datasets saved in DYN-style layout.
+- `NMC30/`
+  - NMC30-specific OCV and dynamic-identification scripts.
+- `OMTLIFE8AHC-HP/`
+  - OMT8-specific OCV and special dynamic-identification scripts.
+- `FullESCmodels/`
+  - Legacy bundled ESC models used as fallbacks by some scripts.
+
+## 4. Entry points
+
+- `ESCvalidation.m`
+  - Single validation run.
+
+```matlab
+addpath(genpath('.'));
+results = ESCvalidation( ...
+    fullfile('models', 'NMC30model.mat'), ...
+    fullfile('ESC_Id', 'DYN_Files', 'NMC30_DYN', 'NMC30_DYN_P25.mat'), ...
+    true);
+```
+
+- `runESCvalidation.m`
+  - Batch validation across models and datasets.
+
+```matlab
+addpath(genpath('.'));
+batch = runESCvalidation( ...
+    {fullfile('models', 'ATLmodel.mat'), fullfile('models', 'NMC30model.mat')}, ...
+    {fullfile('ESC_Id', 'DYN_Files', 'ATL_DYN', 'ATL_DYN_40_P25.mat')}, ...
+    false);
+```
+
+- `validate_models.m`
+  - Repo convenience smoke test for the main ESC models.
+
+```matlab
+addpath(genpath('.'));
+cd ESC_Id
+validate_models
+```
+
+- `NMC30/OCVNMC30fromROM.m`
+  - Builds the NMC30 OCV model.
+- `NMC30/NMC30DynParIdROMsim.m`
+  - Builds the NMC30 full ESC model from its special dynamic-identification path.
+- `OMTLIFE8AHC-HP/OMTLIFEocv.m`
+  - Builds the OMT8 OCV model.
+- `OMTLIFE8AHC-HP/OMTdynId.m`
+  - Builds the OMT8 full ESC model from its special single-profile dynamic-identification path.
+
+## 5. Default behavior
+
+- `ESCvalidation.m` defaults to a built-in model search order when `modelFile` is empty:
+  - `models/ATLmodel.mat`
+  - `ESC_Id/FullESCmodels/LFP/ATLmodel.mat`
+  - `models/OMTLIFEmodel.mat`
+  - `ESC_Id/OMTLIFE8AHC-HP/OMTLIFEmodel.mat`
+- `ESCvalidation.m` defaults to `Evaluation/OMTLIFE8AHC-HP/Bus_CoreBatteryData_Data.mat` when `data` is empty.
+- `ESCvalidation.m` defaults `enabledPlot` to `true`.
+- `ESCvalidation.m` assumes `+I = discharge` and will auto-flip current sign only when a SOC trace is available and indicates the sign is reversed.
+- `ESCvalidation.m` uses a single scalar temperature in `simCell`; if the dataset contains a temperature trace, the median value is used.
+- Legacy `DYNData.script1` validation uses `z0 = 1` by design for continuity with `utility/DYN_eg/runProcessDynamic.m`.
+- `runESCvalidation.m` disables plotting automatically when more than one job is run.
+
+## 6. Inputs
+
+- Required inputs for `ESCvalidation.m`:
+  - an ESC model file, a loaded model struct, or `[]` for default resolution
+  - a dataset input, unless the default Bus Core Battery profile is intended
+- Supported validation input formats in `ESCvalidation.m`:
+  - MAT-file path containing a measured profile
+  - MAT-file path containing `dataset`
+  - MAT-file path containing `DYNData`
+  - struct with current/voltage fields
+  - legacy struct array with `script1`
+- Required model content:
+  - ESC model struct with `QParam`, `RCParam`, `RParam`, `R0Param`, `MParam`, `M0Param`, `GParam`, and `etaParam`
+- Optional inputs:
+  - explicit temperature fields in the dataset
+  - SOC trace for initial-SOC inference and current-sign correction
+  - custom plot enable/disable flag
+
+## 7. Datasets
+
+- Add OCV source data under `ESC_Id/OCV_Files/<CHEMISTRY>/`.
+- Add reusable dynamic identification datasets under `ESC_Id/DYN_Files/<CHEMISTRY>_DYN/`.
+- Keep measured validation profiles in the owning application folder when that is the source of truth.
+  - Current repo example: `Evaluation/OMTLIFE8AHC-HP/Bus_CoreBatteryData_Data.mat`
+- DYN naming convention used in this repo:
+  - `<CHEMISTRY>_DYN_P25.mat`
+  - `<CHEMISTRY>_DYN_N10.mat`
+- Current examples:
+  - `ESC_Id/DYN_Files/NMC30_DYN/NMC30_DYN_P25.mat`
+  - `ESC_Id/DYN_Files/OMT8_DYN/OMT8_DYN_P25.mat`
+  - `ESC_Id/DYN_Files/ATL_DYN/ATL_DYN_40_P25.mat`
+- OCV patching for OMT8:
+  - `ESC_Id/OCV_Files/OMTLIFE8AHC-HP/DataPrep/patchLfpOcvInterpTail.m` reads `LFP_OCV_interp.mat` and writes `LFP_OCV_interp_tailPatched.mat`.
+
+## 8. How to run
+
+- Standard run, NMC30:
+
+```matlab
+addpath(genpath('.'));
+cd ESC_Id
+NMC30.OCVNMC30fromROM
+NMC30.NMC30DynParIdROMsim
+```
+
+- Standard run, OMT8:
+
+```matlab
+addpath(genpath('.'));
+cd ESC_Id
+OMTLIFE8AHC-HP.OMTLIFEocv
+OMTLIFE8AHC-HP.OMTdynId
+```
+
+- Validation run:
+
+```matlab
+addpath(genpath('.'));
+results = ESCvalidation( ...
+    fullfile('models', 'OMTLIFEmodel.mat'), ...
+    fullfile('Evaluation', 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat'), ...
+    true);
+```
+
+- Extended run:
+
+```matlab
+addpath(genpath('.'));
+cd ESC_Id
+validate_models
+```
+
+- Extended batch validation:
+
+```matlab
+addpath(genpath('.'));
+jobs = struct( ...
+    'modelFile', {fullfile('models', 'ATLmodel.mat'), fullfile('models', 'NMC30model.mat')}, ...
+    'data', {fullfile('ESC_Id', 'DYN_Files', 'ATL_DYN', 'ATL_DYN_40_P25.mat'), ...
+             fullfile('ESC_Id', 'DYN_Files', 'NMC30_DYN', 'NMC30_DYN_P25.mat')}, ...
+    'enabledPlot', {false, false});
+batch = runESCvalidation(jobs);
+```
+
+## 9. Validation tools
+
+- `ESCvalidation.m`
+  - Validates one model against one or more normalized cases and returns voltage RMSE, mean error, MAE, max-absolute error, and legacy 95% to 5% window RMSE.
+- `runESCvalidation.m`
+  - Runs multiple validation jobs and summarizes mean and max RMSE per job.
+- `validate_models.m`
+  - Validates the repo's ATL, NMC30, and OMT8 ESC models.
+- `extract_results.m`
+  - Reads saved validation results and prints a text summary.
+
+Expected outputs:
+- in-memory results struct from `ESCvalidation.m`
+- in-memory batch struct from `runESCvalidation.m`
+- `ESC_Id/ESC_validation_results.mat` when `validate_models.m` is used
+
+## 10. Study / experiment tools
+
+- `runESCvalidation.m`
+  - Acts as the main multi-case comparison tool in this layer.
+- `extract_results.m`
+  - Helps summarize saved validation runs for reporting.
+- TODO: there is no dedicated ESC-only sweep runner in this layer beyond batch validation. Add one here if ESC model-comparison studies become a first-class workflow.
+
+## 11. Plotting
+
+- Plot during validation by setting `enabledPlot = true` in `ESCvalidation.m`.
+- Re-plot saved results with `plotEscValidation.m`.
+
+```matlab
+addpath(genpath('.'));
+cd ESC_Id
+load('ESC_validation_results.mat');
+plotEscValidation(result_nmc);
+```
+
+- Current plot content:
+  - measured vs simulated voltage
+  - current trace
+  - voltage error trace
+- Plot titles use normalized labels such as `NMC30 Dyn | RMSE xx.xx mV` and `OMT8 BSS | RMSE xx.xx mV`.
+
+## 12. Results
+
+- Final ESC models are saved in `models/`, not in `ESC_Id/`.
+  - Example: `models/NMC30model.mat`
+  - Example: `models/OMTLIFEmodel.mat`
+- Validation results saved by `validate_models.m` go to:
+  - `ESC_Id/ESC_validation_results.mat`
+- Validation output format:
+  - a top-level results struct with `cases`, `summary_table`, and `metrics`
+- Result meaning:
+  - `voltage_rmse_mv` is the main whole-trace voltage-fit metric
+  - `legacy_window_rmse_mv` preserves the older 95% to 5% OCV-window comparison
+  - `voltage_mean_error_mv` is the bias term
+  - `voltage_max_abs_error_mv` highlights worst-case excursion
+
+## 13. Troubleshooting
+
+- Warning: `Current may have wrong sign as SOC > 110%`
+  - Usually means a legacy `script1` validation path is being used on a profile that does not start near full discharge-ready SOC.
+- Error: missing required model fields
+  - The loaded model is not a full ESC model usable by `simCell`.
+- Unexpected temperature behavior
+  - `ESCvalidation.m` uses one scalar temperature even if the source profile varies over time.
+- OMT8 mismatch between dynamic fit and validation route
+  - `OMTdynId.m` is a special single-profile fitting path and should not be treated as a generic `processDynamic.m` case.
+- TODO: MATLAB version and toolbox requirements are not explicit in code for every chemistry-specific script.
+
+## 14. Related documentation
+
+- Parent layer:
+  - `../README.md`
+- Related layers:
+  - `../Evaluation/README.md`
+  - `../models/README.md`
+  - `../utility/README.md`
+- Related scripts:
+  - `DiagProcessOCV.m`
+  - `processDynamic.m`
+  - `ESCvalidation.m`
+  - `plotEscValidation.m`

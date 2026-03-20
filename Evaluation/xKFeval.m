@@ -71,10 +71,12 @@ for idx = 1:n_estimators
     est_result.rmse_voltage = sqrt(mean(est_result.error_voltage(~isnan(est_result.error_voltage)).^2));
     est_result.me_soc = mean(est_result.error_soc(~isnan(est_result.error_soc)));
     est_result.me_voltage = mean(est_result.error_voltage(~isnan(est_result.error_voltage)));
+    est_result.mssd_soc = computeMssd(est_result.soc);
+    est_result.mssd_voltage = computeMssd(est_result.voltage);
     est_result.kfDataFinal = est.kfData;
 
     estimators(idx) = est;
-    results.estimators(idx) = est_result; %#ok<AGROW>
+    results.estimators(idx) = est_result; 
 end
 
 results.dataset = dataset;
@@ -89,7 +91,7 @@ if flags.Summaryfigs
 end
 makeOptionalFigures(results);
 end
-
+ 
 function dataset = normalizeDataset(dataset, flags)
 required = {'current_a', 'voltage_v'};
 for idx = 1:numel(required)
@@ -296,24 +298,36 @@ fprintf('\n%s Results (SOC metrics vs %s, voltage metrics vs %s)\n', ...
     results.dataset.metric_voltage_name);
 for idx = 1:numel(results.estimators)
     est = results.estimators(idx);
-    fprintf('  %-10s SOC RMSE = %.4f%%, SOC ME = %.4f%%, V RMSE = %.2f mV, V ME = %.2f mV\n', ...
+    fprintf(['  %-10s SOC RMSE = %.4f%%, SOC ME = %.4f%%, SOC MSSD = %.6f %%^2, ' ...
+        'V RMSE = %.2f mV, V ME = %.2f mV, V MSSD = %.4f mV^2\n'], ...
         est.name, 100 * est.rmse_soc, 100 * est.me_soc, ...
-        1000 * est.rmse_voltage, 1000 * est.me_voltage);
+        1e4 * est.mssd_soc, 1000 * est.rmse_voltage, 1000 * est.me_voltage, ...
+        1e6 * est.mssd_voltage);
 end
 end
 
 function printDiagnostics(results)
-fprintf('\nBias / Innovation Diagnostics (error = metric trace - estimate):\n');
+context_label = strtrim(getTitlePrefix(results.dataset));
+if isempty(context_label)
+    fprintf('\nBias / Innovation Diagnostics (error = metric trace - estimate):\n');
+else
+    fprintf('\n%s Bias / Innovation Diagnostics (error = metric trace - estimate):\n', context_label);
+end
 for idx = 1:numel(results.estimators)
     est = results.estimators(idx);
-    printEstimatorBiasMetrics(est.name, est.error_soc, est.error_voltage, est.innovation_pre, est.sk);
+    if isempty(context_label)
+        est_label = est.name;
+    else
+        est_label = sprintf('%s | %s', context_label, est.name);
+    end
+    printEstimatorBiasMetrics(est_label, est.error_soc, est.error_voltage, est.innovation_pre, est.sk);
 end
 end
 
 function makeSummaryFigures(results)
 dataset = results.dataset;
 estimators = results.estimators;
-t = dataset.time_s;
+[t, time_label] = getTimeAxisData(dataset.time_s);
 
 figure('Name', sprintf('%sCell Voltage', getTitlePrefix(dataset)), 'NumberTitle', 'off');
 hold on;
@@ -327,7 +341,7 @@ for idx = 1:numel(estimators)
     plot(t, est.voltage, 'LineStyle', est.lineStyle, 'Color', est.color, ...
         'LineWidth', 1.5, 'DisplayName', est.name);
 end
-grid on; xlabel('Time [s]'); ylabel('Voltage [V]');
+grid on; xlabel(time_label); ylabel('Voltage [V]');
 title(sprintf('%sCell Voltage', getTitlePrefix(dataset)));
 legend('Location', 'best');
 
@@ -344,7 +358,7 @@ for idx = 1:numel(estimators)
     plot(t, 100 * est.soc, 'LineStyle', est.lineStyle, 'Color', est.color, ...
         'LineWidth', 1.5, 'DisplayName', sprintf('%s (RMSE=%.3f%%)', est.name, 100 * est.rmse_soc));
 end
-grid on; xlabel('Time [s]'); ylabel('SOC [%]');
+grid on; xlabel(time_label); ylabel('SOC [%]');
 title(sprintf('%sSOC Estimation Comparison', getTitlePrefix(dataset)));
 legend('Location', 'best');
 
@@ -355,7 +369,7 @@ for idx = 1:numel(estimators)
     plot(t, 100 * est.error_soc, 'LineStyle', est.lineStyle, 'Color', est.color, ...
         'LineWidth', 1.5, 'DisplayName', sprintf('%s (RMSE=%.3f%%)', est.name, 100 * est.rmse_soc));
 end
-grid on; xlabel('Time [s]'); ylabel('SOC Error [%]');
+grid on; xlabel(time_label); ylabel('SOC Error [%]');
 title(sprintf('%sSOC Estimation Errors vs %s', getTitlePrefix(dataset), dataset.metric_soc_name));
 legend('Location', 'best');
 
@@ -366,7 +380,7 @@ for idx = 1:numel(estimators)
     plot(t, est.error_voltage, 'LineStyle', est.lineStyle, 'Color', est.color, ...
         'LineWidth', 1.5, 'DisplayName', sprintf('%s (RMSE=%.2f mV)', est.name, 1000 * est.rmse_voltage));
 end
-grid on; xlabel('Time [s]'); ylabel('Voltage Error [V]');
+grid on; xlabel(time_label); ylabel('Voltage Error [V]');
 title(sprintf('%sVoltage Estimation Errors vs %s', getTitlePrefix(dataset), dataset.metric_voltage_name));
 legend('Location', 'best');
 
@@ -394,7 +408,7 @@ if has_r0 && results.flags.R0figs
         plot(t, 1000 * (est.r0 - est.r0_bnd), ':', 'Color', est.color, ...
             'LineWidth', 1.0, 'HandleVisibility', 'off');
     end
-    grid on; xlabel('Time [s]'); ylabel('R0 [m\Omega]');
+    grid on; xlabel(time_label); ylabel('R0 [m\Omega]');
     title(sprintf('%sR0 Estimates and Bounds', getTitlePrefix(dataset)));
     legend('Location', 'best');
 end
@@ -427,14 +441,14 @@ if has_bias && results.flags.Biasfigs
         title(sprintf('%sEstimate', bias_names{min(biasIdx, numel(bias_names))}));
         legend('Location', 'best');
     end
-    xlabel('Time [s]');
+    xlabel(time_label);
 end
 end
 
 function makeOptionalFigures(results)
 dataset = results.dataset;
 estimators = results.estimators;
-t = dataset.time_s;
+[t, time_label] = getTimeAxisData(dataset.time_s);
 methodNames = {estimators.name};
 
 if results.flags.InnovationACFPACFfigs
@@ -454,6 +468,7 @@ if results.flags.SOCfigs
         set(gca, 'colororderindex', 1); plot(t, 100 * est.soc_bnd, ':');
         set(gca, 'colororderindex', 1); plot(t, -100 * est.soc_bnd, ':');
         title(sprintf('SOC estimation error (percent, %s)', est.name));
+        xlabel(time_label);
         legend('Error', '+3\sigma', '-3\sigma', 'Location', 'best');
     end
 end
@@ -466,8 +481,30 @@ if results.flags.Vfigs
         set(gca, 'colororderindex', 1); plot(t, est.voltage_bnd, ':');
         set(gca, 'colororderindex', 1); plot(t, -est.voltage_bnd, ':');
         title(sprintf('Voltage estimation error (%s)', est.name));
+        xlabel(time_label);
         legend('Error', '+3\sigma', '-3\sigma', 'Location', 'best');
     end
+end
+end
+
+function [time_axis, time_label] = getTimeAxisData(time_s)
+time_s = time_s(:);
+if isempty(time_s)
+    time_axis = time_s;
+    time_label = 'Time [s]';
+    return;
+end
+
+duration_s = max(time_s) - min(time_s);
+if duration_s >= 3600
+    time_axis = time_s / 3600;
+    time_label = 'Time [h]';
+elseif duration_s >= 120
+    time_axis = time_s / 60;
+    time_label = 'Time [min]';
+else
+    time_axis = time_s;
+    time_label = 'Time [s]';
 end
 end
 
@@ -493,6 +530,18 @@ if isfield(flags, fieldName) && ~isempty(flags.(fieldName))
 else
     value = defaultValue;
 end
+end
+
+function value = computeMssd(signal)
+signal = signal(:);
+valid = isfinite(signal);
+signal = signal(valid);
+if numel(signal) < 2
+    value = NaN;
+    return;
+end
+diff_signal = diff(signal);
+value = mean(diff_signal .^ 2);
 end
 
 function x = clamp01(x)
