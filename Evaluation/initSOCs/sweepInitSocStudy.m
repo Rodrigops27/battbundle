@@ -12,14 +12,15 @@ function sweepResults = sweepInitSocStudy(socRangePercent, socStepPercent, cfg)
 %   cfg              Optional struct. Useful fields:
 %                      tc, ts, dataset_mode, SweepSummaryfigs,
 %                      PlotSocEstimationfigs, PlotVoltageEstimationfigs,
-%                      rom_dataset_file, raw_bus_file, esc_model_file,
-%                      tuning
+%                      esc_dataset_file, rom_dataset_file, raw_bus_file,
+%                      esc_model_file, estimator_names, SaveResults,
+%                      results_file, tuning
 %
 % Output:
 %   sweepResults     Struct with sweep settings, RMSE tables, and run results.
 
-clear iterESCSPKF iterESCEKF iterEaEKF iterEnacrSPKF;
-clear iterEsSPKF iterEbSPKF;
+clear iterEKF iterESCSPKF iterESCEKF iterEaEKF iterEacrSPKF iterEnacrSPKF;
+clear iterEDUKF iterEsSPKF iterEbSPKF iterEBiSPKF;
 
 if nargin < 1 || isempty(socRangePercent)
     socRangePercent = [0 100];
@@ -49,6 +50,18 @@ cfg = normalizeStudyConfig(cfg, repo_root);
 soc0_sweep_percent = buildSocSweep(socRangePercent, socStepPercent);
 
 esc_src = load(cfg.esc_model_file);
+rom_model = [];
+if any(strcmp(cfg.estimator_names, 'ROM-EKF'))
+    if isempty(cfg.rom_file)
+        error('sweepInitSocStudy:MissingROMFile', ...
+            'ROM-EKF was selected but no ROM model file was found.');
+    end
+    rom_src = load(cfg.rom_file);
+    if ~isfield(rom_src, 'ROM')
+        error('sweepInitSocStudy:BadROMFile', 'Expected variable "ROM" in %s.', cfg.rom_file);
+    end
+    rom_model = rom_src.ROM;
+end
 nmc30_esc = extractEscModelStruct(esc_src);
 evalDataset = buildEvalDataset(cfg, nmc30_esc);
 
@@ -62,8 +75,7 @@ flags.Biasfigs = false;
 flags.default_temperature_c = cfg.tc;
 flags.Verbose = false;
 
-estimator_names = { ...
-    'ESC-SPKF', 'ESC-EKF', 'EaEKF', 'EnacrSPKF', 'EsSPKF', 'EbSPKF'};
+estimator_names = cfg.estimator_names(:).';
 n_estimators = numel(estimator_names);
 n_sweeps = numel(soc0_sweep_percent);
 
@@ -73,7 +85,7 @@ all_results = cell(n_sweeps, 1);
 
 for sweep_idx = 1:n_sweeps
     soc_init_kf = soc0_sweep_percent(sweep_idx);
-    estimators = buildEscEstimators(soc_init_kf, cfg, nmc30_esc);
+    estimators = buildEscEstimators(soc_init_kf, cfg, nmc30_esc, rom_model, estimator_names);
     run_results = xKFeval(evalDataset, estimators, flags);
     all_results{sweep_idx} = run_results;
 
@@ -131,6 +143,17 @@ sweepResults.soc_rmse_table = soc_rmse_table;
 sweepResults.voltage_rmse_table = voltage_rmse_table;
 sweepResults.evalDataset = evalDataset;
 sweepResults.all_results = all_results;
+sweepResults.created_on = datestr(now, 'yyyy-mm-dd HH:MM:SS');
+sweepResults.study_script = mfilename('fullpath');
+sweepResults.config = cfg;
+sweepResults.saved_results_file = '';
+sweepResults.result_variable = 'sweepResults';
+
+if cfg.SaveResults
+    results_file = resolveInitSocResultsFile(cfg, here, evalDataset);
+    sweepResults.saved_results_file = results_file;
+    saveInitSocResults(results_file, sweepResults);
+end
 
 if nargout == 0
     assignin('base', 'initSocSweepResults', sweepResults);
@@ -143,23 +166,36 @@ tuning_defaults = defaultInitSocTuning();
 
 cfg.tc = getCfg(cfg, 'tc', 25);
 cfg.ts = getCfg(cfg, 'ts', 1);
-cfg.dataset_mode = getCfg(cfg, 'dataset_mode', 'rom');
+cfg.dataset_mode = getCfg(cfg, 'dataset_mode', 'esc');
 cfg.SweepSummaryfigs = getCfg(cfg, 'SweepSummaryfigs', false);
 cfg.PlotSocEstimationfigs = getCfg(cfg, 'PlotSocEstimationfigs', true);
 cfg.PlotVoltageEstimationfigs = getCfg(cfg, 'PlotVoltageEstimationfigs', true);
+cfg.SaveResults = logical(getCfg(cfg, 'SaveResults', true));
+cfg.results_file = getCfg(cfg, 'results_file', '');
+cfg.esc_dataset_file = getCfg(cfg, 'esc_dataset_file', ...
+    fullfile(evaluation_root, 'ESCSimData', 'datasets', 'esc_bus_coreBattery_dataset.mat'));
 cfg.rom_dataset_file = getCfg(cfg, 'rom_dataset_file', ...
     fullfile(evaluation_root, 'ROMSimData', 'datasets', 'rom_bus_coreBattery_dataset.mat'));
+cfg.rom_file = getCfg(cfg, 'rom_file', ...
+    firstExistingFileOrEmpty({ ...
+    fullfile(repo_root, 'models', 'ROM_ATL20_beta.mat')}));
 cfg.raw_bus_file = getCfg(cfg, 'raw_bus_file', ...
     fullfile(evaluation_root, 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat'));
 cfg.esc_model_file = getCfg(cfg, 'esc_model_file', ...
     firstExistingFile({ ...
-    fullfile(repo_root, 'models', 'NMC30model.mat'), ...
-    fullfile(repo_root, 'ESC_Id', 'NMC30', 'NMC30model.mat')}, ...
+    fullfile(repo_root, 'models', 'ATLmodel.mat'), ...
+    fullfile(repo_root, 'ESC_Id', 'FullESCmodels', 'LFP', 'ATLmodel.mat')}, ...
     'sweepInitSocStudy:MissingESCModel', ...
-    'No NMC30 ESC model file found.'));
+    'No ATL ESC model file found.'));
+cfg.estimator_names = normalizeEstimatorSelection(getCfg(cfg, 'estimator_names', defaultInitSocEstimatorNames()));
 cfg.tuning = getCfg(cfg, 'tuning', tuning_defaults);
 
 cfg.tuning = mergeStructDefaults(cfg.tuning, tuning_defaults);
+end
+
+function names = defaultInitSocEstimatorNames()
+names = {'ESC-SPKF', 'ESC-EKF', 'EaEKF', 'EacrSPKF', 'EnacrSPKF', ...
+    'EDUKF', 'EsSPKF', 'EbSPKF', 'EBiSPKF', 'Em7SPKF'};
 end
 
 function tuning = defaultInitSocTuning()
@@ -169,6 +205,7 @@ tuning.SigmaX0_hk = 1e-6;
 tuning.SigmaX0_soc = 1e-3;
 tuning.sigma_w_esc = 1e-3;
 tuning.sigma_v_esc = 1e-3;
+tuning.sigma_x0_rom_tail = 2e6;
 tuning.SigmaR0 = 1e-6;
 tuning.SigmaWR0 = 1e-16;
 tuning.current_bias_var0 = 1e-5;
@@ -211,6 +248,21 @@ end
 
 function evalDataset = buildEvalDataset(cfg, model)
 switch lower(cfg.dataset_mode)
+    case 'esc'
+        dataset = loadOrBuildEscDataset(cfg.esc_dataset_file, cfg.raw_bus_file, cfg.esc_model_file, cfg.tc);
+        evalDataset = struct();
+        evalDataset.time_s = dataset.time_s(:);
+        evalDataset.current_a = dataset.current_a(:);
+        evalDataset.voltage_v = dataset.voltage_v(:);
+        evalDataset.temperature_c = selectTemperatureTrace(dataset, cfg.tc);
+        evalDataset.dataset_soc = getOptionalField(dataset, 'soc_true', []);
+        evalDataset.soc_init_reference = inferReferenceSoc0(dataset);
+        evalDataset.capacity_ah = getParamESC('QParam', cfg.tc, model);
+        evalDataset.reference_name = 'ESC reference';
+        evalDataset.voltage_name = 'ESC';
+        evalDataset.title_prefix = 'Init Sweep ATL BSS';
+        evalDataset.r0_reference = getParamESC('R0Param', cfg.tc, model);
+
     case 'rom'
         dataset = loadOrBuildRomDataset(cfg.rom_dataset_file, cfg.raw_bus_file, cfg.tc);
         evalDataset = struct();
@@ -244,11 +296,11 @@ switch lower(cfg.dataset_mode)
 
     otherwise
         error('sweepInitSocStudy:BadDatasetMode', ...
-            'Unsupported dataset_mode "%s". Use "rom" or "bus_raw".', cfg.dataset_mode);
+            'Unsupported dataset_mode "%s". Use "esc", "rom", or "bus_raw".', cfg.dataset_mode);
 end
 end
 
-function estimators = buildEscEstimators(soc_init_kf, cfg, model)
+function estimators = buildEscEstimators(soc_init_kf, cfg, model, ROM, estimator_names)
 tuning = cfg.tuning;
 n_rc = numel(getParamESC('RCParam', cfg.tc, model));
 SigmaX0 = diag([ ...
@@ -257,39 +309,93 @@ SigmaX0 = diag([ ...
     tuning.SigmaX0_soc]);
 R0init = getParamESC('R0Param', cfg.tc, model);
 
-estimators = repmat(estimatorTemplate(), 6, 1);
+estimators = repmat(estimatorTemplate(), numel(estimator_names), 1);
 
-estimators(1) = makeEstimator('ESC-SPKF', ...
-    initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, model), ...
-    @stepEscSpkf, soc_init_kf, [0.00 0.45 0.74], ':');
+for idx = 1:numel(estimator_names)
+    switch estimator_names{idx}
+        case 'ESC-SPKF'
+            estimators(idx) = makeEstimator('ESC-SPKF', ...
+                initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, model), ...
+                @stepEscSpkf, soc_init_kf, [0.00 0.45 0.74], ':');
 
-estimators(2) = makeEstimator('ESC-EKF', ...
-    initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, model), ...
-    @stepEscEkf, soc_init_kf, [0.85 0.33 0.10], '--');
+        case 'ROM-EKF'
+            rom_state_count = inferRomTransientStateCount(ROM, getFieldOr(tuning, 'nx_rom', []));
+            sigma_x0_rom = diag([ones(1, rom_state_count), tuning.sigma_x0_rom_tail]);
+            estimators(idx) = makeEstimator('ROM-EKF', ...
+                initKF(soc_init_kf, cfg.tc, sigma_x0_rom, tuning.sigma_v_esc, tuning.sigma_w_esc, 'OutB', ROM), ...
+                @stepRomEkf, soc_init_kf, [0.64 0.08 0.18], '-');
 
-estimators(3) = makeEstimator('EaEKF', ...
-    initEaEKF(soc_init_kf, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, model), ...
-    @stepEaEkf, soc_init_kf, [0.93 0.69 0.13], '-.');
+        case 'ESC-EKF'
+            estimators(idx) = makeEstimator('ESC-EKF', ...
+                initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, model), ...
+                @stepEscEkf, soc_init_kf, [0.85 0.33 0.10], '--');
 
-estimators(4) = makeEstimator('EnacrSPKF', ...
-    initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, model), ...
-    @stepEnacrSpkf, soc_init_kf, [0.47 0.67 0.19], '--');
+        case 'EaEKF'
+            estimators(idx) = makeEstimator('EaEKF', ...
+                initEaEKF(soc_init_kf, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, model), ...
+                @stepEaEkf, soc_init_kf, [0.93 0.69 0.13], '-.');
 
-estimators(5) = makeEstimator('EsSPKF', ...
-    initEDUKF(soc_init_kf, R0init, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, ...
-    tuning.SigmaR0, tuning.SigmaWR0, model), ...
-    @stepEsSpkf, soc_init_kf, [0.13 0.55 0.13], '--');
-estimators(5).tracksR0 = true;
-estimators(5).r0_init = estimators(5).kfData.R0hat;
+        case 'EacrSPKF'
+            estimators(idx) = makeEstimator('EacrSPKF', ...
+                initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, model), ...
+                @stepEacrSpkf, soc_init_kf, [0.49 0.18 0.56], '-');
 
-estimators(6) = makeEstimator('EbSPKF', ...
-    initEbSpkf(soc_init_kf, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, ...
-    tuning.single_bias_process_var, tuning.current_bias_var0, model), ...
-    @stepEbSpkf, soc_init_kf, [0.25 0.25 0.25], ':');
-estimators(6).bias_dim = 1;
-estimators(6).bias_init = estimators(6).kfData.xhat(estimators(6).kfData.ibInd);
-estimators(6).bias_bnd_init = 3 * sqrt(max( ...
-    estimators(6).kfData.SigmaX(estimators(6).kfData.ibInd, estimators(6).kfData.ibInd), 0));
+        case 'EnacrSPKF'
+            estimators(idx) = makeEstimator('EnacrSPKF', ...
+                initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, model), ...
+                @stepEnacrSpkf, soc_init_kf, [0.47 0.67 0.19], '--');
+
+        case 'EDUKF'
+            estimators(idx) = makeEstimator('EDUKF', ...
+                initEDUKF(soc_init_kf, R0init, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, ...
+                tuning.SigmaR0, tuning.SigmaWR0, model), ...
+                @stepEdukf, soc_init_kf, [0.30 0.75 0.93], '-');
+            estimators(idx).tracksR0 = true;
+            estimators(idx).r0_init = estimators(idx).kfData.R0hat;
+
+        case 'EsSPKF'
+            estimators(idx) = makeEstimator('EsSPKF', ...
+                initEDUKF(soc_init_kf, R0init, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, ...
+                tuning.SigmaR0, tuning.SigmaWR0, model), ...
+                @stepEsSpkf, soc_init_kf, [0.13 0.55 0.13], '--');
+            estimators(idx).tracksR0 = true;
+            estimators(idx).r0_init = estimators(idx).kfData.R0hat;
+
+        case 'EbSPKF'
+            estimators(idx) = makeEstimator('EbSPKF', ...
+                initEbSpkf(soc_init_kf, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, ...
+                tuning.single_bias_process_var, tuning.current_bias_var0, model), ...
+                @stepEbSpkf, soc_init_kf, [0.25 0.25 0.25], ':');
+            estimators(idx).bias_dim = 1;
+            estimators(idx).bias_init = estimators(idx).kfData.xhat(estimators(idx).kfData.ibInd);
+            estimators(idx).bias_bnd_init = 3 * sqrt(max( ...
+                estimators(idx).kfData.SigmaX(estimators(idx).kfData.ibInd, estimators(idx).kfData.ibInd), 0));
+
+        case 'EBiSPKF'
+            estimators(idx) = makeEstimator('EBiSPKF', ...
+                initEbiSpkf(soc_init_kf, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, ...
+                tuning.current_bias_var0, model), ...
+                @stepEbiSpkf, soc_init_kf, [0.64 0.08 0.18], '-.');
+            estimators(idx).bias_dim = 1;
+            estimators(idx).bias_init = estimators(idx).kfData.bhat(:).';
+            estimators(idx).bias_bnd_init = 3 * sqrt(max(diag(estimators(idx).kfData.SigmaB), 0)).';
+
+        case 'Em7SPKF'
+            estimators(idx) = makeEstimator('Em7SPKF', ...
+                initEm7Spkf(soc_init_kf, R0init, cfg.tc, SigmaX0, tuning.sigma_v_esc, tuning.sigma_w_esc, ...
+                tuning.SigmaR0, tuning.SigmaWR0, tuning.current_bias_var0, model), ...
+                @stepEm7Spkf, soc_init_kf, [0.82 0.23 0.47], '-');
+            estimators(idx).tracksR0 = true;
+            estimators(idx).r0_init = estimators(idx).kfData.R0hat;
+            estimators(idx).bias_dim = 1;
+            estimators(idx).bias_init = estimators(idx).kfData.bhat(:).';
+            estimators(idx).bias_bnd_init = 3 * sqrt(max(diag(estimators(idx).kfData.SigmaB), 0)).';
+
+        otherwise
+            error('sweepInitSocStudy:UnsupportedEstimator', ...
+                'Unsupported estimator "%s".', estimator_names{idx});
+    end
+end
 end
 
 function estimator = makeEstimator(name, kfData, stepFcn, soc0_percent, color, lineStyle)
@@ -322,6 +428,11 @@ function step = stepEscSpkf(vk, ik, Tk, dt, kfData)
 step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
 end
 
+function step = stepRomEkf(vk, ik, Tk, ~, kfData)
+[zk, boundzk, kfData] = iterEKF(vk, ik, Tk, kfData);
+step = baseStepStruct(zk(end), zk(end-1), boundzk(end), boundzk(end-1), kfData);
+end
+
 function step = stepEscEkf(vk, ik, Tk, dt, kfData)
 [soc, v_pred, soc_bnd, kfData, v_bnd] = iterESCEKF(vk, ik, Tk, dt, kfData);
 step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
@@ -332,9 +443,21 @@ function step = stepEaEkf(vk, ik, Tk, dt, kfData)
 step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
 end
 
+function step = stepEacrSpkf(vk, ik, Tk, dt, kfData)
+[soc, v_pred, soc_bnd, kfData, v_bnd] = iterEacrSPKF(vk, ik, Tk, dt, kfData);
+step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
+end
+
 function step = stepEnacrSpkf(vk, ik, Tk, dt, kfData)
 [soc, v_pred, soc_bnd, kfData, v_bnd] = iterEnacrSPKF(vk, ik, Tk, dt, kfData);
 step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
+end
+
+function step = stepEdukf(vk, ik, Tk, dt, kfData)
+[soc, v_pred, soc_bnd, kfData, v_bnd, r0_est, r0_bnd] = iterEDUKF(vk, ik, Tk, dt, kfData);
+step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
+step.r0 = r0_est;
+step.r0_bnd = r0_bnd;
 end
 
 function step = stepEsSpkf(vk, ik, Tk, dt, kfData)
@@ -349,6 +472,22 @@ function step = stepEbSpkf(vk, ik, Tk, dt, kfData)
 step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
 step.bias = ib_est;
 step.bias_bnd = ib_bnd;
+end
+
+function step = stepEbiSpkf(vk, ik, Tk, dt, kfData)
+[soc, v_pred, soc_bnd, kfData, v_bnd, ib_est, ib_bnd] = iterEBiSPKF(vk, ik, Tk, dt, kfData);
+step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
+step.bias = ib_est;
+step.bias_bnd = ib_bnd;
+end
+
+function step = stepEm7Spkf(vk, ik, Tk, dt, kfData)
+[soc, v_pred, soc_bnd, kfData, v_bnd, bias_est, bias_bnd, r0_est, r0_bnd] = Em7SPKF(vk, ik, Tk, dt, kfData);
+step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
+step.r0 = r0_est;
+step.r0_bnd = r0_bnd;
+step.bias = bias_est;
+step.bias_bnd = bias_bnd;
 end
 
 function step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData)
@@ -387,6 +526,24 @@ kfData.Wm = [weight1; weight2 * ones(2 * kfData.Na, 1)];
 kfData.Wc = kfData.Wm;
 end
 
+function kfData = initEbiSpkf(soc0, T0, SigmaX0, SigmaV, SigmaW, sigma_ib0, model)
+biasCfg = struct();
+biasCfg.nb = 1;
+biasCfg.bhat0 = 0;
+biasCfg.SigmaB0 = sigma_ib0;
+biasCfg.currentBiasInd = 1;
+kfData = initESCSPKF(soc0, T0, SigmaX0, SigmaV, SigmaW, model, biasCfg);
+end
+
+function kfData = initEm7Spkf(soc0, R0init, T0, SigmaX0, SigmaV, SigmaW, SigmaR0, SigmaWR0, sigma_ib0, model)
+biasCfg = struct();
+biasCfg.nb = 1;
+biasCfg.bhat0 = 0;
+biasCfg.SigmaB0 = sigma_ib0;
+biasCfg.currentBiasInd = 1;
+kfData = Em7init(soc0, R0init, T0, SigmaX0, SigmaV, SigmaW, SigmaR0, SigmaWR0, model, biasCfg);
+end
+
 function dataset = loadOrBuildRomDataset(dataset_file, raw_bus_file, tc)
 if exist(dataset_file, 'file') == 2
     raw = load(dataset_file);
@@ -402,6 +559,25 @@ cfg.profile_file = raw_bus_file;
 cfg.source_capacity_ah = 8;
 cfg.tc = tc;
 dataset = createBusCoreBatterySyntheticDataset(dataset_file, cfg);
+end
+
+function dataset = loadOrBuildEscDataset(dataset_file, raw_bus_file, esc_model_file, tc)
+if exist(dataset_file, 'file') == 2
+    raw = load(dataset_file);
+    if ~isfield(raw, 'dataset')
+        error('sweepInitSocStudy:BadDatasetFile', 'Expected variable "dataset" in %s.', dataset_file);
+    end
+    dataset = raw.dataset;
+    if isfield(dataset, 'esc_model_file') && pathsMatchPortable(dataset.esc_model_file, esc_model_file)
+        return;
+    end
+end
+
+cfg = struct();
+cfg.profile_file = raw_bus_file;
+cfg.model_file = esc_model_file;
+cfg.tc = tc;
+dataset = BSSsimESCdata(dataset_file, cfg);
 end
 
 function temperature_c = selectTemperatureTrace(dataset, default_temp)
@@ -713,55 +889,6 @@ title(sprintf('Initial SOC Sweep Voltage RMSE (%s)', upper(dataset_mode)));
 legend('Location', 'best');
 end
 
-function plotPerEstimatorSocConvergence(all_results, soc0_sweep_percent, estimator_names)
-reference = all_results{1}.dataset.reference_soc;
-time_s = all_results{1}.dataset.time_s;
-palette = parula(max(numel(soc0_sweep_percent), 2));
-
-for est_idx = 1:numel(estimator_names)
-    figure('Name', sprintf('SOC Estimation - %s', estimator_names{est_idx}), 'NumberTitle', 'off');
-    plot(time_s, 100 * reference, 'k-', 'LineWidth', 2.5, 'DisplayName', 'Reference');
-    hold on;
-    for sweep_idx = 1:numel(all_results)
-        est = all_results{sweep_idx}.estimators(est_idx);
-        plot(time_s, 100 * est.soc, '-', ...
-            'Color', palette(sweep_idx, :), ...
-            'LineWidth', 1.2, ...
-            'DisplayName', sprintf('SOC0=%.2f%%', soc0_sweep_percent(sweep_idx)));
-    end
-    grid on;
-    xlabel('Time [s]');
-    ylabel('SOC [%]');
-    title(sprintf('SOC Estimation Convergence - %s', estimator_names{est_idx}));
-    legend('Location', 'best');
-end
-end
-
-function plotPerEstimatorVoltageConvergence(all_results, soc0_sweep_percent, estimator_names)
-voltage_ref = all_results{1}.dataset.voltage_v;
-voltage_name = all_results{1}.dataset.voltage_name;
-time_s = all_results{1}.dataset.time_s;
-palette = parula(max(numel(soc0_sweep_percent), 2));
-
-for est_idx = 1:numel(estimator_names)
-    figure('Name', sprintf('Voltage Estimation - %s', estimator_names{est_idx}), 'NumberTitle', 'off');
-    plot(time_s, voltage_ref, 'k-', 'LineWidth', 2.5, 'DisplayName', voltage_name);
-    hold on;
-    for sweep_idx = 1:numel(all_results)
-        est = all_results{sweep_idx}.estimators(est_idx);
-        plot(time_s, est.voltage, '-', ...
-            'Color', palette(sweep_idx, :), ...
-            'LineWidth', 1.2, ...
-            'DisplayName', sprintf('SOC0=%.2f%%', soc0_sweep_percent(sweep_idx)));
-    end
-    grid on;
-    xlabel('Time [s]');
-    ylabel('Voltage [V]');
-    title(sprintf('Voltage Estimation Convergence - %s', estimator_names{est_idx}));
-    legend('Location', 'best');
-end
-end
-
 function model = extractEscModelStruct(raw)
 if isfield(raw, 'nmc30_model')
     model = raw.nmc30_model;
@@ -771,6 +898,125 @@ else
     error('sweepInitSocStudy:BadESCModelFile', ...
         'Expected variable "nmc30_model" or "model" in the ESC model file.');
 end
+end
+
+function estimator_names = normalizeEstimatorSelection(raw_names)
+if ischar(raw_names)
+    raw_names = {raw_names};
+elseif isa(raw_names, 'string')
+    raw_names = cellstr(raw_names(:));
+elseif ~iscell(raw_names)
+    error('sweepInitSocStudy:BadEstimatorSelection', ...
+        'cfg.estimator_names must be a char vector, string array, or cell array.');
+end
+
+estimator_names = cell(1, numel(raw_names));
+for idx = 1:numel(raw_names)
+    name = char(raw_names{idx});
+    key = regexprep(upper(name), '[^A-Z0-9]', '');
+    switch key
+        case {'ITERESCSPKF', 'ESCSPKF'}
+            estimator_names{idx} = 'ESC-SPKF';
+        case {'ITEREKF', 'ITERROMEKF', 'ROMEKF'}
+            estimator_names{idx} = 'ROM-EKF';
+        case {'ITERESCEKF', 'ESCEKF'}
+            estimator_names{idx} = 'ESC-EKF';
+        case {'ITEREAEKF', 'EAEKF'}
+            estimator_names{idx} = 'EaEKF';
+        case {'ITEREACRSPKF', 'EACRSPKF'}
+            estimator_names{idx} = 'EacrSPKF';
+        case {'ITERENACRSPKF', 'ENACRSPKF'}
+            estimator_names{idx} = 'EnacrSPKF';
+        case {'ITEREDUKF', 'EDUKF'}
+            estimator_names{idx} = 'EDUKF';
+        case {'ITERESSPKF', 'ESSPKF'}
+            estimator_names{idx} = 'EsSPKF';
+        case {'ITEREBSPKF', 'EBSPKF'}
+            estimator_names{idx} = 'EbSPKF';
+        case {'ITEREBISPKF', 'EBISPKF'}
+            estimator_names{idx} = 'EBiSPKF';
+        case {'ITEREM7SPKF', 'EM7SPKF'}
+            estimator_names{idx} = 'Em7SPKF';
+        otherwise
+            error('sweepInitSocStudy:UnsupportedEstimator', ...
+                'Unsupported estimator selector "%s".', name);
+    end
+end
+
+estimator_names = unique(estimator_names, 'stable');
+if isempty(estimator_names)
+    error('sweepInitSocStudy:NoEstimators', ...
+        'cfg.estimator_names must select at least one estimator.');
+end
+end
+
+function results_file = resolveInitSocResultsFile(cfg, here, evalDataset)
+if ~isempty(cfg.results_file)
+    results_file = cfg.results_file;
+    return;
+end
+
+title_prefix = getFieldOr(evalDataset, 'title_prefix', 'init_soc_sweep');
+base_name = sprintf('%s_init_soc_sweep_results.mat', sanitizeFilename(title_prefix));
+results_file = fullfile(here, 'results', base_name);
+end
+
+function n_states = inferRomTransientStateCount(ROM, fallback_value)
+if nargin < 2
+    fallback_value = [];
+end
+
+if isfield(ROM, 'ROMmdls') && ~isempty(ROM.ROMmdls)
+    n_states = size(ROM.ROMmdls(1).A, 1) - 1;
+    return;
+end
+
+if ~isempty(fallback_value)
+    n_states = fallback_value;
+    return;
+end
+
+error('sweepInitSocStudy:MissingROMStateCount', ...
+    'Could not infer the ROM transient-state count from ROM.ROMmdls.');
+end
+
+function saveInitSocResults(results_file, sweepResults)
+results_dir = fileparts(results_file);
+if ~isempty(results_dir) && exist(results_dir, 'dir') ~= 7
+    mkdir(results_dir);
+end
+save(results_file, 'sweepResults');
+fprintf('\nInitial-SOC sweep results saved to %s\n', results_file);
+end
+
+function name = sanitizeFilename(name)
+name = regexprep(char(name), '[^\w\-]+', '_');
+name = regexprep(name, '_+', '_');
+name = regexprep(name, '^_|_$', '');
+if isempty(name)
+    name = 'init_soc_sweep';
+end
+end
+
+function path_out = normalizePath(path_in)
+path_out = strrep(char(path_in), '/', filesep);
+path_out = strrep(path_out, '\', filesep);
+end
+
+function tf = pathsMatchPortable(path_a, path_b)
+a = comparablePath(path_a);
+b = comparablePath(path_b);
+tf = strcmpi(a, b) || endsWith(a, stripLeadingSeparators(b), 'IgnoreCase', true) || ...
+    endsWith(b, stripLeadingSeparators(a), 'IgnoreCase', true);
+end
+
+function path_out = comparablePath(path_in)
+path_out = lower(normalizePath(path_in));
+path_out = regexprep(path_out, [regexptranslate('escape', filesep), '+'], filesep);
+end
+
+function path_out = stripLeadingSeparators(path_in)
+path_out = regexprep(char(path_in), '^[\\/]+', '');
 end
 
 function file_path = firstExistingFile(candidates, error_id, error_msg)
@@ -784,4 +1030,14 @@ end
 
 searched = sprintf('\n  - %s', candidates{:});
 error(error_id, '%s Searched:%s', error_msg, searched);
+end
+
+function file_path = firstExistingFileOrEmpty(candidates)
+file_path = '';
+for idx = 1:numel(candidates)
+    if exist(candidates{idx}, 'file') == 2
+        file_path = candidates{idx};
+        return;
+    end
+end
 end

@@ -1,9 +1,10 @@
-function sweepResults = runInitSocStudy(socRangePercent, socStepPercent)
+function sweepResults = runInitSocStudy(socRangePercent, socStepPercent, cfg)
 % runInitSocStudy Wrapper for the ESC initial-SOC convergence study.
 %
 % Examples:
 %   runInitSocStudy
 %   runInitSocStudy([45 80], 2)
+%   runInitSocStudy([45 80], 2, cfg)
 %
 % The wrapper owns the default tuning and plotting choices, then calls
 % sweepInitSocStudy with those settings.
@@ -14,15 +15,26 @@ end
 if nargin < 2 || isempty(socStepPercent)
     socStepPercent = 10;
 end
+if nargin < 3 || isempty(cfg)
+    cfg = struct();
+end
 
-cfg = struct();
-cfg.dataset_mode = 'rom';
-cfg.tc = 25;
-cfg.ts = 1;
-cfg.SweepSummaryfigs = false;
-cfg.PlotSocEstimationfigs = true;
-cfg.PlotVoltageEstimationfigs = true;
-cfg.tuning = defaultWrapperTuning();
+defaults = struct();
+defaults.dataset_mode = 'esc';
+defaults.tc = 25;
+defaults.ts = 1;
+defaults.SweepSummaryfigs = false;
+defaults.PlotSocEstimationfigs = true;
+defaults.PlotVoltageEstimationfigs = true;
+defaults.SaveResults = true;
+defaults.results_file = '';
+defaults.estimator_names = { ...
+    'iterEbSPKF', 'iterESCSPKF', 'iterEBiSPKF', ...
+    'iterEaEKF', 'iterEsSPKF', 'iterEDUKF'};
+defaults.tuning = defaultWrapperTuning();
+
+cfg = mergeStructDefaults(cfg, defaults);
+cfg.tuning = mergeStructDefaults(cfg.tuning, defaultWrapperTuning());
 
 sweepResults = sweepInitSocStudy(socRangePercent, socStepPercent, cfg);
 
@@ -45,4 +57,12 @@ tuning.sigma_v_bias = 1e2;
 tuning.current_bias_var0 = 1e-5;
 tuning.output_bias_var0 = 1e-5;
 tuning.single_bias_process_var = 1e-8;
+end
+
+function out = mergeStructDefaults(in, defaults)
+out = defaults;
+names = fieldnames(in);
+for idx = 1:numel(names)
+    out.(names{idx}) = in.(names{idx});
+end
 end
