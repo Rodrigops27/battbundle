@@ -1,5 +1,6 @@
 function sweepResults = sweepNoiseStudy(sigmaWRange, sigmaVRange, stepMultiplier, cfg)
 % sweepNoiseStudy Sweep process and sensor noise over configurable ranges.
+% Grid sweeping 10 estimators can take hours. Patience is advised!
 %
 % Usage:
 %   results = sweepNoiseStudy()
@@ -12,10 +13,12 @@ function sweepResults = sweepNoiseStudy(sigmaWRange, sigmaVRange, stepMultiplier
 %   stepMultiplier  Multiplicative step between sweep points. Default 5.
 %   cfg             Optional struct. Useful fields:
 %                     tc, ts, dataset_mode, sweep_mode,
-%                     fixed_sigma_w, fixed_sigma_v, NoiseSummaryfigs,
+%                     fixed_sigma_w, fixed_sigma_v, include_rom_ekf,
+%                     estimator_names,
+%                     use_parallel, NoiseSummaryfigs,
 %                     PlotSocRmsefigs, PlotVoltageRmsefigs,
-%                     rom_dataset_file, raw_bus_file, rom_file,
-%                     esc_model_file, tuning
+%                     esc_dataset_file, rom_dataset_file, raw_bus_file,
+%                     rom_file, esc_model_file, tuning
 %
 % Output:
 %   sweepResults    Struct with sweep settings, RMSE tables, and run results.
@@ -23,11 +26,13 @@ function sweepResults = sweepNoiseStudy(sigmaWRange, sigmaVRange, stepMultiplier
 clear iterEKF iterESCSPKF iterESCEKF iterEaEKF iterEacrSPKF iterEnacrSPKF;
 clear iterEDUKF iterEsSPKF iterEbSPKF iterEBiSPKF;
 
+input_meta = captureInputMeta(nargin, sigmaWRange, sigmaVRange, stepMultiplier, cfg);
+
 if nargin < 1 || isempty(sigmaWRange)
-    sigmaWRange = [1e-3 1e1];
+    sigmaWRange = [1e-3 1e2];
 end
 if nargin < 2 || isempty(sigmaVRange)
-    sigmaVRange = [1e-3 1e1];
+    sigmaVRange = [1e-6 2e-1];
 end
 if nargin < 3 || isempty(stepMultiplier)
     stepMultiplier = 5;
@@ -50,15 +55,22 @@ end
 repo_root = fileparts(fileparts(here));
 addpath(genpath(repo_root));
 
-cfg = normalizeStudyConfig(cfg, repo_root);
+cfg = normalizeStudyConfig(cfg, repo_root, input_meta);
 [sigma_w_values, sigma_v_values] = buildSweepAxes(cfg, sigmaWRange, sigmaVRange, stepMultiplier);
 
-rom_src = load(cfg.rom_file);
 esc_src = load(cfg.esc_model_file);
-if ~isfield(rom_src, 'ROM')
-    error('sweepNoiseStudy:BadROMFile', 'Expected variable "ROM" in %s.', cfg.rom_file);
+ROM = [];
+if any(strcmp(cfg.estimator_names, 'ROM-EKF'))
+    if isempty(cfg.rom_file)
+        error('sweepNoiseStudy:MissingROMFile', ...
+            'ROM-EKF was selected but no ROM model file was found.');
+    end
+    rom_src = load(cfg.rom_file);
+    if ~isfield(rom_src, 'ROM')
+        error('sweepNoiseStudy:BadROMFile', 'Expected variable "ROM" in %s.', cfg.rom_file);
+    end
+    ROM = rom_src.ROM;
 end
-ROM = rom_src.ROM;
 nmc30_esc = extractEscModelStruct(esc_src);
 evalDataset = buildEvalDataset(cfg, nmc30_esc);
 
@@ -72,37 +84,70 @@ flags.Biasfigs = false;
 flags.default_temperature_c = cfg.tc;
 flags.Verbose = false;
 
-estimator_names = { ...
-    'ROM-EKF', 'ESC-SPKF', 'ESC-EKF', 'EaEKF', 'EacrSPKF', ...
-    'EnacrSPKF', 'EDUKF', 'EsSPKF', 'EbSPKF', 'EBiSPKF'};
+estimator_names = cfg.estimator_names(:).';
 n_estimators = numel(estimator_names);
 n_w = numel(sigma_w_values);
 n_v = numel(sigma_v_values);
 n_runs = n_w * n_v;
+[run_w_idx, run_v_idx, run_sigma_w, run_sigma_v] = buildRunPlan(sigma_w_values, sigma_v_values);
+hwait = createSweepWaitbar(n_runs, estimator_names, sigma_w_values, sigma_v_values);
+cleanup_waitbar = onCleanup(@() closeSweepWaitbar(hwait)); %#ok<NASGU>
+completed_runs = 0;
 
 soc_rmse = NaN(n_w, n_v, n_estimators);
 voltage_rmse = NaN(n_w, n_v, n_estimators);
 soc_me = NaN(n_w, n_v, n_estimators);
 voltage_me = NaN(n_w, n_v, n_estimators);
+soc_mssd = NaN(n_w, n_v, n_estimators);
+voltage_mssd = NaN(n_w, n_v, n_estimators);
 all_results = cell(n_w, n_v);
 
-for w_idx = 1:n_w
-    for v_idx = 1:n_v
-        noise_cfg = struct('sigma_w', sigma_w_values(w_idx), 'sigma_v', sigma_v_values(v_idx));
-        estimators = buildAllEstimators(evalDataset.soc_init_reference, cfg, ROM, nmc30_esc, noise_cfg);
-        run_results = xKFeval(evalDataset, estimators, flags);
-        all_results{w_idx, v_idx} = run_results;
-
-        for est_idx = 1:n_estimators
-            soc_rmse(w_idx, v_idx, est_idx) = 100 * run_results.estimators(est_idx).rmse_soc;
-            voltage_rmse(w_idx, v_idx, est_idx) = 1000 * run_results.estimators(est_idx).rmse_voltage;
-            soc_me(w_idx, v_idx, est_idx) = 100 * run_results.estimators(est_idx).me_soc;
-            voltage_me(w_idx, v_idx, est_idx) = 1000 * run_results.estimators(est_idx).me_voltage;
-        end
-    end
+[use_parallel, parallel_message] = resolveParallelMode(cfg);
+if cfg.use_parallel && ~use_parallel
+    fprintf('%s\n', parallel_message);
+elseif use_parallel
+    fprintf('Parallel sweep enabled.\n');
 end
 
-summary_table = buildSummaryTable(estimator_names, sigma_w_values, sigma_v_values, soc_rmse, voltage_rmse, soc_me, voltage_me);
+fprintf('\nNoise covariance sweep starting with %d estimator(s).\n', n_estimators);
+fprintf('Included estimators: %s\n', strjoin(estimator_names, ', '));
+
+if use_parallel
+    run_outputs = cell(n_runs, 1);
+    progress_queue = parallel.pool.DataQueue;
+    afterEach(progress_queue, @onParallelProgress);
+
+    parfor run_idx = 1:n_runs
+        run_outputs{run_idx} = evaluateSweepPoint( ...
+            run_sigma_w(run_idx), run_sigma_v(run_idx), ...
+            evalDataset, cfg, ROM, nmc30_esc, flags);
+        send(progress_queue, struct( ...
+            'run_idx', run_idx, ...
+            'sigma_w', run_sigma_w(run_idx), ...
+            'sigma_v', run_sigma_v(run_idx)));
+    end
+
+    for run_idx = 1:n_runs
+        [soc_rmse, voltage_rmse, soc_me, voltage_me, soc_mssd, voltage_mssd, all_results] = storeSweepPoint( ...
+            soc_rmse, voltage_rmse, soc_me, voltage_me, soc_mssd, voltage_mssd, all_results, ...
+            run_w_idx(run_idx), run_v_idx(run_idx), run_outputs{run_idx});
+    end
+else
+    for run_idx = 1:n_runs
+        point_output = evaluateSweepPoint( ...
+            run_sigma_w(run_idx), run_sigma_v(run_idx), ...
+            evalDataset, cfg, ROM, nmc30_esc, flags);
+        [soc_rmse, voltage_rmse, soc_me, voltage_me, soc_mssd, voltage_mssd, all_results] = storeSweepPoint( ...
+            soc_rmse, voltage_rmse, soc_me, voltage_me, soc_mssd, voltage_mssd, all_results, ...
+            run_w_idx(run_idx), run_v_idx(run_idx), point_output);
+        updateProgress(run_idx, run_sigma_w(run_idx), run_sigma_v(run_idx));
+    end
+end
+updateSweepWaitbar(hwait, n_runs, n_runs, sigma_w_values(end), sigma_v_values(end), n_estimators);
+
+summary_table = buildSummaryTable( ...
+    estimator_names, sigma_w_values, sigma_v_values, ...
+    soc_rmse, voltage_rmse, soc_me, voltage_me, soc_mssd, voltage_mssd);
 
 fprintf('\nNoise-covariance sweep summary (%s dataset)\n', upper(cfg.dataset_mode));
 fprintf('Sweep mode: %s\n', upper(cfg.sweep_mode));
@@ -114,20 +159,14 @@ fprintf('\nAggregate summary across sigma_w / sigma_v sweep\n');
 for est_idx = 1:n_estimators
     soc_vals = soc_rmse(:, :, est_idx);
     v_vals = voltage_rmse(:, :, est_idx);
+    soc_mssd_vals = soc_mssd(:, :, est_idx);
+    v_mssd_vals = voltage_mssd(:, :, est_idx);
     fprintf('  %-10s mean SOC RMSE = %.3f%%, best = %.3f%%, worst = %.3f%% | ', ...
         estimator_names{est_idx}, finiteMean(soc_vals(:)), finiteMin(soc_vals(:)), finiteMax(soc_vals(:)));
-    fprintf('mean V RMSE = %.2f mV, best = %.2f mV, worst = %.2f mV\n', ...
+    fprintf('mean SOC MSSD = %.6f %%^2 | ', finiteMean(soc_mssd_vals(:)));
+    fprintf('mean V RMSE = %.2f mV, best = %.2f mV, worst = %.2f mV | ', ...
         finiteMean(v_vals(:)), finiteMin(v_vals(:)), finiteMax(v_vals(:)));
-end
-
-if cfg.NoiseSummaryfigs
-    plotAggregateNoiseFigures(sigma_w_values, sigma_v_values, soc_rmse, voltage_rmse, estimator_names, cfg.sweep_mode);
-end
-if cfg.PlotSocRmsefigs
-    plotPerEstimatorPerformanceFigures(sigma_w_values, sigma_v_values, soc_rmse, estimator_names, 'SOC RMSE [%]', 'SOC', cfg.sweep_mode);
-end
-if cfg.PlotVoltageRmsefigs
-    plotPerEstimatorPerformanceFigures(sigma_w_values, sigma_v_values, voltage_rmse, estimator_names, 'Voltage RMSE [mV]', 'Voltage', cfg.sweep_mode);
+    fprintf('mean V MSSD = %.4f mV^2\n', finiteMean(v_mssd_vals(:)));
 end
 
 sweepResults = struct();
@@ -140,47 +179,113 @@ sweepResults.soc_rmse_percent = soc_rmse;
 sweepResults.voltage_rmse_mv = voltage_rmse;
 sweepResults.soc_me_percent = soc_me;
 sweepResults.voltage_me_mv = voltage_me;
+sweepResults.soc_mssd_percent2 = soc_mssd;
+sweepResults.voltage_mssd_mv2 = voltage_mssd;
 sweepResults.summary_table = summary_table;
 sweepResults.evalDataset = evalDataset;
 sweepResults.all_results = all_results;
 sweepResults.total_runs = n_runs;
 
+if cfg.NoiseSummaryfigs
+    plotNoiseSweepSummary(sweepResults);
+end
+if cfg.PlotSocRmsefigs
+    plotNoiseSweepHeatmaps(sweepResults, {'soc_rmse_percent', 'soc_mssd_percent2'});
+end
+if cfg.PlotVoltageRmsefigs
+    plotNoiseSweepHeatmaps(sweepResults, {'voltage_rmse_mv', 'voltage_mssd_mv2'});
+end
+
 if nargout == 0
     assignin('base', 'noiseCovSweepResults', sweepResults);
 end
+
+    function updateProgress(completed_runs_value, sigma_w_value, sigma_v_value)
+        completed_runs = completed_runs_value; %#ok<NASGU>
+        updateSweepWaitbar(hwait, completed_runs_value, n_runs, sigma_w_value, sigma_v_value, n_estimators);
+        fprintf('Noise covariance sweep point %d/%d: sigma_w = %.3g, sigma_v = %.3g, %d estimator(s)\n', ...
+            completed_runs_value, n_runs, sigma_w_value, sigma_v_value, n_estimators);
+    end
+
+    function onParallelProgress(progress_data)
+        completed_runs = completed_runs + 1;
+        updateSweepWaitbar(hwait, completed_runs, n_runs, progress_data.sigma_w, progress_data.sigma_v, n_estimators);
+        fprintf('Noise covariance sweep point %d/%d: sigma_w = %.3g, sigma_v = %.3g, %d estimator(s)\n', ...
+            completed_runs, n_runs, progress_data.sigma_w, progress_data.sigma_v, n_estimators);
+    end
 end
 
-function cfg = normalizeStudyConfig(cfg, repo_root)
+function cfg = normalizeStudyConfig(cfg, repo_root, input_meta)
 evaluation_root = fullfile(repo_root, 'Evaluation');
 tuning_defaults = defaultNoiseTuning();
 
 cfg.tc = getCfg(cfg, 'tc', 25);
 cfg.ts = getCfg(cfg, 'ts', 1);
-cfg.dataset_mode = getCfg(cfg, 'dataset_mode', 'rom');
+cfg.dataset_mode = getCfg(cfg, 'dataset_mode', 'esc');
 cfg.sweep_mode = lower(getCfg(cfg, 'sweep_mode', 'grid'));
 cfg.fixed_sigma_w = getCfg(cfg, 'fixed_sigma_w', 1e-3);
 cfg.fixed_sigma_v = getCfg(cfg, 'fixed_sigma_v', 1e-3);
+cfg.include_rom_ekf = logical(getCfg(cfg, 'include_rom_ekf', false));
+cfg.estimator_names = normalizeEstimatorSelection(getCfg(cfg, 'estimator_names', defaultNoiseEstimatorNames()));
+cfg.use_parallel = logical(getCfg(cfg, 'use_parallel', false));
 cfg.NoiseSummaryfigs = getCfg(cfg, 'NoiseSummaryfigs', false);
 cfg.PlotSocRmsefigs = getCfg(cfg, 'PlotSocRmsefigs', true);
 cfg.PlotVoltageRmsefigs = getCfg(cfg, 'PlotVoltageRmsefigs', true);
+cfg.esc_dataset_file = getCfg(cfg, 'esc_dataset_file', ...
+    fullfile(evaluation_root, 'ESCSimData', 'datasets', 'esc_bus_coreBattery_dataset.mat'));
 cfg.rom_dataset_file = getCfg(cfg, 'rom_dataset_file', ...
     fullfile(evaluation_root, 'ROMSimData', 'datasets', 'rom_bus_coreBattery_dataset.mat'));
 cfg.raw_bus_file = getCfg(cfg, 'raw_bus_file', ...
     fullfile(evaluation_root, 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat'));
 cfg.rom_file = getCfg(cfg, 'rom_file', ...
-    firstExistingFile({ ...
-    fullfile(repo_root, 'models', 'ROM_NMC30_HRA12.mat'), ...
-    fullfile(repo_root, 'models', 'ROM_NMC30_HRA.mat')}, ...
-    'sweepNoiseStudy:MissingROMFile', ...
-    'No ROM model file found.'));
+    firstExistingFileOrEmpty({ ...
+    fullfile(repo_root, 'models', 'ROM_ATL20_beta.mat')}));
 cfg.esc_model_file = getCfg(cfg, 'esc_model_file', ...
     firstExistingFile({ ...
-    fullfile(repo_root, 'models', 'NMC30model.mat'), ...
-    fullfile(repo_root, 'ESC_Id', 'NMC30', 'NMC30model.mat')}, ...
+    fullfile(repo_root, 'models', 'ATLmodel.mat'), ...
+    fullfile(repo_root, 'ESC_Id', 'FullESCmodels', 'LFP', 'ATLmodel.mat')}, ...
     'sweepNoiseStudy:MissingESCModel', ...
-    'No NMC30 ESC model file found.'));
+    'No ATL ESC model file found.'));
 cfg.tuning = getCfg(cfg, 'tuning', tuning_defaults);
 cfg.tuning = mergeStructDefaults(cfg.tuning, tuning_defaults);
+cfg = resolveEstimatorSelectionConfig(cfg, input_meta);
+end
+
+function cfg = resolveEstimatorSelectionConfig(cfg, input_meta)
+rom_cfg_was_set = isfield(input_meta.cfg_fields, 'include_rom_ekf');
+name_cfg_was_set = isfield(input_meta.cfg_fields, 'estimator_names');
+
+if cfg.include_rom_ekf && ~any(strcmp(cfg.estimator_names, 'ROM-EKF'))
+    cfg.estimator_names = [{'ROM-EKF'}, cfg.estimator_names];
+end
+
+if any(strcmp(cfg.estimator_names, 'ROM-EKF')) && isempty(cfg.rom_file)
+    error('sweepNoiseStudy:MissingROMFile', ...
+        'ROM-EKF was selected but no ATL ROM model file was found.');
+end
+
+if input_meta.is_default_invocation || name_cfg_was_set || rom_cfg_was_set
+    return;
+end
+end
+
+function input_meta = captureInputMeta(nargin_value, sigmaWRange, sigmaVRange, stepMultiplier, cfg)
+input_meta = struct();
+input_meta.range_w_was_set = nargin_value >= 1 && ~isempty(sigmaWRange);
+input_meta.range_v_was_set = nargin_value >= 2 && ~isempty(sigmaVRange);
+input_meta.step_was_set = nargin_value >= 3 && ~isempty(stepMultiplier);
+cfg_fields = struct();
+if nargin_value >= 4 && ~isempty(cfg) && isstruct(cfg)
+    names = fieldnames(cfg);
+    for idx = 1:numel(names)
+        cfg_fields.(names{idx}) = true;
+    end
+end
+input_meta.cfg_fields = cfg_fields;
+input_meta.cfg_was_set = ~isempty(fieldnames(cfg_fields));
+input_meta.is_default_invocation = ~( ...
+    input_meta.range_w_was_set || input_meta.range_v_was_set || ...
+    input_meta.step_was_set || input_meta.cfg_was_set);
 end
 
 function [sigma_w_values, sigma_v_values] = buildSweepAxes(cfg, sigmaWRange, sigmaVRange, stepMultiplier)
@@ -206,11 +311,14 @@ tuning.SigmaX0_rc = 1e-6;
 tuning.SigmaX0_hk = 1e-6;
 tuning.SigmaX0_soc = 1e-3;
 tuning.sigma_x0_rom_tail = 2e6;
-tuning.nx_rom = 12;
 tuning.SigmaR0 = 1e-6;
 tuning.SigmaWR0 = 1e-16;
 tuning.current_bias_var0 = 1e-5;
 tuning.single_bias_process_var = 1e-8;
+end
+
+function names = defaultNoiseEstimatorNames()
+names = {'EbSPKF', 'ESC-SPKF', 'EBiSPKF', 'EaEKF', 'EsSPKF', 'EDUKF'};
 end
 
 function sweep_values = buildLogLikeSweep(valueRange, stepMultiplier)
@@ -238,6 +346,21 @@ end
 
 function evalDataset = buildEvalDataset(cfg, model)
 switch lower(cfg.dataset_mode)
+    case 'esc'
+        dataset = loadOrBuildEscDataset(cfg.esc_dataset_file, cfg.raw_bus_file, cfg.esc_model_file, cfg.tc);
+        evalDataset = struct();
+        evalDataset.time_s = dataset.time_s(:);
+        evalDataset.current_a = dataset.current_a(:);
+        evalDataset.voltage_v = dataset.voltage_v(:);
+        evalDataset.temperature_c = selectTemperatureTrace(dataset, cfg.tc);
+        evalDataset.dataset_soc = getOptionalField(dataset, 'soc_true', []);
+        evalDataset.soc_init_reference = inferReferenceSoc0(dataset);
+        evalDataset.capacity_ah = getParamESC('QParam', cfg.tc, model);
+        evalDataset.reference_name = 'ESC reference';
+        evalDataset.voltage_name = 'ESC';
+        evalDataset.title_prefix = 'Noise Sweep ATL BSS';
+        evalDataset.r0_reference = getParamESC('R0Param', cfg.tc, model);
+
     case 'rom'
         dataset = loadOrBuildRomDataset(cfg.rom_dataset_file, cfg.raw_bus_file, cfg.tc);
         evalDataset = struct();
@@ -271,7 +394,7 @@ switch lower(cfg.dataset_mode)
 
     otherwise
         error('sweepNoiseStudy:BadDatasetMode', ...
-            'Unsupported dataset_mode "%s". Use "rom" or "bus_raw".', cfg.dataset_mode);
+            'Unsupported dataset_mode "%s". Use "esc", "rom", or "bus_raw".', cfg.dataset_mode);
 end
 end
 
@@ -286,72 +409,103 @@ R0init = getParamESC('R0Param', cfg.tc, model);
 
 sigma_w = noise_cfg.sigma_w;
 sigma_v = noise_cfg.sigma_v;
-sigma_x0_rom = diag([ones(1, tuning.nx_rom), tuning.sigma_x0_rom_tail]);
+estimators = repmat(estimatorTemplate(), numel(cfg.estimator_names), 1);
 
-estimators = repmat(estimatorTemplate(), 10, 1);
+for idx = 1:numel(cfg.estimator_names)
+    switch cfg.estimator_names{idx}
+        case 'ROM-EKF'
+            rom_state_count = inferRomTransientStateCount(ROM, getFieldOr(tuning, 'nx_rom', []));
+            sigma_x0_rom = diag([ones(1, rom_state_count), tuning.sigma_x0_rom_tail]);
+            estimators(idx) = makeEstimator( ...
+                'ROM-EKF', ...
+                initKF(soc_init_kf, cfg.tc, sigma_x0_rom, sigma_v, sigma_w, 'OutB', ROM), ...
+                @stepRomEkf, soc_init_kf, [0.64 0.08 0.18], '-');
 
-estimators(1) = makeEstimator( ...
-    'ROM-EKF', ...
-    initKF(soc_init_kf, cfg.tc, sigma_x0_rom, sigma_v, sigma_w, 'OutB', ROM), ...
-    @stepRomEkf, soc_init_kf, [0.64 0.08 0.18], '-');
+        case 'ESC-SPKF'
+            estimators(idx) = makeEstimator('ESC-SPKF', ...
+                initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, model), ...
+                @stepEscSpkf, soc_init_kf, [0.00 0.45 0.74], ':');
 
-estimators(2) = makeEstimator('ESC-SPKF', ...
-    initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, model), ...
-    @stepEscSpkf, soc_init_kf, [0.00 0.45 0.74], ':');
+        case 'ESC-EKF'
+            estimators(idx) = makeEstimator('ESC-EKF', ...
+                initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, model), ...
+                @stepEscEkf, soc_init_kf, [0.85 0.33 0.10], '--');
 
-estimators(3) = makeEstimator('ESC-EKF', ...
-    initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, model), ...
-    @stepEscEkf, soc_init_kf, [0.85 0.33 0.10], '--');
+        case 'EaEKF'
+            estimators(idx) = makeEstimator('EaEKF', ...
+                initEaEKF(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, model), ...
+                @stepEaEkf, soc_init_kf, [0.93 0.69 0.13], '-.');
 
-estimators(4) = makeEstimator('EaEKF', ...
-    initEaEKF(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, model), ...
-    @stepEaEkf, soc_init_kf, [0.93 0.69 0.13], '-.');
+        case 'EacrSPKF'
+            estimators(idx) = makeEstimator('EacrSPKF', ...
+                initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, model), ...
+                @stepEacrSpkf, soc_init_kf, [0.49 0.18 0.56], '-');
 
-estimators(5) = makeEstimator('EacrSPKF', ...
-    initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, model), ...
-    @stepEacrSpkf, soc_init_kf, [0.49 0.18 0.56], '-');
+        case 'EnacrSPKF'
+            estimators(idx) = makeEstimator('EnacrSPKF', ...
+                initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, model), ...
+                @stepEnacrSpkf, soc_init_kf, [0.47 0.67 0.19], '--');
 
-estimators(6) = makeEstimator('EnacrSPKF', ...
-    initESCSPKF(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, model), ...
-    @stepEnacrSpkf, soc_init_kf, [0.47 0.67 0.19], '--');
+        case 'EDUKF'
+            estimators(idx) = makeEstimator('EDUKF', ...
+                initEDUKF(soc_init_kf, R0init, cfg.tc, SigmaX0, sigma_v, sigma_w, ...
+                tuning.SigmaR0, tuning.SigmaWR0, model), ...
+                @stepEdukf, soc_init_kf, [0.30 0.75 0.93], '-');
+            estimators(idx).tracksR0 = true;
+            estimators(idx).r0_init = estimators(idx).kfData.R0hat;
 
-estimators(7) = makeEstimator('EDUKF', ...
-    initEDUKF(soc_init_kf, R0init, cfg.tc, SigmaX0, sigma_v, sigma_w, ...
-    tuning.SigmaR0, tuning.SigmaWR0, model), ...
-    @stepEdukf, soc_init_kf, [0.30 0.75 0.93], '-');
-estimators(7).tracksR0 = true;
-estimators(7).r0_init = estimators(7).kfData.R0hat;
+        case 'EsSPKF'
+            estimators(idx) = makeEstimator('EsSPKF', ...
+                initEDUKF(soc_init_kf, R0init, cfg.tc, SigmaX0, sigma_v, sigma_w, ...
+                tuning.SigmaR0, tuning.SigmaWR0, model), ...
+                @stepEsSpkf, soc_init_kf, [0.13 0.55 0.13], '--');
+            estimators(idx).tracksR0 = true;
+            estimators(idx).r0_init = estimators(idx).kfData.R0hat;
 
-estimators(8) = makeEstimator('EsSPKF', ...
-    initEDUKF(soc_init_kf, R0init, cfg.tc, SigmaX0, sigma_v, sigma_w, ...
-    tuning.SigmaR0, tuning.SigmaWR0, model), ...
-    @stepEsSpkf, soc_init_kf, [0.13 0.55 0.13], '--');
-estimators(8).tracksR0 = true;
-estimators(8).r0_init = estimators(8).kfData.R0hat;
+        case 'EbSPKF'
+            estimators(idx) = makeEstimator('EbSPKF', ...
+                initEbSpkf(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, ...
+                tuning.single_bias_process_var, tuning.current_bias_var0, model), ...
+                @stepEbSpkf, soc_init_kf, [0.25 0.25 0.25], ':');
+            estimators(idx).bias_dim = 1;
+            estimators(idx).bias_init = estimators(idx).kfData.xhat(estimators(idx).kfData.ibInd);
+            estimators(idx).bias_bnd_init = 3 * sqrt(max( ...
+                estimators(idx).kfData.SigmaX(estimators(idx).kfData.ibInd, estimators(idx).kfData.ibInd), 0));
 
-estimators(9) = makeEstimator('EbSPKF', ...
-    initEbSpkf(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, ...
-    tuning.single_bias_process_var, tuning.current_bias_var0, model), ...
-    @stepEbSpkf, soc_init_kf, [0.25 0.25 0.25], ':');
-estimators(9).bias_dim = 1;
-estimators(9).bias_init = estimators(9).kfData.xhat(estimators(9).kfData.ibInd);
-estimators(9).bias_bnd_init = 3 * sqrt(max( ...
-    estimators(9).kfData.SigmaX(estimators(9).kfData.ibInd, estimators(9).kfData.ibInd), 0));
+        case 'EBiSPKF'
+            estimators(idx) = makeEstimator('EBiSPKF', ...
+                initEbiSpkf(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, tuning.current_bias_var0, model), ...
+                @stepEbiSpkf, soc_init_kf, [0.64 0.08 0.18], '-.');
+            estimators(idx).bias_dim = 1;
+            estimators(idx).bias_init = estimators(idx).kfData.bhat(:).';
+            estimators(idx).bias_bnd_init = 3 * sqrt(max(diag(estimators(idx).kfData.SigmaB), 0)).';
 
-estimators(10) = makeEstimator('EBiSPKF', ...
-    initEbiSpkf(soc_init_kf, cfg.tc, SigmaX0, sigma_v, sigma_w, tuning.current_bias_var0, model), ...
-    @stepEbiSpkf, soc_init_kf, [0.64 0.08 0.18], '-.');
-estimators(10).bias_dim = 1;
-estimators(10).bias_init = estimators(10).kfData.bhat(:).';
-estimators(10).bias_bnd_init = 3 * sqrt(max(diag(estimators(10).kfData.SigmaB), 0)).';
+        case 'Em7SPKF'
+            estimators(idx) = makeEstimator('Em7SPKF', ...
+                initEm7Spkf(soc_init_kf, R0init, cfg.tc, SigmaX0, sigma_v, sigma_w, ...
+                tuning.SigmaR0, tuning.SigmaWR0, tuning.current_bias_var0, model), ...
+                @stepEm7Spkf, soc_init_kf, [0.82 0.23 0.47], '-');
+            estimators(idx).tracksR0 = true;
+            estimators(idx).r0_init = estimators(idx).kfData.R0hat;
+            estimators(idx).bias_dim = 1;
+            estimators(idx).bias_init = estimators(idx).kfData.bhat(:).';
+            estimators(idx).bias_bnd_init = 3 * sqrt(max(diag(estimators(idx).kfData.SigmaB), 0)).';
+
+        otherwise
+            error('sweepNoiseStudy:UnsupportedEstimator', ...
+                'Unsupported estimator "%s".', cfg.estimator_names{idx});
+    end
+end
 end
 
-function summary_table = buildSummaryTable(estimator_names, sigma_w_values, sigma_v_values, soc_rmse, voltage_rmse, soc_me, voltage_me)
+function summary_table = buildSummaryTable(estimator_names, sigma_w_values, sigma_v_values, soc_rmse, voltage_rmse, soc_me, voltage_me, soc_mssd, voltage_mssd)
 n_estimators = numel(estimator_names);
 best_soc_rmse = NaN(n_estimators, 1);
 best_soc_me = NaN(n_estimators, 1);
+best_soc_mssd = NaN(n_estimators, 1);
 best_v_rmse = NaN(n_estimators, 1);
 best_v_me = NaN(n_estimators, 1);
+best_v_mssd = NaN(n_estimators, 1);
 best_sigma_w = NaN(n_estimators, 1);
 best_sigma_v = NaN(n_estimators, 1);
 
@@ -361,15 +515,19 @@ for est_idx = 1:n_estimators
     [w_idx, v_idx] = ind2sub(size(soc_slice), linear_idx);
     best_soc_rmse(est_idx) = best_val;
     best_soc_me(est_idx) = soc_me(w_idx, v_idx, est_idx);
+    best_soc_mssd(est_idx) = soc_mssd(w_idx, v_idx, est_idx);
     best_v_rmse(est_idx) = voltage_rmse(w_idx, v_idx, est_idx);
     best_v_me(est_idx) = voltage_me(w_idx, v_idx, est_idx);
+    best_v_mssd(est_idx) = voltage_mssd(w_idx, v_idx, est_idx);
     best_sigma_w(est_idx) = sigma_w_values(w_idx);
     best_sigma_v(est_idx) = sigma_v_values(v_idx);
 end
 
 summary_table = table( ...
-    best_sigma_w, best_sigma_v, best_soc_rmse, best_soc_me, best_v_rmse, best_v_me, ...
-    'VariableNames', {'BestSigmaW', 'BestSigmaV', 'BestSocRmsePct', 'BestSocMePct', 'VoltageRmseMvAtBestSoc', 'VoltageMeMvAtBestSoc'}, ...
+    best_sigma_w, best_sigma_v, best_soc_rmse, best_soc_me, best_soc_mssd, ...
+    best_v_rmse, best_v_me, best_v_mssd, ...
+    'VariableNames', {'BestSigmaW', 'BestSigmaV', 'BestSocRmsePct', 'BestSocMePct', 'BestSocMssdPct2', ...
+    'VoltageRmseMvAtBestSoc', 'VoltageMeMvAtBestSoc', 'VoltageMssdMv2AtBestSoc'}, ...
     'RowNames', matlab.lang.makeUniqueStrings(estimator_names));
 end
 
@@ -456,6 +614,15 @@ step.bias = ib_est;
 step.bias_bnd = ib_bnd;
 end
 
+function step = stepEm7Spkf(vk, ik, Tk, dt, kfData)
+[soc, v_pred, soc_bnd, kfData, v_bnd, bias_est, bias_bnd, r0_est, r0_bnd] = Em7SPKF(vk, ik, Tk, dt, kfData);
+step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData);
+step.r0 = r0_est;
+step.r0_bnd = r0_bnd;
+step.bias = bias_est;
+step.bias_bnd = bias_bnd;
+end
+
 function step = baseStepStruct(soc, v_pred, soc_bnd, v_bnd, kfData)
 step = struct();
 step.soc = soc;
@@ -501,6 +668,15 @@ biasCfg.currentBiasInd = 1;
 kfData = initESCSPKF(soc0, T0, SigmaX0, SigmaV, SigmaW, model, biasCfg);
 end
 
+function kfData = initEm7Spkf(soc0, R0init, T0, SigmaX0, SigmaV, SigmaW, SigmaR0, SigmaWR0, sigma_ib0, model)
+biasCfg = struct();
+biasCfg.nb = 1;
+biasCfg.bhat0 = 0;
+biasCfg.SigmaB0 = sigma_ib0;
+biasCfg.currentBiasInd = 1;
+kfData = Em7init(soc0, R0init, T0, SigmaX0, SigmaV, SigmaW, SigmaR0, SigmaWR0, model, biasCfg);
+end
+
 function dataset = loadOrBuildRomDataset(dataset_file, raw_bus_file, tc)
 if exist(dataset_file, 'file') == 2
     raw = load(dataset_file);
@@ -516,6 +692,25 @@ cfg.profile_file = raw_bus_file;
 cfg.source_capacity_ah = 8;
 cfg.tc = tc;
 dataset = createBusCoreBatterySyntheticDataset(dataset_file, cfg);
+end
+
+function dataset = loadOrBuildEscDataset(dataset_file, raw_bus_file, esc_model_file, tc)
+if exist(dataset_file, 'file') == 2
+    raw = load(dataset_file);
+    if ~isfield(raw, 'dataset')
+        error('sweepNoiseStudy:BadDatasetFile', 'Expected variable "dataset" in %s.', dataset_file);
+    end
+    dataset = raw.dataset;
+    if isfield(dataset, 'esc_model_file') && pathsMatchPortable(dataset.esc_model_file, esc_model_file)
+        return;
+    end
+end
+
+cfg = struct();
+cfg.profile_file = raw_bus_file;
+cfg.model_file = esc_model_file;
+cfg.tc = tc;
+dataset = BSSsimESCdata(dataset_file, cfg);
 end
 
 function temperature_c = selectTemperatureTrace(dataset, default_temp)
@@ -813,90 +1008,6 @@ else
 end
 end
 
-function plotAggregateNoiseFigures(sigma_w_values, sigma_v_values, soc_rmse, voltage_rmse, estimator_names, sweep_mode)
-palette = lines(numel(estimator_names));
-
-if strcmp(sweep_mode, 'sigma_v')
-    x_values = sigma_v_values;
-    x_label = '\sigma_v';
-    soc_source = @() squeeze(meanOverDim1OmitNan(soc_rmse(:, :, :)));
-    v_source = @() squeeze(meanOverDim1OmitNan(voltage_rmse(:, :, :)));
-else
-    x_values = sigma_w_values;
-    x_label = '\sigma_w';
-    soc_source = @() squeeze(meanOverDim2OmitNan(soc_rmse(:, :, :)));
-    v_source = @() squeeze(meanOverDim2OmitNan(voltage_rmse(:, :, :)));
-end
-
-soc_curves = soc_source();
-v_curves = v_source();
-
-figure('Name', 'Noise Sweep - Mean SOC RMSE', 'NumberTitle', 'off');
-hold on;
-for est_idx = 1:numel(estimator_names)
-    semilogx(x_values, soc_curves(:, est_idx), '-o', ...
-        'LineWidth', 1.4, 'Color', palette(est_idx, :), ...
-        'DisplayName', estimator_names{est_idx});
-end
-grid on;
-xlabel(x_label);
-ylabel('Mean SOC RMSE [%]');
-title(sprintf('Noise Sweep Mean SOC RMSE vs %s', x_label));
-legend('Location', 'best');
-
-figure('Name', 'Noise Sweep - Mean Voltage RMSE', 'NumberTitle', 'off');
-hold on;
-for est_idx = 1:numel(estimator_names)
-    semilogx(x_values, v_curves(:, est_idx), '-o', ...
-        'LineWidth', 1.4, 'Color', palette(est_idx, :), ...
-        'DisplayName', estimator_names{est_idx});
-end
-grid on;
-xlabel(x_label);
-ylabel('Mean Voltage RMSE [mV]');
-title(sprintf('Noise Sweep Mean Voltage RMSE vs %s', x_label));
-legend('Location', 'best');
-end
-
-function plotPerEstimatorPerformanceFigures(sigma_w_values, sigma_v_values, data_cube, estimator_names, colorbar_label, figure_prefix, sweep_mode)
-if numel(sigma_w_values) > 1 && numel(sigma_v_values) > 1
-    plotPerEstimatorHeatmaps(sigma_w_values, sigma_v_values, data_cube, estimator_names, colorbar_label, figure_prefix);
-elseif strcmp(sweep_mode, 'sigma_v')
-    plotPerEstimatorCurves(sigma_v_values, squeeze(data_cube(1, :, :)), estimator_names, colorbar_label, figure_prefix, '\sigma_v');
-else
-    plotPerEstimatorCurves(sigma_w_values, squeeze(data_cube(:, 1, :)), estimator_names, colorbar_label, figure_prefix, '\sigma_w');
-end
-end
-
-function plotPerEstimatorHeatmaps(sigma_w_values, sigma_v_values, data_cube, estimator_names, colorbar_label, figure_prefix)
-for est_idx = 1:numel(estimator_names)
-    figure('Name', sprintf('%s - %s', figure_prefix, estimator_names{est_idx}), 'NumberTitle', 'off');
-    imagesc(log10(sigma_v_values), log10(sigma_w_values), data_cube(:, :, est_idx));
-    axis xy;
-    grid on;
-    xlabel('log_{10}(\sigma_v)');
-    ylabel('log_{10}(\sigma_w)');
-    title(sprintf('%s Sweep - %s', figure_prefix, estimator_names{est_idx}));
-    cb = colorbar;
-    ylabel(cb, colorbar_label);
-    xticks(log10(sigma_v_values));
-    xticklabels(formatTickLabels(sigma_v_values));
-    yticks(log10(sigma_w_values));
-    yticklabels(formatTickLabels(sigma_w_values));
-end
-end
-
-function plotPerEstimatorCurves(x_values, data_matrix, estimator_names, y_label, figure_prefix, x_label)
-for est_idx = 1:numel(estimator_names)
-    figure('Name', sprintf('%s - %s', figure_prefix, estimator_names{est_idx}), 'NumberTitle', 'off');
-    semilogx(x_values, data_matrix(:, est_idx), '-o', 'LineWidth', 1.4);
-    grid on;
-    xlabel(x_label);
-    ylabel(y_label);
-    title(sprintf('%s Sweep - %s', figure_prefix, estimator_names{est_idx}));
-end
-end
-
 function text_value = formatSweepVector(values)
 parts = formatTickLabels(values);
 text_value = strjoin(parts, ', ');
@@ -913,20 +1024,6 @@ values = sum(data, 2) ./ max(valid_counts, 1);
 values(valid_counts == 0) = NaN;
 end
 
-function values = meanOverDim2OmitNan(data)
-valid_counts = sum(isfinite(data), 2);
-data(~isfinite(data)) = 0;
-values = sum(data, 2) ./ max(valid_counts, 1);
-values(valid_counts == 0) = NaN;
-end
-
-function values = meanOverDim1OmitNan(data)
-valid_counts = sum(isfinite(data), 1);
-data(~isfinite(data)) = 0;
-values = sum(data, 1) ./ max(valid_counts, 1);
-values(valid_counts == 0) = NaN;
-end
-
 function model = extractEscModelStruct(raw)
 if isfield(raw, 'nmc30_model')
     model = raw.nmc30_model;
@@ -936,6 +1033,96 @@ else
     error('sweepNoiseStudy:BadESCModelFile', ...
         'Expected variable "nmc30_model" or "model" in the ESC model file.');
 end
+end
+
+function n_states = inferRomTransientStateCount(ROM, fallback_value)
+if nargin < 2
+    fallback_value = [];
+end
+
+if isfield(ROM, 'ROMmdls') && ~isempty(ROM.ROMmdls)
+    n_states = size(ROM.ROMmdls(1).A, 1) - 1;
+    return;
+end
+
+if ~isempty(fallback_value)
+    n_states = fallback_value;
+    return;
+end
+
+error('sweepNoiseStudy:MissingROMStateCount', ...
+    'Could not infer the ROM transient-state count from ROM.ROMmdls.');
+end
+
+function estimator_names = normalizeEstimatorSelection(raw_names)
+if ischar(raw_names)
+    raw_names = {raw_names};
+elseif isa(raw_names, 'string')
+    raw_names = cellstr(raw_names(:));
+elseif ~iscell(raw_names)
+    error('sweepNoiseStudy:BadEstimatorSelection', ...
+        'cfg.estimator_names must be a char vector, string array, or cell array.');
+end
+
+estimator_names = cell(1, numel(raw_names));
+for idx = 1:numel(raw_names)
+    name = char(raw_names{idx});
+    key = regexprep(upper(name), '[^A-Z0-9]', '');
+    switch key
+        case {'ITEREKF', 'ITERROMEKF', 'ROMEKF'}
+            estimator_names{idx} = 'ROM-EKF';
+        case {'ITERESCSPKF', 'ESCSPKF'}
+            estimator_names{idx} = 'ESC-SPKF';
+        case {'ITERESCEKF', 'ESCEKF'}
+            estimator_names{idx} = 'ESC-EKF';
+        case {'ITEREAEKF', 'EAEKF'}
+            estimator_names{idx} = 'EaEKF';
+        case {'ITEREACRSPKF', 'EACRSPKF'}
+            estimator_names{idx} = 'EacrSPKF';
+        case {'ITERENACRSPKF', 'ENACRSPKF'}
+            estimator_names{idx} = 'EnacrSPKF';
+        case {'ITEREDUKF', 'EDUKF'}
+            estimator_names{idx} = 'EDUKF';
+        case {'ITERESSPKF', 'ESSPKF'}
+            estimator_names{idx} = 'EsSPKF';
+        case {'ITEREBSPKF', 'EBSPKF'}
+            estimator_names{idx} = 'EbSPKF';
+        case {'ITEREBISPKF', 'EBISPKF'}
+            estimator_names{idx} = 'EBiSPKF';
+        case {'ITEREM7SPKF', 'EM7SPKF'}
+            estimator_names{idx} = 'Em7SPKF';
+        otherwise
+            error('sweepNoiseStudy:UnsupportedEstimator', ...
+                'Unsupported estimator selector "%s".', name);
+    end
+end
+
+estimator_names = unique(estimator_names, 'stable');
+if isempty(estimator_names)
+    error('sweepNoiseStudy:NoEstimators', ...
+        'cfg.estimator_names must select at least one estimator.');
+end
+end
+
+function path_out = normalizePath(path_in)
+path_out = strrep(char(path_in), '/', filesep);
+path_out = strrep(path_out, '\', filesep);
+end
+
+function tf = pathsMatchPortable(path_a, path_b)
+a = comparablePath(path_a);
+b = comparablePath(path_b);
+tf = strcmpi(a, b) || endsWith(a, stripLeadingSeparators(b), 'IgnoreCase', true) || ...
+    endsWith(b, stripLeadingSeparators(a), 'IgnoreCase', true);
+end
+
+function path_out = comparablePath(path_in)
+path_out = lower(normalizePath(path_in));
+path_out = regexprep(path_out, [regexptranslate('escape', filesep), '+'], filesep);
+end
+
+function path_out = stripLeadingSeparators(path_in)
+path_out = regexprep(char(path_in), '^[\\/]+', '');
 end
 
 function file_path = firstExistingFile(candidates, error_id, error_msg)
@@ -949,4 +1136,126 @@ end
 
 searched = sprintf('\n  - %s', candidates{:});
 error(error_id, '%s Searched:%s', error_msg, searched);
+end
+
+function file_path = firstExistingFileOrEmpty(candidates)
+file_path = '';
+for idx = 1:numel(candidates)
+    if exist(candidates{idx}, 'file') == 2
+        file_path = candidates{idx};
+        return;
+    end
+end
+end
+
+function [run_w_idx, run_v_idx, run_sigma_w, run_sigma_v] = buildRunPlan(sigma_w_values, sigma_v_values)
+n_w = numel(sigma_w_values);
+n_v = numel(sigma_v_values);
+n_runs = n_w * n_v;
+
+run_w_idx = zeros(n_runs, 1);
+run_v_idx = zeros(n_runs, 1);
+run_sigma_w = zeros(n_runs, 1);
+run_sigma_v = zeros(n_runs, 1);
+
+run_idx = 0;
+for w_idx = 1:n_w
+    for v_idx = 1:n_v
+        run_idx = run_idx + 1;
+        run_w_idx(run_idx) = w_idx;
+        run_v_idx(run_idx) = v_idx;
+        run_sigma_w(run_idx) = sigma_w_values(w_idx);
+        run_sigma_v(run_idx) = sigma_v_values(v_idx);
+    end
+end
+end
+
+function point_output = evaluateSweepPoint(sigma_w_value, sigma_v_value, evalDataset, cfg, ROM, model, flags)
+noise_cfg = struct('sigma_w', sigma_w_value, 'sigma_v', sigma_v_value);
+estimators = buildAllEstimators(evalDataset.soc_init_reference, cfg, ROM, model, noise_cfg);
+run_results = xKFeval(evalDataset, estimators, flags);
+point_output = collectPointMetrics(run_results);
+end
+
+function point_output = collectPointMetrics(run_results)
+point_output = struct();
+point_output.run_results = run_results;
+n_estimators = numel(run_results.estimators);
+point_output.soc_rmse = NaN(1, n_estimators);
+point_output.voltage_rmse = NaN(1, n_estimators);
+point_output.soc_me = NaN(1, n_estimators);
+point_output.voltage_me = NaN(1, n_estimators);
+point_output.soc_mssd = NaN(1, n_estimators);
+point_output.voltage_mssd = NaN(1, n_estimators);
+for est_idx = 1:n_estimators
+    point_output.soc_rmse(est_idx) = 100 * run_results.estimators(est_idx).rmse_soc;
+    point_output.voltage_rmse(est_idx) = 1000 * run_results.estimators(est_idx).rmse_voltage;
+    point_output.soc_me(est_idx) = 100 * run_results.estimators(est_idx).me_soc;
+    point_output.voltage_me(est_idx) = 1000 * run_results.estimators(est_idx).me_voltage;
+    point_output.soc_mssd(est_idx) = 1e4 * run_results.estimators(est_idx).mssd_soc;
+    point_output.voltage_mssd(est_idx) = 1e6 * run_results.estimators(est_idx).mssd_voltage;
+end
+end
+
+function [soc_rmse, voltage_rmse, soc_me, voltage_me, soc_mssd, voltage_mssd, all_results] = storeSweepPoint( ...
+        soc_rmse, voltage_rmse, soc_me, voltage_me, soc_mssd, voltage_mssd, all_results, w_idx, v_idx, point_output)
+all_results{w_idx, v_idx} = point_output.run_results;
+soc_rmse(w_idx, v_idx, :) = reshape(point_output.soc_rmse, 1, 1, []);
+voltage_rmse(w_idx, v_idx, :) = reshape(point_output.voltage_rmse, 1, 1, []);
+soc_me(w_idx, v_idx, :) = reshape(point_output.soc_me, 1, 1, []);
+voltage_me(w_idx, v_idx, :) = reshape(point_output.voltage_me, 1, 1, []);
+soc_mssd(w_idx, v_idx, :) = reshape(point_output.soc_mssd, 1, 1, []);
+voltage_mssd(w_idx, v_idx, :) = reshape(point_output.voltage_mssd, 1, 1, []);
+end
+
+function [use_parallel, message] = resolveParallelMode(cfg)
+use_parallel = false;
+message = '';
+if ~cfg.use_parallel
+    return;
+end
+
+if exist('parfor', 'builtin') ~= 5 || exist('gcp', 'file') ~= 2
+    message = 'Parallel sweep requested but Parallel Computing Toolbox is unavailable. Falling back to serial for-loop.';
+    return;
+end
+
+if ~license('test', 'Distrib_Computing_Toolbox')
+    message = 'Parallel sweep requested but Parallel Computing Toolbox is not licensed. Falling back to serial for-loop.';
+    return;
+end
+
+try
+    gcp('nocreate');
+    use_parallel = true;
+catch
+    message = 'Parallel sweep requested but no parallel pool could be initialized. Falling back to serial for-loop.';
+end
+end
+
+function hwait = createSweepWaitbar(n_runs, estimator_names, sigma_w_values, sigma_v_values)
+hwait = [];
+message = sprintf('Sweep 0/%d | sigma_w=%.3g | sigma_v=%.3g | %d estimator(s)', ...
+    n_runs, sigma_w_values(1), sigma_v_values(1), numel(estimator_names));
+try
+    hwait = waitbar(0, message, 'Name', 'Noise Covariance Sweep');
+catch
+    hwait = [];
+end
+end
+
+function updateSweepWaitbar(hwait, completed_runs, total_runs, sigma_w_value, sigma_v_value, n_estimators)
+if isempty(hwait) || ~ishandle(hwait)
+    return;
+end
+fraction = completed_runs / max(total_runs, 1);
+message = sprintf('Sweep %d/%d | sigma_w=%.3g | sigma_v=%.3g | %d estimator(s)', ...
+    completed_runs, total_runs, sigma_w_value, sigma_v_value, n_estimators);
+waitbar(fraction, hwait, message);
+end
+
+function closeSweepWaitbar(hwait)
+if ~isempty(hwait) && ishandle(hwait)
+    close(hwait);
+end
 end
