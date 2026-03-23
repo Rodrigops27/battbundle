@@ -100,9 +100,14 @@ end
 paths = struct();
 paths.autotuning_root = here;
 paths.repo_root = repo_root;
-paths.results_root_abs = resolveReadPath(cfg.output.results_root, repo_root);
+paths.results_root_abs = resolveAbsolutePath(cfg.output.results_root, repo_root);
 if exist(paths.results_root_abs, 'dir') ~= 7
     mkdir(paths.results_root_abs);
+end
+cfg.output.results_root = paths.results_root_abs;
+if ~isempty(cfg.output.aggregate_results_file)
+    cfg.output.aggregate_results_file = resolveOutputPath( ...
+        cfg.output.aggregate_results_file, paths.results_root_abs, repo_root);
 end
 
 cfg.scenarios = normalizeScenarios(cfg.scenarios, repo_root);
@@ -165,7 +170,7 @@ for idx = 1:numel(fields)
     if ischar(value) || (isstring(value) && isscalar(value))
         value_char = char(value);
         if looksLikePathField(fields{idx}) && ~isempty(value_char)
-            cfg_out.(fields{idx}) = resolveReadPath(value_char, repo_root);
+            cfg_out.(fields{idx}) = resolveAbsolutePath(value_char, repo_root);
         end
     elseif isstruct(value)
         cfg_out.(fields{idx}) = normalizeScenarioPaths(value, repo_root);
@@ -204,8 +209,9 @@ else
 end
 end
 
-function path_out = resolveReadPath(path_in, repo_root)
-if exist(path_in, 'file') == 2 || exist(path_in, 'dir') == 7
+function path_out = resolveAbsolutePath(path_in, repo_root)
+path_in = char(path_in);
+if isempty(path_in)
     path_out = path_in;
     return;
 end
@@ -213,6 +219,13 @@ if isAbsolutePath(path_in)
     path_out = path_in;
     return;
 end
+
+repo_candidate = fullfile(repo_root, path_in);
+if exist(repo_candidate, 'file') == 2 || exist(repo_candidate, 'dir') == 7
+    path_out = repo_candidate;
+    return;
+end
+
 path_out = fullfile(repo_root, path_in);
 end
 
@@ -227,8 +240,7 @@ if isAbsolutePath(path_in)
 end
 
 candidate = fullfile(default_root, path_in);
-parent_dir = fileparts(candidate);
-if isempty(parent_dir) || exist(parent_dir, 'dir') == 7
+if isAbsolutePath(candidate)
     path_out = candidate;
 else
     path_out = fullfile(repo_root, path_in);
