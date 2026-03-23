@@ -7,6 +7,10 @@ Use this layer when you want to:
 - compare SOC and voltage metrics across estimators
 - run initialization, noise, or fault sensitivity studies
 
+The default study scenario in this layer is the ATL20 desktop evaluation:
+- ESC model: `models/ATLmodel.mat`
+- benchmark dataset: `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`
+
 ## Main Entry Points
 
 - `runBenchmark.m`
@@ -18,8 +22,12 @@ Use this layer when you want to:
   - Example structured benchmark entry point.
 - `initSOCs/sweepInitSocStudy.m`
   - SOC-initialization sensitivity study.
+- `NoiseTuningSweep/README.md`
+  - covariance-tuning study guide and entry points.
+- `Injection/README.md`
+  - Noise-injection and perturbance-injection study guide and entry points.
 - `tests/runInjTest.m`
-  - Noise-injection and fault-injection wrapper.
+  - Legacy compatibility wrapper forwarding to `Injection/runInjectionStudy.m`.
 - `plotInnovationAcfPacf.m`
   - Innovation plotting helper.
 - `printEstimatorBiasMetrics.m`
@@ -32,12 +40,14 @@ Use this layer when you want to:
 Save benchmark-ready `.mat` files containing a `dataset` struct under one of:
 - `Evaluation/ROMSimData/datasets/`
 - `Evaluation/ESCSimData/datasets/`
+- `Evaluation/Injection/datasets/`
 - `Evaluation/tests/datasets/`
 
 Use:
 - `ROMSimData/datasets/` for ROM-driven reference datasets
 - `ESCSimData/datasets/` for ESC-driven reference datasets
-- `tests/datasets/` for perturbed, injected-noise, or injected-fault cases
+- `Injection/datasets/` for the renamed user-facing injection-study datasets
+- `tests/datasets/` for legacy perturbed, injected-noise, or injected-fault cases
 
 ### Raw measured application profiles
 
@@ -183,11 +193,11 @@ cd Evaluation/initSOCs
 runInitSocStudy
 ```
 
-### Noise and fault injection
+### Noise and perturbance injection
 
 ```matlab
-cd Evaluation/tests
-runInjTest
+cd Evaluation/Injection
+runInjectionStudy
 ```
 
 ## Plotting And Outputs
