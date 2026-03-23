@@ -382,11 +382,23 @@ end
 end
 
 function tf = pathsMatch(path_a, path_b)
-tf = strcmpi(normalizePath(path_a), normalizePath(path_b));
+a = comparablePath(path_a);
+b = comparablePath(path_b);
+tf = strcmpi(a, b) || endsWith(a, stripLeadingSeparators(b), 'IgnoreCase', true) || ...
+    endsWith(b, stripLeadingSeparators(a), 'IgnoreCase', true);
 end
 
 function out = normalizePath(path_in)
 out = strrep(char(path_in), '/', '\');
+end
+
+function out = comparablePath(path_in)
+out = lower(strrep(char(path_in), '/', '\'));
+out = regexprep(out, '\\+', '\\');
+end
+
+function out = stripLeadingSeparators(path_in)
+out = regexprep(char(path_in), '^[\\/]+', '');
 end
 
 function tf = isAbsolutePath(path_in)

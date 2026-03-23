@@ -37,6 +37,8 @@ Out of scope:
   - aggregate summary plotting helper for saved multi-estimator sweep results
 - `plotNoiseSweepHeatmaps.m`
   - per-estimator heatmap and 1D sweep plotting helper for saved multi-estimator sweep results
+- `printNoiseSweepSummary.m`
+  - console summary helper for saved multi-estimator sweep results
 - `plotEaEkfCovarianceSweeps.m`
   - plotting helper for `EaEKF` covariance evolution from saved sweep results
 - `results/`
@@ -102,6 +104,7 @@ Plot from a saved multi-estimator sweep:
 ```matlab
 S = load('Evaluation/NoiseTuningSweep/results/runNoiseCovStudy_YYYYMMDD_HHMMSS.mat');
 
+printNoiseSweepSummary(S.sweepResults);
 plotNoiseSweepSummary(S.sweepResults);
 plotNoiseSweepHeatmaps(S.sweepResults);
 plotEaEkfCovarianceSweeps(S.sweepResults);
@@ -119,10 +122,40 @@ cfg.sweep_mode = 'grid';
 results = runOneEstSweeNoise([], [], [], cfg);
 ```
 
+Run a single-estimator sweep on the ESC synthetic dataset:
+
+```matlab
+addpath(genpath('.'));
+
+cfg = struct();
+cfg.estimator_name = 'Em7SPKF';
+cfg.dataset_mode = 'esc';
+cfg.esc_dataset_file = fullfile('Evaluation', 'ESCSimData', 'datasets', 'esc_bus_coreBattery_dataset.mat');
+cfg.esc_model_file = fullfile('models', 'ATLmodel.mat');
+cfg.sweep_mode = 'grid';
+
+results = runOneEstSweeNoise([], [], [], cfg);
+```
+
+Run a single-estimator sweep on the raw bus profile:
+
+```matlab
+addpath(genpath('.'));
+
+cfg = struct();
+cfg.estimator_name = 'Em7SPKF';
+cfg.dataset_mode = 'bus_raw';
+cfg.raw_bus_file = fullfile('Evaluation', 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat');
+cfg.esc_model_file = fullfile('models', 'ATLmodel.mat');
+cfg.sweep_mode = 'sigma_w';
+
+results = runOneEstSweeNoise([], [], [], cfg);
+```
+
 ## Current limitations
 
 - `runOneEstSweeNoise` / `oneEstSweeNoise` currently support `ROM-EKF` and `Em7SPKF` as the explicit single-estimator choices in code.
-- `oneEstSweeNoise` currently supports `dataset_mode = 'rom'` only.
+- `oneEstSweeNoise` now supports `dataset_mode = 'esc'`, `dataset_mode = 'rom'`, and `dataset_mode = 'bus_raw'`.
 - `runNoiseCovStudy` and `sweepNoiseStudy` are path-independent from the repo root because they derive the repo path from the script location and use repo-relative defaults.
 
 ## Outputs

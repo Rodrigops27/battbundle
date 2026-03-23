@@ -13,7 +13,8 @@ function sweepResults = oneEstSweeNoise(sigmaWRange, sigmaVRange, stepMultiplier
 % Default estimator:
 %   'ROM-EKF'
 
-clear iterEKF;
+clear iterEKF iterESCSPKF iterESCEKF iterEaEKF iterEacrSPKF iterEnacrSPKF;
+clear iterEDUKF iterEsSPKF iterEbSPKF iterEBiSPKF;
 
 if nargin < 1 || isempty(sigmaWRange)
     sigmaWRange = [1e0 1e2];
@@ -45,12 +46,15 @@ addpath(genpath(repo_root));
 cfg = normalizeStudyConfig(cfg, repo_root);
 [sigma_w_values, sigma_v_values] = buildSweepAxes(cfg, sigmaWRange, sigmaVRange, stepMultiplier);
 
-rom_src = load(cfg.rom_file);
 esc_src = load(cfg.esc_model_file);
-if ~isfield(rom_src, 'ROM')
-    error('oneEstSweeNoise:BadROMFile', 'Expected variable "ROM" in %s.', cfg.rom_file);
+ROM = [];
+if strcmpi(cfg.estimator_name, 'ROM-EKF')
+    rom_src = load(cfg.rom_file);
+    if ~isfield(rom_src, 'ROM')
+        error('oneEstSweeNoise:BadROMFile', 'Expected variable "ROM" in %s.', cfg.rom_file);
+    end
+    ROM = rom_src.ROM;
 end
-ROM = rom_src.ROM;
 model = extractEscModelStruct(esc_src);
 evalDataset = buildEvalDataset(cfg, model);
 
@@ -199,6 +203,7 @@ defaults.PlotVoltageMetricfigs = true;
 defaults.PlotInnovationMetricfigs = true;
 defaults.continue_on_failure = true;
 defaults.print_failure_table = true;
+defaults.esc_dataset_file = fullfile(repo_root, 'Evaluation', 'ESCSimData', 'datasets', 'esc_bus_coreBattery_dataset.mat');
 defaults.rom_dataset_file = fullfile(repo_root, 'Evaluation', 'ROMSimData', 'datasets', 'rom_bus_coreBattery_dataset.mat');
 defaults.raw_bus_file = fullfile(repo_root, 'Evaluation', 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat');
 defaults.rom_file = firstExistingFile({ ...
@@ -277,6 +282,21 @@ end
 
 function evalDataset = buildEvalDataset(cfg, model)
 switch lower(cfg.dataset_mode)
+    case 'esc'
+        dataset = loadOrBuildEscDataset(cfg.esc_dataset_file, cfg.raw_bus_file, cfg.esc_model_file, cfg.tc);
+        evalDataset = struct();
+        evalDataset.time_s = dataset.time_s(:);
+        evalDataset.current_a = dataset.current_a(:);
+        evalDataset.voltage_v = dataset.voltage_v(:);
+        evalDataset.temperature_c = selectTemperatureTrace(dataset, cfg.tc);
+        evalDataset.dataset_soc = getOptionalField(dataset, 'soc_true', []);
+        evalDataset.soc_init_reference = inferReferenceSoc0(dataset);
+        evalDataset.capacity_ah = getParamESC('QParam', cfg.tc, model);
+        evalDataset.reference_name = 'ESC reference';
+        evalDataset.voltage_name = 'ESC';
+        evalDataset.title_prefix = sprintf('%s Noise Sweep', cfg.estimator_name);
+        evalDataset.r0_reference = getParamESC('R0Param', cfg.tc, model);
+
     case 'rom'
         dataset = loadOrBuildRomDataset(cfg.rom_dataset_file, cfg.raw_bus_file, cfg.tc);
         evalDataset = struct();
@@ -290,14 +310,27 @@ switch lower(cfg.dataset_mode)
         evalDataset.reference_name = 'Reference';
         evalDataset.voltage_name = 'ROM';
         evalDataset.title_prefix = sprintf('%s Noise Sweep', cfg.estimator_name);
+        evalDataset.r0_reference = getParamESC('R0Param', cfg.tc, model);
 
     case 'bus_raw'
-        error('oneEstSweeNoise:UnsupportedDatasetMode', ...
-            'The single-estimator study currently supports dataset_mode = "rom" only.');
+        profile = loadBusCoreBatteryProfile(cfg.raw_bus_file);
+        profile = resampleProfile(profile, cfg.ts);
+        evalDataset = struct();
+        evalDataset.time_s = profile.time_s(:);
+        evalDataset.current_a = profile.current_a(:);
+        evalDataset.voltage_v = profile.voltage_v(:);
+        evalDataset.temperature_c = selectProfileTemperature(profile, cfg.tc);
+        evalDataset.dataset_soc = profile.soc_ref(:);
+        evalDataset.soc_init_reference = inferProfileReferenceSoc0(profile);
+        evalDataset.capacity_ah = getParamESC('QParam', cfg.tc, model);
+        evalDataset.reference_name = 'Reference';
+        evalDataset.voltage_name = 'Measured';
+        evalDataset.title_prefix = sprintf('%s Noise Sweep', cfg.estimator_name);
+        evalDataset.r0_reference = getParamESC('R0Param', cfg.tc, model);
 
     otherwise
         error('oneEstSweeNoise:BadDatasetMode', ...
-            'Unsupported dataset_mode "%s".', cfg.dataset_mode);
+            'Unsupported dataset_mode "%s". Use "esc", "rom", or "bus_raw".', cfg.dataset_mode);
 end
 end
 
@@ -583,6 +616,25 @@ cfg.tc = tc;
 dataset = createBusCoreBatterySyntheticDataset(dataset_file, cfg);
 end
 
+function dataset = loadOrBuildEscDataset(dataset_file, raw_bus_file, esc_model_file, tc)
+if exist(dataset_file, 'file') == 2
+    raw = load(dataset_file);
+    if ~isfield(raw, 'dataset')
+        error('oneEstSweeNoise:BadDatasetFile', 'Expected variable "dataset" in %s.', dataset_file);
+    end
+    dataset = raw.dataset;
+    if isfield(dataset, 'esc_model_file') && pathsMatchPortable(dataset.esc_model_file, esc_model_file)
+        return;
+    end
+end
+
+cfg = struct();
+cfg.profile_file = raw_bus_file;
+cfg.model_file = esc_model_file;
+cfg.tc = tc;
+dataset = BSSsimESCdata(dataset_file, cfg);
+end
+
 function temperature_c = selectTemperatureTrace(dataset, default_temp)
 n_samples = numel(dataset.time_s);
 if isfield(dataset, 'temperature_c') && numel(dataset.temperature_c) == n_samples
@@ -600,6 +652,222 @@ elseif isfield(dataset, 'soc_init_percent') && ~isempty(dataset.soc_init_percent
 else
     error('oneEstSweeNoise:MissingReferenceSOC0', ...
         'No initial SOC is available from dataset.soc_true(1) or dataset.soc_init_percent.');
+end
+end
+
+function profile = loadBusCoreBatteryProfile(profile_file)
+if exist(profile_file, 'file') ~= 2
+    error('oneEstSweeNoise:MissingProfile', 'Profile file not found: %s', profile_file);
+end
+
+raw = load(profile_file);
+primary = choosePrimaryNode(raw);
+
+profile = struct();
+[current_raw, ~] = extractSignal(primary, {'Total_Current_A', 'Current_Vector_A'});
+[voltage_raw, ~] = extractSignal(primary, {'Voltage_Vector_V', 'Total_Voltage_V'});
+[soc_raw, ~] = extractSignal(primary, {'SOC_Vector_Percent'});
+[temp_raw, ~] = extractSignal(primary, {'Temperature_Vector_degC'});
+
+profile.current_a = coerceNumericVector(current_raw, false);
+profile.voltage_v = normalizeOptionalSignal(voltage_raw, numel(profile.current_a), 'voltage');
+profile.soc_ref = normalizeSocSignal(normalizeOptionalSignal(soc_raw, numel(profile.current_a), 'soc'));
+profile.temperature_c = normalizeOptionalSignal(temp_raw, numel(profile.current_a), 'temperature');
+
+if isempty(profile.current_a) || isempty(profile.voltage_v)
+    error('oneEstSweeNoise:MissingSignals', ...
+        'The evaluation dataset must contain at least current and voltage.');
+end
+
+if isa(current_raw, 'timeseries')
+    profile.time_s = normalizeTimeVector(current_raw.Time, numel(profile.current_a), 'current.Time');
+else
+    profile.time_s = (0:numel(profile.current_a)-1).';
+end
+profile.current_a = orientCurrentToDischargePositive(profile.current_a, profile.time_s, profile.soc_ref);
+end
+
+function profile = resampleProfile(profile, ts)
+time_s = profile.time_s(:);
+if numel(time_s) < 2
+    return;
+end
+
+[time_s, unique_idx] = unique(time_s, 'stable');
+profile.current_a = profile.current_a(unique_idx);
+profile.voltage_v = profile.voltage_v(unique_idx);
+if ~isempty(profile.soc_ref)
+    profile.soc_ref = profile.soc_ref(unique_idx);
+end
+if ~isempty(profile.temperature_c)
+    profile.temperature_c = profile.temperature_c(unique_idx);
+end
+
+dt = diff(time_s);
+if all(abs(dt - ts) <= 1e-9)
+    profile.time_s = time_s;
+    return;
+end
+
+new_time = (time_s(1):ts:time_s(end)).';
+profile.current_a = interp1(time_s, profile.current_a(:), new_time, 'previous', 'extrap');
+profile.voltage_v = interp1(time_s, profile.voltage_v(:), new_time, 'linear', 'extrap');
+if ~isempty(profile.soc_ref)
+    profile.soc_ref = interp1(time_s, profile.soc_ref(:), new_time, 'linear', 'extrap');
+    profile.soc_ref = normalizeSocSignal(profile.soc_ref);
+end
+if ~isempty(profile.temperature_c)
+    profile.temperature_c = interp1(time_s, profile.temperature_c(:), new_time, 'linear', 'extrap');
+end
+profile.time_s = new_time(:);
+end
+
+function current_a = orientCurrentToDischargePositive(current_a, time_s, soc_ref)
+current_a = current_a(:);
+if isempty(soc_ref) || all(isnan(soc_ref)) || numel(current_a) < 3
+    return;
+end
+
+dt = diff(time_s(:));
+dsoc = diff(soc_ref(:));
+current_k = current_a(1:end-1);
+valid = isfinite(dt) & dt > 0 & isfinite(dsoc) & isfinite(current_k) & abs(current_k) > 1e-9;
+if ~any(valid)
+    return;
+end
+
+alignment_score = sum(current_k(valid) .* (-dsoc(valid) ./ dt(valid)));
+if alignment_score < 0
+    current_a = -current_a;
+end
+end
+
+function primary = choosePrimaryNode(raw)
+names = fieldnames(raw);
+if numel(names) == 1
+    primary = raw.(names{1});
+else
+    primary = raw;
+end
+end
+
+function [value, path_used] = extractSignal(node, selectors)
+value = [];
+path_used = '';
+for idx = 1:numel(selectors)
+    selector = selectors{idx};
+    if isstruct(node) && isfield(node, selector)
+        value = node.(selector);
+        path_used = selector;
+        return;
+    end
+end
+end
+
+function out = normalizeOptionalSignal(raw_value, n_expected, signal_name)
+if isempty(raw_value)
+    out = [];
+    return;
+end
+out = coerceNumericVector(raw_value, false);
+if isempty(out)
+    out = [];
+    return;
+end
+if numel(out) ~= n_expected
+    error('oneEstSweeNoise:SignalLengthMismatch', ...
+        'Source %s signal has %d samples, expected %d.', signal_name, numel(out), n_expected);
+end
+out = out(:);
+end
+
+function value = coerceNumericVector(raw_value, allow_scalar)
+value = [];
+if isempty(raw_value)
+    return;
+end
+if isa(raw_value, 'timeseries')
+    value = coerceTimeseriesData(raw_value, allow_scalar);
+    return;
+end
+if isnumeric(raw_value)
+    if isscalar(raw_value)
+        if allow_scalar
+            value = double(raw_value);
+        end
+    elseif isvector(raw_value)
+        value = double(raw_value(:));
+    end
+end
+end
+
+function value = coerceTimeseriesData(ts_obj, allow_scalar)
+value = [];
+data = ts_obj.Data;
+if isempty(data) || ~isnumeric(data)
+    return;
+end
+
+data = double(data);
+if isvector(data)
+    value = data(:);
+    if isscalar(value) && ~allow_scalar
+        value = [];
+    end
+    return;
+end
+
+data = reshape(data, size(data, 1), []);
+if size(data, 2) == 1
+    value = data(:, 1);
+elseif allow_scalar && numel(data) == 1
+    value = data(1);
+else
+    value = rowMeanOmitNan(data);
+end
+end
+
+function time_s = normalizeTimeVector(time_raw, n_expected, signal_name)
+if isdatetime(time_raw)
+    time_raw = seconds(time_raw(:) - time_raw(1));
+elseif isduration(time_raw)
+    time_raw = seconds(time_raw(:));
+else
+    time_raw = double(time_raw(:));
+end
+if numel(time_raw) ~= n_expected
+    error('oneEstSweeNoise:TimeLengthMismatch', ...
+        'Source %s vector has %d samples, expected %d.', signal_name, numel(time_raw), n_expected);
+end
+time_s = double(time_raw(:) - time_raw(1));
+end
+
+function soc = normalizeSocSignal(soc)
+if isempty(soc)
+    return;
+end
+soc = soc(:);
+if any(abs(soc) > 1.5)
+    soc = soc / 100;
+end
+soc = min(max(soc, 0), 1);
+end
+
+function temperature_c = selectProfileTemperature(profile, default_temp)
+n_samples = numel(profile.time_s);
+if isfield(profile, 'temperature_c') && numel(profile.temperature_c) == n_samples && ~isempty(profile.temperature_c)
+    temperature_c = profile.temperature_c(:);
+else
+    temperature_c = default_temp * ones(n_samples, 1);
+end
+end
+
+function soc0 = inferProfileReferenceSoc0(profile)
+if ~isempty(profile.soc_ref) && any(isfinite(profile.soc_ref))
+    soc0 = 100 * profile.soc_ref(find(isfinite(profile.soc_ref), 1, 'first'));
+else
+    error('oneEstSweeNoise:MissingProfileSOC0', ...
+        'The raw bus dataset does not contain an initial SOC reference.');
 end
 end
 
@@ -675,6 +943,34 @@ error('oneEstSweeNoise:MissingROMStateCount', ...
     'Could not infer the ROM transient-state count from ROM.ROMmdls.');
 end
 
+function values = rowMeanOmitNan(data)
+valid_counts = sum(isfinite(data), 2);
+data(~isfinite(data)) = 0;
+values = sum(data, 2) ./ max(valid_counts, 1);
+values(valid_counts == 0) = NaN;
+end
+
+function path_out = normalizePath(path_in)
+path_out = strrep(char(path_in), '/', filesep);
+path_out = strrep(path_out, '\', filesep);
+end
+
+function tf = pathsMatchPortable(path_a, path_b)
+a = comparablePath(path_a);
+b = comparablePath(path_b);
+tf = strcmpi(a, b) || endsWith(a, stripLeadingSeparators(b), 'IgnoreCase', true) || ...
+    endsWith(b, stripLeadingSeparators(a), 'IgnoreCase', true);
+end
+
+function path_out = comparablePath(path_in)
+path_out = lower(normalizePath(path_in));
+path_out = regexprep(path_out, [regexptranslate('escape', filesep), '+'], filesep);
+end
+
+function path_out = stripLeadingSeparators(path_in)
+path_out = regexprep(char(path_in), '^[\\/]+', '');
+end
+
 function file_path = firstExistingFile(candidates, error_id, error_msg)
 file_path = '';
 for idx = 1:numel(candidates)
@@ -686,4 +982,14 @@ end
 
 searched = sprintf('\n  - %s', candidates{:});
 error(error_id, '%s Searched:%s', error_msg, searched);
+end
+
+function file_path = firstExistingFileOrEmpty(candidates)
+file_path = '';
+for idx = 1:numel(candidates)
+    if exist(candidates{idx}, 'file') == 2
+        file_path = candidates{idx};
+        return;
+    end
+end
 end

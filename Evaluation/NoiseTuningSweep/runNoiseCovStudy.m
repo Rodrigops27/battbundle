@@ -138,7 +138,7 @@ if exist(results_dir, 'dir') ~= 7
     mkdir(results_dir);
 end
 
-save(results_file, 'sweepResults', 'cfg', 'sigmaWRange', 'sigmaVRange', 'stepMultiplier');
+save(results_file, 'sweepResults', 'cfg', 'sigmaWRange', 'sigmaVRange', 'stepMultiplier', '-v7.3');
 end
 
 function tuning = defaultWrapperTuning()

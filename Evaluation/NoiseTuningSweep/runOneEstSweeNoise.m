@@ -7,7 +7,7 @@ function sweepResults = runOneEstSweeNoise(sigmaWRange, sigmaVRange, stepMultipl
 %   sigma_v range  = [1e-6 2e-1]
 %   fixed sigma_w  = 1e2
 %   fixed sigma_v  = 1e-2
-%   sweep_mode     = 'both'
+%   sweep_mode     = 'grid'
 %
 % Examples:
 %   runOneEstSweeNoise
@@ -28,6 +28,7 @@ if nargin < 4 || isempty(cfg)
 end
 
 cfg = normalizeWrapperConfig(cfg);
+study_timer = tic;
 
 switch cfg.sweep_mode
     case 'both'
@@ -53,6 +54,14 @@ switch cfg.sweep_mode
             'cfg.sweep_mode must be "both", "sigma_w", "sigma_v", or "grid".');
 end
 
+elapsed_seconds = toc(study_timer);
+fprintf('\nrunOneEstSweeNoise completed in %.1f s (%.2f min, %.2f h)\n', ...
+    elapsed_seconds, elapsed_seconds / 60, elapsed_seconds / 3600);
+
+if isstruct(sweepResults)
+    sweepResults.elapsed_seconds = elapsed_seconds;
+end
+
 if nargout == 0
     assignin('base', 'oneEstNoiseSweepResults', sweepResults);
 end
@@ -61,7 +70,7 @@ end
 function cfg = normalizeWrapperConfig(cfg)
 defaults = struct();
 defaults.estimator_name = 'ROM-EKF';
-defaults.sweep_mode = 'both';
+defaults.sweep_mode = 'grid';
 defaults.fixed_sigma_w = 1e2;
 defaults.fixed_sigma_v = 1e-2;
 defaults.dataset_mode = 'rom';
@@ -79,7 +88,6 @@ end
 
 function tuning = defaultWrapperTuning()
 tuning = struct();
-tuning.nx_rom = 12;
 tuning.sigma_x0_rom_tail = 2e6;
 end
 

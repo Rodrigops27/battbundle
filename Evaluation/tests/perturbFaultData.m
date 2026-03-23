@@ -79,7 +79,7 @@ faultedDataset.fault_voltage_std_mv = cfg.voltage_std_mv;
 faultedDataset.fault_voltage_noise_v = voltage_noise;
 faultedDataset.fault_model = 'current_gain_offset + uniform_voltage_noise';
 faultedDataset.source_dataset = sourceInfo.label;
-faultedDataset.fault_dataset_file = savePath;
+faultedDataset.fault_dataset_file = toProjectRelativePath(savePath, repo_root);
 faultedDataset.voltage_name = sprintf('Faulted (gain=%.3g, offset=%.3g A, %.0f mV)', ...
     cfg.current_gain, cfg.current_offset_a, cfg.voltage_std_mv);
 if ~isempty(cfg.random_seed)
@@ -159,8 +159,37 @@ end
 
 loaded = load(datasetInput);
 dataset = extractSavedDataset(loaded, datasetInput, 'perturbFaultData');
- [~, base_name] = fileparts(datasetInput);
-info = struct('path', datasetInput, 'label', datasetInput, 'base_name', base_name);
+[~, base_name] = fileparts(datasetInput);
+stored_path = toProjectRelativePath(datasetInput, repo_root);
+info = struct('path', stored_path, 'label', stored_path, 'base_name', base_name);
+end
+
+function path_out = toProjectRelativePath(path_in, repo_root)
+if isempty(path_in)
+    path_out = '';
+    return;
+end
+
+path_in = normalizeStoredPath(path_in);
+repo_root = normalizeStoredPath(repo_root);
+
+if startsWith(lower(path_in), lower(repo_root))
+    path_out = path_in(numel(repo_root)+1:end);
+else
+    [~, name, ext] = fileparts(path_in);
+    path_out = [name, ext];
+end
+
+if isempty(path_out)
+    path_out = '/';
+elseif path_out(1) ~= '/'
+    path_out = ['/', path_out];
+end
+end
+
+function path_out = normalizeStoredPath(path_in)
+path_out = strrep(char(path_in), '\', '/');
+path_out = regexprep(path_out, '/+', '/');
 end
 
 function dataset = extractSavedDataset(loaded, file_path, caller_name)

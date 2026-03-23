@@ -68,7 +68,7 @@ if isempty(source_step_id)
 end
 
 extra_fields = struct();
-extra_fields.source_profile_file = profile.profile_file;
+extra_fields.source_profile_file = toProjectRelativePath(profile.profile_file, repo_root);
 extra_fields.source_profile_name = profile.profile_name;
 extra_fields.source_time_s = profile.time_s(:);
 extra_fields.source_current_a = source_current_a(:);
@@ -95,6 +95,33 @@ sim_cfg = struct( ...
     'extra_fields', extra_fields);
 
 dataset = simulateROMProfile(target_current_a(:), sim_cfg);
+end
+
+function path_out = toProjectRelativePath(path_in, repo_root)
+if isempty(path_in)
+    path_out = '';
+    return;
+end
+
+path_in = normalizeStoredPath(path_in);
+repo_root = normalizeStoredPath(repo_root);
+
+if startsWith(lower(path_in), lower(repo_root))
+    path_out = path_in(numel(repo_root)+1:end);
+else
+    path_out = path_in;
+end
+
+if isempty(path_out)
+    path_out = '/';
+elseif path_out(1) ~= '/'
+    path_out = ['/', path_out];
+end
+end
+
+function path_out = normalizeStoredPath(path_in)
+path_out = strrep(char(path_in), '\', '/');
+path_out = regexprep(path_out, '/+', '/');
 end
 
 function capacity_ah = loadNMC30Capacity(repo_root)

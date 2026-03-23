@@ -108,8 +108,8 @@ dataset.hysteresis_state = hysteresis_state(:);
 dataset.instantaneous_hysteresis = instantaneous_hysteresis(:);
 dataset.capacity_ah = target_capacity_ah;
 dataset.step_id = source_step_id(:);
-dataset.esc_model_file = model_file;
-dataset.source_profile_file = profile.profile_file;
+dataset.esc_model_file = toProjectRelativePath(model_file, repo_root);
+dataset.source_profile_file = toProjectRelativePath(profile.profile_file, repo_root);
 dataset.source_profile_name = profile.profile_name;
 dataset.source_signal_paths = profile.signal_paths;
 dataset.source_time_s = profile.time_s(:);
@@ -142,6 +142,34 @@ fprintf('  Source capacity: %.3f Ah | Target ESC capacity: %.3f Ah\n', ...
     dataset.source_capacity_ah, dataset.target_capacity_ah);
 fprintf('  Current scale factor: %.6f | Initial SOC: %.2f %%\n', ...
     dataset.current_scale_factor, dataset.soc_init_percent);
+end
+
+function path_out = toProjectRelativePath(path_in, repo_root)
+if isempty(path_in)
+    path_out = '';
+    return;
+end
+
+path_in = normalizeStoredPath(path_in);
+repo_root = normalizeStoredPath(repo_root);
+
+if startsWith(lower(path_in), lower(repo_root))
+    path_out = path_in(numel(repo_root)+1:end);
+else
+    [~, name, ext] = fileparts(path_in);
+    path_out = [name, ext];
+end
+
+if isempty(path_out)
+    path_out = '/';
+elseif path_out(1) ~= '/'
+    path_out = ['/', path_out];
+end
+end
+
+function path_out = normalizeStoredPath(path_in)
+path_out = strrep(char(path_in), '\', '/');
+path_out = regexprep(path_out, '/+', '/');
 end
 
 function [model_file, model] = loadEscModel(repo_root, cfg)
