@@ -22,12 +22,42 @@ sensor_var = optimizableVariable( ...
 
 objective_cfg = global_cfg.objective;
 bayesopt_cfg = global_cfg.bayesopt;
+[use_parallel, parallel_message] = resolveParallelMode(bayesopt_cfg);
+cache_enabled = fieldOr(bayesopt_cfg, 'cache_objective_evaluations', true) && ~use_parallel;
+objective_cache = [];
+if cache_enabled
+    objective_cache = containers.Map('KeyType', 'char', 'ValueType', 'double');
+end
+
+progress = struct();
+progress.max_evals = bayesopt_cfg.max_objective_evals;
+progress.start_tic = tic;
+progress.waitbar = [];
+progress.show_waitbar = fieldOr(bayesopt_cfg, 'show_waitbar', true);
+
+if progress.show_waitbar
+    progress.waitbar = createProgressWaitbar(scenario_cfg.name, estimator_cfg.name, objective_cfg.metric);
+end
+cleanup_waitbar = onCleanup(@() closeProgressWaitbar(progress.waitbar)); %#ok<NASGU>
 
 fprintf('\nAutotuning %s | %s with objective %s\n', ...
     scenario_cfg.name, estimator_cfg.name, objective_cfg.metric);
+if ~isempty(parallel_message)
+    fprintf('%s\n', parallel_message);
+elseif use_parallel
+    fprintf('BayesOpt parallel evaluation enabled.\n');
+end
 
     function objective = evaluateCandidate(X)
         candidate = convertCandidate(X);
+        cache_key = '';
+        if cache_enabled
+            cache_key = candidateKey(candidate);
+            if isKey(objective_cache, cache_key)
+                objective = objective_cache(cache_key);
+                return;
+            end
+        end
         try
             run_results = evaluateBenchmarkCandidate(candidate);
             metrics = extractMetricsStruct(run_results, estimator_cfg.name);
@@ -37,12 +67,16 @@ fprintf('\nAutotuning %s | %s with objective %s\n', ...
             fprintf('Autotuning penalty for %s | %s: %s\n', ...
                 scenario_cfg.name, estimator_cfg.name, ME.message);
         end
+        if cache_enabled
+            objective_cache(cache_key) = objective;
+        end
     end
 
     function stop = saveCheckpoint(opt_results, state)
         stop = false;
         snapshot = buildCheckpointStruct(opt_results, state);
         save(checkpoint_file, 'snapshot');
+        updateProgressWaitbar(progress.waitbar, snapshot);
     end
 
 results = bayesopt( ...
@@ -52,7 +86,7 @@ results = bayesopt( ...
     'NumSeedPoints', bayesopt_cfg.num_seed_points, ...
     'IsObjectiveDeterministic', bayesopt_cfg.is_objective_deterministic, ...
     'AcquisitionFunctionName', bayesopt_cfg.acquisition_function_name, ...
-    'UseParallel', bayesopt_cfg.use_parallel, ...
+    'UseParallel', use_parallel, ...
     'Verbose', bayesopt_cfg.verbose, ...
     'PlotFcn', {}, ...
     'OutputFcn', @saveCheckpoint, ...
@@ -162,6 +196,11 @@ saveCheckpoint(results, 'done');
         snapshot.bayesopt_checkpoint_file = bayesopt_checkpoint_file;
         snapshot.best_benchmark_results_file = best_benchmark_results_file;
         snapshot.optimizer_state = state;
+        snapshot.parallel_enabled = use_parallel;
+        snapshot.parallel_message = parallel_message;
+        snapshot.elapsed_seconds = toc(progress.start_tic);
+        snapshot.max_objective_evals = progress.max_evals;
+        snapshot.completed_evaluations = height(snapshot.history_table);
 
         if ~isempty(snapshot.history_table)
             snapshot.best_process_noise = snapshot.history_table.BestProcessNoise(end);
@@ -326,5 +365,81 @@ token = regexprep(token, '_+', '_');
 token = regexprep(token, '^_|_$', '');
 if isempty(token)
     token = 'run';
+end
+end
+
+function key = candidateKey(candidate)
+key = sprintf('w=%.16g|v=%.16g', candidate.process_noise, candidate.sensor_noise);
+end
+
+function [use_parallel, message] = resolveParallelMode(bayesopt_cfg)
+use_parallel = false;
+message = '';
+if ~fieldOr(bayesopt_cfg, 'use_parallel', false)
+    return;
+end
+
+if exist('gcp', 'file') ~= 2 || exist('parpool', 'file') ~= 2
+    message = 'Parallel BayesOpt requested but Parallel Computing Toolbox functions are unavailable. Falling back to serial execution.';
+    return;
+end
+
+if ~license('test', 'Distrib_Computing_Toolbox')
+    message = 'Parallel BayesOpt requested but Parallel Computing Toolbox is not licensed. Falling back to serial execution.';
+    return;
+end
+
+pool = gcp('nocreate');
+if isempty(pool) && fieldOr(bayesopt_cfg, 'auto_start_parallel_pool', true)
+    try
+        pool_size = fieldOr(bayesopt_cfg, 'parallel_pool_size', []);
+        if isempty(pool_size)
+            parpool('local');
+        else
+            parpool('local', pool_size);
+        end
+    catch ME
+        message = sprintf('Parallel BayesOpt requested but a pool could not be started (%s). Falling back to serial execution.', ME.message);
+        return;
+    end
+elseif isempty(pool)
+    message = 'Parallel BayesOpt requested but no pool exists and auto_start_parallel_pool is false. Falling back to serial execution.';
+    return;
+end
+
+use_parallel = true;
+end
+
+function hwait = createProgressWaitbar(scenario_name, estimator_name, metric_name)
+hwait = [];
+try
+    hwait = waitbar(0, 'Initializing Bayesian optimization...', ...
+        'Name', sprintf('Autotuning | %s | %s | %s', scenario_name, estimator_name, metric_name));
+catch
+    hwait = [];
+end
+end
+
+function updateProgressWaitbar(hwait, snapshot)
+if isempty(hwait) || ~ishandle(hwait)
+    return;
+end
+
+completed = fieldOr(snapshot, 'completed_evaluations', 0);
+max_evals = max(fieldOr(snapshot, 'max_objective_evals', 1), 1);
+fraction = min(completed / max_evals, 1);
+elapsed_seconds = fieldOr(snapshot, 'elapsed_seconds', NaN);
+elapsed_min = elapsed_seconds / 60;
+best_objective = fieldOr(snapshot, 'best_objective', NaN);
+
+message = sprintf('Eval %d/%d | state=%s | best=%g | elapsed=%.1f min', ...
+    completed, max_evals, fieldOr(snapshot, 'optimizer_state', 'iteration'), best_objective, elapsed_min);
+waitbar(fraction, hwait, message);
+drawnow limitrate;
+end
+
+function closeProgressWaitbar(hwait)
+if ~isempty(hwait) && ishandle(hwait)
+    close(hwait);
 end
 end

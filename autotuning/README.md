@@ -73,6 +73,8 @@ plotAutotuningHistory(results);
 plotAutotunedResults(results);
 ```
 
+During a live run, `tuneEstimatorBayesopt` also opens a waitbar when the MATLAB UI is available. It shows completed evaluations, the current optimizer state, elapsed time, and the best objective found so far.
+
 ## Tuning Multiple Estimators
 
 Add more names under `cfg.scenarios(k).estimator_names`:
@@ -86,6 +88,16 @@ results = runAutotuning(cfg);
 ```
 
 Estimators are tuned independently, one benchmark run per BayesOpt objective evaluation.
+
+If you want BayesOpt to evaluate objective points in parallel:
+
+```matlab
+cfg = defaultAutotuningConfig();
+cfg.bayesopt.use_parallel = true;
+cfg.bayesopt.auto_start_parallel_pool = true;
+```
+
+When parallel execution is unavailable, the layer falls back to serial mode and prints the reason. In serial mode, repeated objective points are cached to avoid re-running identical benchmark evaluations.
 
 ## Adding A Different Dataset / Model Scenario
 
