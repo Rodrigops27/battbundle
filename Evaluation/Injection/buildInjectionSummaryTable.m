@@ -29,8 +29,6 @@ for run_idx = 1:numel(runs)
         rows(row_idx, 1).VoltageMssdMv2 = metric_row.VoltageMssdMv2;
         rows(row_idx, 1).ValidationCurrentRmseA = fieldOr(run.validation, 'current_rmse_a', NaN);
         rows(row_idx, 1).ValidationVoltageRmseMv = fieldOr(run.validation, 'voltage_rmse_mv', NaN);
-        rows(row_idx, 1).InjectedDatasetFile = string(run.injected_dataset_file);
-        rows(row_idx, 1).BenchmarkResultsFile = string(run.benchmark_results_file);
     end
 end
 
