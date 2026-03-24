@@ -28,13 +28,19 @@ defaults.PlotSocEstimationfigs = true;
 defaults.PlotVoltageEstimationfigs = true;
 defaults.SaveResults = true;
 defaults.results_file = '';
+defaults.parallel = struct( ...
+    'use_parallel', false, ...
+    'auto_start_pool', true, ...
+    'pool_size', []);
 defaults.estimator_names = { ...
     'iterEbSPKF', 'iterESCSPKF', 'iterEBiSPKF', ...
     'iterEaEKF', 'iterEsSPKF', 'iterEDUKF'};
 defaults.tuning = defaultWrapperTuning();
 
 cfg = mergeStructDefaults(cfg, defaults);
-cfg.tuning = mergeStructDefaults(cfg.tuning, defaultWrapperTuning());
+if ~isProfileSpec(cfg.tuning)
+    cfg.tuning = mergeStructDefaults(cfg.tuning, defaultWrapperTuning());
+end
 
 sweepResults = sweepInitSocStudy(socRangePercent, socStepPercent, cfg);
 
@@ -48,6 +54,8 @@ tuning = struct();
 tuning.SigmaX0_rc = 1e-6;
 tuning.SigmaX0_hk = 1e-6;
 tuning.SigmaX0_soc = 1e-3;
+tuning.sigma_w_ekf = 1e2;
+tuning.sigma_v_ekf = 1e-3;
 tuning.sigma_w_esc = 1e-3;
 tuning.sigma_v_esc = 1e-3;
 tuning.SigmaR0 = 1e-6;
@@ -65,4 +73,10 @@ names = fieldnames(in);
 for idx = 1:numel(names)
     out.(names{idx}) = in.(names{idx});
 end
+end
+
+function tf = isProfileSpec(tuning_spec)
+tf = isstruct(tuning_spec) && ...
+    (isfield(tuning_spec, 'param_file') || ...
+    (isfield(tuning_spec, 'kind') && strcmpi(char(tuning_spec.kind), 'autotuning_profile')));
 end

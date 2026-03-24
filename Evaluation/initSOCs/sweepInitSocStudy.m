@@ -14,7 +14,7 @@ function sweepResults = sweepInitSocStudy(socRangePercent, socStepPercent, cfg)
 %                      PlotSocEstimationfigs, PlotVoltageEstimationfigs,
 %                      esc_dataset_file, rom_dataset_file, raw_bus_file,
 %                      esc_model_file, estimator_names, SaveResults,
-%                      results_file, tuning
+%                      results_file, tuning, parallel
 %
 % Output:
 %   sweepResults     Struct with sweep settings, RMSE tables, and run results.
@@ -48,6 +48,7 @@ addpath(genpath(repo_root));
 
 cfg = normalizeStudyConfig(cfg, repo_root);
 soc0_sweep_percent = buildSocSweep(socRangePercent, socStepPercent);
+[use_parallel, parallel_message] = resolveParallelMode(cfg.parallel);
 
 esc_src = load(cfg.esc_model_file);
 rom_model = [];
@@ -83,15 +84,27 @@ soc_rmse = NaN(n_sweeps, n_estimators);
 voltage_rmse = NaN(n_sweeps, n_estimators);
 all_results = cell(n_sweeps, 1);
 
-for sweep_idx = 1:n_sweeps
-    soc_init_kf = soc0_sweep_percent(sweep_idx);
-    estimators = buildEscEstimators(soc_init_kf, cfg, nmc30_esc, rom_model, estimator_names);
-    run_results = xKFeval(evalDataset, estimators, flags);
-    all_results{sweep_idx} = run_results;
+if ~isempty(parallel_message)
+    fprintf('%s\n', parallel_message);
+elseif use_parallel
+    fprintf('Initial-SOC sweep parallel execution enabled.\n');
+end
 
-    for est_idx = 1:n_estimators
-        soc_rmse(sweep_idx, est_idx) = 100 * run_results.estimators(est_idx).rmse_soc;
-        voltage_rmse(sweep_idx, est_idx) = 1000 * run_results.estimators(est_idx).rmse_voltage;
+if use_parallel
+    parfor sweep_idx = 1:n_sweeps
+        [run_results, soc_rmse_row, voltage_rmse_row] = evaluateSweepPoint( ...
+            soc0_sweep_percent(sweep_idx), cfg, nmc30_esc, rom_model, estimator_names, evalDataset, flags);
+        all_results{sweep_idx} = run_results;
+        soc_rmse(sweep_idx, :) = soc_rmse_row;
+        voltage_rmse(sweep_idx, :) = voltage_rmse_row;
+    end
+else
+    for sweep_idx = 1:n_sweeps
+        [run_results, soc_rmse_row, voltage_rmse_row] = evaluateSweepPoint( ...
+            soc0_sweep_percent(sweep_idx), cfg, nmc30_esc, rom_model, estimator_names, evalDataset, flags);
+        all_results{sweep_idx} = run_results;
+        soc_rmse(sweep_idx, :) = soc_rmse_row;
+        voltage_rmse(sweep_idx, :) = voltage_rmse_row;
     end
 end
 
@@ -172,6 +185,7 @@ cfg.PlotSocEstimationfigs = getCfg(cfg, 'PlotSocEstimationfigs', true);
 cfg.PlotVoltageEstimationfigs = getCfg(cfg, 'PlotVoltageEstimationfigs', true);
 cfg.SaveResults = logical(getCfg(cfg, 'SaveResults', true));
 cfg.results_file = getCfg(cfg, 'results_file', '');
+cfg.parallel = mergeStructDefaults(getCfg(cfg, 'parallel', struct()), defaultParallelConfig());
 cfg.esc_dataset_file = getCfg(cfg, 'esc_dataset_file', ...
     fullfile(evaluation_root, 'ESCSimData', 'datasets', 'esc_bus_coreBattery_dataset.mat'));
 cfg.rom_dataset_file = getCfg(cfg, 'rom_dataset_file', ...
@@ -189,8 +203,27 @@ cfg.esc_model_file = getCfg(cfg, 'esc_model_file', ...
     'No ATL ESC model file found.'));
 cfg.estimator_names = normalizeEstimatorSelection(getCfg(cfg, 'estimator_names', defaultInitSocEstimatorNames()));
 cfg.tuning = getCfg(cfg, 'tuning', tuning_defaults);
+cfg.tuning_bundle = resolveEstimatorTuningBundle( ...
+    cfg.tuning, cfg.estimator_names, tuning_defaults, repo_root);
+end
 
-cfg.tuning = mergeStructDefaults(cfg.tuning, tuning_defaults);
+function parallel_cfg = defaultParallelConfig()
+parallel_cfg = struct( ...
+    'use_parallel', false, ...
+    'auto_start_pool', true, ...
+    'pool_size', []);
+end
+
+function [run_results, soc_rmse_row, voltage_rmse_row] = evaluateSweepPoint( ...
+        soc_init_kf, cfg, model, ROM, estimator_names, evalDataset, flags)
+estimators = buildEscEstimators(soc_init_kf, cfg, model, ROM, estimator_names);
+run_results = xKFeval(evalDataset, estimators, flags);
+soc_rmse_row = NaN(1, numel(estimator_names));
+voltage_rmse_row = NaN(1, numel(estimator_names));
+for est_idx = 1:numel(estimator_names)
+    soc_rmse_row(est_idx) = 100 * run_results.estimators(est_idx).rmse_soc;
+    voltage_rmse_row(est_idx) = 1000 * run_results.estimators(est_idx).rmse_voltage;
+end
 end
 
 function names = defaultInitSocEstimatorNames()
@@ -203,6 +236,8 @@ tuning = struct();
 tuning.SigmaX0_rc = 1e-6;
 tuning.SigmaX0_hk = 1e-6;
 tuning.SigmaX0_soc = 1e-3;
+tuning.sigma_w_ekf = 1e2;
+tuning.sigma_v_ekf = 1e-3;
 tuning.sigma_w_esc = 1e-3;
 tuning.sigma_v_esc = 1e-3;
 tuning.sigma_x0_rom_tail = 2e6;
@@ -218,6 +253,42 @@ names = fieldnames(in);
 for idx = 1:numel(names)
     out.(names{idx}) = in.(names{idx});
 end
+end
+
+function [use_parallel, message] = resolveParallelMode(parallel_cfg)
+use_parallel = false;
+message = '';
+if ~getCfg(parallel_cfg, 'use_parallel', false)
+    return;
+end
+if exist('gcp', 'file') ~= 2 || exist('parpool', 'file') ~= 2
+    message = 'Parallel initial-SOC sweep requested but Parallel Computing Toolbox functions are unavailable. Falling back to serial execution.';
+    return;
+end
+if ~license('test', 'Distrib_Computing_Toolbox')
+    message = 'Parallel initial-SOC sweep requested but Parallel Computing Toolbox is not licensed. Falling back to serial execution.';
+    return;
+end
+
+pool = gcp('nocreate');
+if isempty(pool) && getCfg(parallel_cfg, 'auto_start_pool', true)
+    try
+        pool_size = getCfg(parallel_cfg, 'pool_size', []);
+        if isempty(pool_size)
+            parpool('local');
+        else
+            parpool('local', pool_size);
+        end
+    catch ME
+        message = sprintf('Parallel initial-SOC sweep requested but a pool could not be started (%s). Falling back to serial execution.', ME.message);
+        return;
+    end
+elseif isempty(pool)
+    message = 'Parallel initial-SOC sweep requested but no pool exists and auto_start_pool is false. Falling back to serial execution.';
+    return;
+end
+
+use_parallel = true;
 end
 
 function value = getCfg(cfg, fieldName, defaultValue)
@@ -301,17 +372,17 @@ end
 end
 
 function estimators = buildEscEstimators(soc_init_kf, cfg, model, ROM, estimator_names)
-tuning = cfg.tuning;
 n_rc = numel(getParamESC('RCParam', cfg.tc, model));
-SigmaX0 = diag([ ...
-    tuning.SigmaX0_rc * ones(1, n_rc), ...
-    tuning.SigmaX0_hk, ...
-    tuning.SigmaX0_soc]);
 R0init = getParamESC('R0Param', cfg.tc, model);
 
 estimators = repmat(estimatorTemplate(), numel(estimator_names), 1);
 
 for idx = 1:numel(estimator_names)
+    tuning = resolvedTuningForEstimator(cfg.tuning_bundle, estimator_names{idx});
+    SigmaX0 = diag([ ...
+        tuning.SigmaX0_rc * ones(1, n_rc), ...
+        tuning.SigmaX0_hk, ...
+        tuning.SigmaX0_soc]);
     switch estimator_names{idx}
         case 'ESC-SPKF'
             estimators(idx) = makeEstimator('ESC-SPKF', ...
@@ -322,7 +393,7 @@ for idx = 1:numel(estimator_names)
             rom_state_count = inferRomTransientStateCount(ROM, getFieldOr(tuning, 'nx_rom', []));
             sigma_x0_rom = diag([ones(1, rom_state_count), tuning.sigma_x0_rom_tail]);
             estimators(idx) = makeEstimator('ROM-EKF', ...
-                initKF(soc_init_kf, cfg.tc, sigma_x0_rom, tuning.sigma_v_esc, tuning.sigma_w_esc, 'OutB', ROM), ...
+                initKF(soc_init_kf, cfg.tc, sigma_x0_rom, tuning.sigma_v_ekf, tuning.sigma_w_ekf, 'OutB', ROM), ...
                 @stepRomEkf, soc_init_kf, [0.64 0.08 0.18], '-');
 
         case 'ESC-EKF'
@@ -396,6 +467,15 @@ for idx = 1:numel(estimator_names)
                 'Unsupported estimator "%s".', estimator_names{idx});
     end
 end
+end
+
+function tuning = resolvedTuningForEstimator(tuning_bundle, estimator_name)
+matches = strcmpi({tuning_bundle.resolved_estimators.estimator_name}, estimator_name);
+if ~any(matches)
+    error('sweepInitSocStudy:MissingResolvedTuning', ...
+        'No resolved tuning entry was found for estimator %s.', estimator_name);
+end
+tuning = tuning_bundle.resolved_estimators(find(matches, 1, 'first')).tuning;
 end
 
 function estimator = makeEstimator(name, kfData, stepFcn, soc0_percent, color, lineStyle)
