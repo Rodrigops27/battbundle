@@ -241,10 +241,12 @@ cd Evaluation/initSOCs
 runInitSocStudy
 ```
 
-With a tuning profile:
+With a tuning profile and parallel computing:
 
 ```matlab
 cfg = struct();
+cfg.parallel.use_parallel = true;
+cfg.parallel.auto_start_pool = true;
 cfg.tuning = struct( ...
     'kind', 'autotuning_profile', ...
     'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
