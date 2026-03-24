@@ -36,6 +36,12 @@ The built-in default scenario is:
   Plots objective and covariance traces from a final result or checkpoint file.
 - [`plotAutotunedResults.m`](bnchmrk/autotuning/plotAutotunedResults.m)
   Re-plots the saved best benchmark result using [`plotEvalResults.m`](bnchmrk/Evaluation/plotEvalResults.m).
+- [`plotAutotuningErrors.m`](bnchmrk/autotuning/plotAutotuningErrors.m)
+  Merges the saved best benchmark result of each autotuned estimator and calls [`plotEvalResults.m`](bnchmrk/Evaluation/plotEvalResults.m) to plot combined SOC-error and voltage-error figures across all tuned estimators.
+- [`plotAutotuningInnovationAcfPacf.m`](bnchmrk/autotuning/plotAutotuningInnovationAcfPacf.m)
+  Merges the saved best benchmark result of each autotuned estimator and calls [`plotInnovationAcfPacf.m`](bnchmrk/Evaluation/plotInnovationAcfPacf.m) to plot combined innovation ACF/PACF figures across all tuned estimators.
+- [`plotAttributes.m`](bnchmrk/autotuning/plotAttributes.m)
+  Merges the saved best benchmark result of each autotuned estimator and plots shared estimator attributes: combined `R0` traces, combined bias traces, and the `EaEKF` covariance plots from the autotuning validation helper.
 - [`plotAutotuningCovarianceValidation.m`](bnchmrk/autotuning/plotAutotuningCovarianceValidation.m)
   Replays the tuned `EaEKF` on the saved desktop-evaluation dataset and compares its tracked `SigmaW`/`SigmaV` against the constant tuned ESC-estimator covariances.
 - [`printAutotuningSummary.m`](bnchmrk/autotuning/printAutotuningSummary.m)
@@ -53,6 +59,16 @@ printAutotuningSummary(results);
 ```
 
 If you call `runAutotuning` with no output, it also assigns `autotuningResults` in the base workspace.
+
+If you already have the per-run struct array and want the summary as a MATLAB table without printing:
+
+```matlab
+summary_table = buildAutotuningSummaryTable(autotuning_results.runs);
+```
+
+Difference between the two summary helpers:
+- `buildAutotuningSummaryTable(...)` returns a table and does not print anything. Use it when you want to sort, filter, export, or compare rows in code.
+- `printAutotuningSummary(...)` loads or normalizes the input, builds that same summary table, and prints it to the Command Window. Use it for a quick human-readable check.
 
 ## Plot Anytime
 
@@ -75,12 +91,68 @@ plotAutotuningHistory(results);
 plotAutotunedResults(results);
 ```
 
+To reproduce the standard combined SOC-error figure across all autotuned estimators:
+
+```matlab
+plotAutotuningErrors( ...
+    fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'));
+```
+
+To add the voltage-error figure as well:
+
+```matlab
+plotAutotuningErrors( ...
+    fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
+    struct('plot_voltage_error', true));
+```
+
+This helper loads each run's `best_benchmark_results.mat`, merges the estimators into one xKFeval-style results struct, and then reuses [`Evaluation/plotEvalResults.m`](bnchmrk/Evaluation/plotEvalResults.m). Use it when you want the same multi-estimator error figures as the evaluation layer.
+
+To plot innovation ACF/PACF across all autotuned estimators:
+
+```matlab
+plotAutotuningInnovationAcfPacf( ...
+    fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'));
+```
+
+To limit the lag range:
+
+```matlab
+plotAutotuningInnovationAcfPacf( ...
+    fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
+    struct('max_lag', 40));
+```
+
+This helper loads each run's `best_benchmark_results.mat`, merges the estimators into one xKFeval-style results struct, extracts `innovation_pre` from each estimator, and then reuses [`Evaluation/plotInnovationAcfPacf.m`](bnchmrk/Evaluation/plotInnovationAcfPacf.m).
+
+To plot attribute figures from the autotuning aggregate:
+
+```matlab
+plotAttributes( ...
+    fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'));
+```
+
+This wrapper can create:
+- one combined `R0` figure for all estimators that track `R0`
+- one combined bias figure for all estimators that track bias states
+- the `EaEKF` covariance-validation figures
+
+To disable the covariance plots and keep only `R0` and bias:
+
+```matlab
+plotAttributes( ...
+    fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
+    struct('plot_ea_covariances', false));
+```
+
 To validate the tuned ESC covariance levels against the adaptive `EaEKF` covariance trace on the desktop dataset:
 
 ```matlab
 validation = plotAutotuningCovarianceValidation( ...
     fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'));
 ```
+
+Use this when the autotuning run has already finished and you want to reopen the saved aggregate MAT file as the single entry point, instead of keeping the original `results` struct in memory.
 
 This plot:
 - uses the aggregate autotuning MAT file as the single entry point
