@@ -36,6 +36,8 @@ The built-in default scenario is:
   Plots objective and covariance traces from a final result or checkpoint file.
 - [`plotAutotunedResults.m`](bnchmrk/autotuning/plotAutotunedResults.m)
   Re-plots the saved best benchmark result using [`plotEvalResults.m`](bnchmrk/Evaluation/plotEvalResults.m).
+- [`plotAutotuningCovarianceValidation.m`](bnchmrk/autotuning/plotAutotuningCovarianceValidation.m)
+  Replays the tuned `EaEKF` on the saved desktop-evaluation dataset and compares its tracked `SigmaW`/`SigmaV` against the constant tuned ESC-estimator covariances.
 - [`printAutotuningSummary.m`](bnchmrk/autotuning/printAutotuningSummary.m)
   Prints the compact summary table.
 
@@ -72,6 +74,23 @@ After a run completes:
 plotAutotuningHistory(results);
 plotAutotunedResults(results);
 ```
+
+To validate the tuned ESC covariance levels against the adaptive `EaEKF` covariance trace on the desktop dataset:
+
+```matlab
+validation = plotAutotuningCovarianceValidation( ...
+    fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'));
+```
+
+This plot:
+- uses the aggregate autotuning MAT file as the single entry point
+- replays the tuned `EaEKF` on `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`
+- plots the `EaEKF` tracked `SigmaW` diagonal and `SigmaV`
+- adds EaEKF-only tracking figures for process and sensor covariance evolution
+- overlays the constant tuned ESC-estimator covariances as horizontal lines
+- overlays the `EaEKF` mean, median, and mode as horizontal reference lines
+- marks the `EaEKF` initial `SigmaW` and `SigmaV`
+- prints summary tables comparing the tuned ESC covariances against the EaEKF initial, final, mean, median, and mode values
 
 During a live run, `tuneEstimatorBayesopt` also opens a waitbar when the MATLAB UI is available. It shows completed evaluations, the current optimizer state, elapsed time, and the best objective found so far.
 
