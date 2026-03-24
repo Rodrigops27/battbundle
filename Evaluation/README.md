@@ -16,6 +16,8 @@ The default study scenario in this layer is the ATL20 desktop evaluation:
 - `runBenchmark.m`
   - Reusable benchmark API for dataset, model, and estimator-set specs.
   - No-input default now runs the ATL ESC-driven BSS benchmark and saves results unless disabled.
+- `resolveEstimatorTuningBundle.m`
+  - Resolves direct tuning structs or autotuning profile MAT files into per-estimator tuning.
 - `xKFeval.m`
   - Core evaluation runner.
 - `mainEval.m`
@@ -90,8 +92,48 @@ See the top-level `README.md` for the full benchmark dataset contract.
 1. Place or build a benchmark dataset under `Evaluation/.../datasets/`.
 2. Ensure the ESC model exists in `models/`.
 3. Add a ROM model in `models/` if `ROM-EKF` should run.
-4. Run `runBenchmark.m` or a study wrapper.
+4. Optionally point `estimatorSetSpec.tuning` or wrapper `cfg.tuning` at an autotuning param file.
+5. Run `runBenchmark.m` or a study wrapper.
 5. Inspect the metric table and plots.
+
+## Tuned Estimator Profiles
+
+`runBenchmark.m` now accepts two tuning styles:
+- a plain shared tuning struct, as before
+- a resolved tuning profile spec pointing at an autotuning MAT file
+
+The tuning-profile entry point is:
+
+```matlab
+estimatorSetSpec.tuning = struct( ...
+    'kind', 'autotuning_profile', ...
+    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
+    'scenario_name', 'atl_bss_esc', ...
+    'selection_policy', 'best_objective', ...
+    'fallback_to_default', true);
+```
+
+Supported profile fields:
+- `param_file`
+  - MAT file produced by the autotuning layer.
+- `scenario_name`
+  - Optional scenario filter inside the autotuning MAT file.
+- `selection_policy`
+  - One of `best_objective`, `last`, or `first`.
+- `fallback_to_default`
+  - If `true`, missing files or missing estimator entries fall back to default/shared tuning.
+- `warn_on_missing_param_file`
+  - Default `true`.
+- `warn_on_missing_estimator`
+  - Default `true`.
+- any regular tuning fields such as `SigmaX0_soc`
+  - Applied as shared overrides on top of the resolved tuned values.
+
+Behavior:
+- If the param file is found and a matching estimator entry exists, `runBenchmark.m` uses the tuned covariance values from that file.
+- If the param file is missing, `runBenchmark.m` warns and falls back to default/shared tuning when `fallback_to_default = true`.
+- If a requested estimator is missing from the param file, `runBenchmark.m` also warns and falls back for that estimator when `fallback_to_default = true`.
+- The resolved outcome is saved in `results.metadata.tuning_bundle`.
 
 ## Default Benchmark Example
 
@@ -161,7 +203,13 @@ modelSpec = struct( ...
 
 estimatorSetSpec = struct( ...
     'registry_name', 'all', ...
-    'allow_rom_skip', true);
+    'allow_rom_skip', true, ...
+    'tuning', struct( ...
+        'kind', 'autotuning_profile', ...
+        'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
+        'scenario_name', 'atl_bss_esc', ...
+        'selection_policy', 'best_objective', ...
+        'fallback_to_default', true));
 
 flags = struct( ...
     'Summaryfigs', true, ...
@@ -193,11 +241,37 @@ cd Evaluation/initSOCs
 runInitSocStudy
 ```
 
+With a tuning profile:
+
+```matlab
+cfg = struct();
+cfg.tuning = struct( ...
+    'kind', 'autotuning_profile', ...
+    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
+    'scenario_name', 'atl_bss_esc', ...
+    'selection_policy', 'best_objective', ...
+    'fallback_to_default', true);
+runInitSocStudy([0 100], 10, cfg);
+```
+
 ### Noise and perturbance injection
 
 ```matlab
 cd Evaluation/Injection
 runInjectionStudy
+```
+
+With a tuning profile:
+
+```matlab
+cfg = defaultInjectionConfig();
+cfg.scenarios(1).estimatorSetSpec.tuning = struct( ...
+    'kind', 'autotuning_profile', ...
+    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
+    'scenario_name', 'atl_bss_esc', ...
+    'selection_policy', 'best_objective', ...
+    'fallback_to_default', true);
+runInjectionStudy(cfg);
 ```
 
 ## Plotting And Outputs
@@ -246,6 +320,7 @@ results = runBenchmark(datasetSpec, modelSpec, estimatorSetSpec, flags);
 
 - Repo convention is `+I = discharge`.
 - `ROM-EKF` is skipped by `runBenchmark.m` when no compatible ROM is available unless that skip is disallowed explicitly.
+- Tuning-profile warnings come from `runBenchmark.m` when a param file or estimator entry is missing and fallback tuning is used.
 - `mainEval.m` is an example scenario, not the only supported benchmark path.
 - Benchmark datasets should be normalized before use; raw measured profiles belong in source/application folders until converted.
 - Estimator-specific assumptions and failure modes are documented in `docs/estimators.md`.

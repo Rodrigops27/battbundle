@@ -56,7 +56,8 @@ function results = runBenchmark(datasetSpec, modelSpec, estimatorSetSpec, flags)
 %   estimatorSetSpec.estimator_names Optional cellstr/string estimator names.
 %   estimatorSetSpec.allow_rom_skip Optional logical, default true.
 %   estimatorSetSpec.soc0_percent   Optional estimator initial SOC override.
-%   estimatorSetSpec.tuning         Optional tuning struct.
+%   estimatorSetSpec.tuning         Optional shared tuning struct or tuning-profile
+%                                   spec with field param_file.
 %
 %   flags                           Passed through to xKFeval.
 %   flags.SaveResults               Optional logical, default true.
@@ -105,14 +106,15 @@ end
 
 datasetSpec = normalizeDatasetSpec(datasetSpec, here, repo_root);
 modelSpec = normalizeModelSpec(modelSpec, repo_root);
-estimatorSetSpec = normalizeEstimatorSetSpec(estimatorSetSpec);
 flags = normalizeBenchmarkFlags(flags, modelSpec.tc);
+[estimatorSetSpec, tuning_bundle] = normalizeEstimatorSetSpec(estimatorSetSpec, repo_root);
+reportResolvedTuningBundle(tuning_bundle, flags);
 
 [esc_model, esc_model_file] = loadEscModel(modelSpec.esc_model_file);
 [ROM, rom_status] = loadCompatibleRom(modelSpec, esc_model, esc_model_file, estimatorSetSpec);
 dataset = loadDatasetFromSpec(datasetSpec);
 evalDataset = buildEvalDataset(dataset, datasetSpec, esc_model, modelSpec, rom_status);
-[estimators, estimator_meta] = buildEstimators(evalDataset, estimatorSetSpec, modelSpec.tc, esc_model, ROM, rom_status);
+[estimators, estimator_meta] = buildEstimators(evalDataset, estimatorSetSpec, tuning_bundle, modelSpec.tc, esc_model, ROM, rom_status);
 
 results = xKFeval(evalDataset, estimators, flags);
 results.metadata = struct();
@@ -132,6 +134,9 @@ results.metadata.metrics_table = buildMetricsTable(results.estimators);
 results.metadata.datasetSpec = stripBuilderHandle(datasetSpec);
 results.metadata.modelSpec = modelSpec;
 results.metadata.estimatorSetSpec = estimatorSetSpec;
+results.metadata.tuning_bundle = tuning_bundle;
+results.metadata.tuning_profile_used = tuning_bundle.profile_used;
+results.metadata.tuning_profile_file = tuning_bundle.profile_file;
 results.metadata.saved_results_file = '';
 
 results = saveResultsIfRequested(results, flags, here, repo_root);
@@ -193,7 +198,7 @@ if ~isempty(modelSpec.rom_model_file)
 end
 end
 
-function estimatorSetSpec = normalizeEstimatorSetSpec(estimatorSetSpec)
+function [estimatorSetSpec, tuning_bundle] = normalizeEstimatorSetSpec(estimatorSetSpec, repo_root)
 if ~isfield(estimatorSetSpec, 'registry_name') || isempty(estimatorSetSpec.registry_name)
     estimatorSetSpec.registry_name = 'mainEval10';
 end
@@ -209,11 +214,13 @@ if ~isfield(estimatorSetSpec, 'soc0_percent')
     estimatorSetSpec.soc0_percent = [];
 end
 defaults = defaultEstimatorTuning();
-if ~isfield(estimatorSetSpec, 'tuning') || isempty(estimatorSetSpec.tuning)
-    estimatorSetSpec.tuning = defaults;
-else
-    estimatorSetSpec.tuning = mergeStructDefaults(estimatorSetSpec.tuning, defaults);
+raw_tuning = [];
+if isfield(estimatorSetSpec, 'tuning')
+    raw_tuning = estimatorSetSpec.tuning;
 end
+tuning_bundle = resolveEstimatorTuningBundle( ...
+    raw_tuning, estimatorSetSpec.estimator_names, defaults, repo_root);
+estimatorSetSpec.tuning = tuning_bundle.requested_tuning;
 end
 
 function flags = normalizeBenchmarkFlags(flags, tc)
@@ -345,18 +352,13 @@ if isfield(dataset, 'metric_voltage_name') && ~isempty(dataset.metric_voltage_na
 end
 end
 
-function [estimators, meta] = buildEstimators(evalDataset, estimatorSetSpec, tc, esc_model, ROM, rom_status)
-tuning = estimatorSetSpec.tuning;
+function [estimators, meta] = buildEstimators(evalDataset, estimatorSetSpec, tuning_bundle, tc, esc_model, ROM, rom_status)
 requested = estimatorSetSpec.estimator_names(:);
 estimators = repmat(estimatorTemplate(), numel(requested), 1);
 skipped = {};
 idx = 0;
 
 n_rc = numel(getParamESC('RCParam', tc, esc_model));
-SigmaX0 = diag([ ...
-    tuning.SigmaX0_rc * ones(1, n_rc), ...
-    tuning.SigmaX0_hk, ...
-    tuning.SigmaX0_soc]);
 R0init = getParamESC('R0Param', tc, esc_model);
 
 if isempty(estimatorSetSpec.soc0_percent)
@@ -367,6 +369,11 @@ end
 
 for name_idx = 1:numel(requested)
     name = requested{name_idx};
+    tuning = resolvedTuningForEstimator(tuning_bundle, name);
+    SigmaX0 = diag([ ...
+        tuning.SigmaX0_rc * ones(1, n_rc), ...
+        tuning.SigmaX0_hk, ...
+        tuning.SigmaX0_soc]);
     if strcmpi(name, 'ROM-EKF')
         if ~rom_status.can_use
             if estimatorSetSpec.allow_rom_skip
@@ -400,6 +407,15 @@ end
 estimators = estimators(1:idx);
 meta = struct();
 meta.skipped_estimators = skipped;
+end
+
+function tuning = resolvedTuningForEstimator(tuning_bundle, estimator_name)
+matches = strcmpi({tuning_bundle.resolved_estimators.estimator_name}, estimator_name);
+if ~any(matches)
+    error('runBenchmark:MissingResolvedTuning', ...
+        'No resolved tuning entry was found for estimator %s.', estimator_name);
+end
+tuning = tuning_bundle.resolved_estimators(find(matches, 1, 'first')).tuning;
 end
 
 function estimator = buildEscEstimator(name, soc0, tc, SigmaX0, tuning, R0init, esc_model)
@@ -872,6 +888,23 @@ out = defaults;
 names = fieldnames(in);
 for idx = 1:numel(names)
     out.(names{idx}) = in.(names{idx});
+end
+end
+
+function reportResolvedTuningBundle(tuning_bundle, flags)
+if ~flags.Verbose
+    return;
+end
+
+if tuning_bundle.profile_used
+    if isempty(tuning_bundle.profile_scenario_name)
+        fprintf('Using tuned estimator profile: %s\n', tuning_bundle.profile_file);
+    else
+        fprintf('Using tuned estimator profile: %s (scenario %s)\n', ...
+            tuning_bundle.profile_file, tuning_bundle.profile_scenario_name);
+    end
+elseif tuning_bundle.profile_requested
+    fprintf('Tuning profile requested but default tuning was used.\n');
 end
 end
 
