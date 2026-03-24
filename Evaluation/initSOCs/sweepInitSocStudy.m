@@ -1065,7 +1065,7 @@ results_dir = fileparts(results_file);
 if ~isempty(results_dir) && exist(results_dir, 'dir') ~= 7
     mkdir(results_dir);
 end
-save(results_file, 'sweepResults');
+save(results_file, 'sweepResults', '-v7.3'); % Careful it may not fit in the computer
 fprintf('\nInitial-SOC sweep results saved to %s\n', results_file);
 end
 
