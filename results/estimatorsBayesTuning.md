@@ -59,6 +59,7 @@ Scenario details:
 ## Observations
 
 - Under the `SocRmsePct` Bayes tuning objective, `ESC-EKF` is the best overall SOC estimator on this ATL desktop run.
+    - `ESC-EKF` show more even bias, the other estimators presents a positively increasing residual.
 - `EaEKF` is not the SOC winner, but it is the strongest voltage-fit estimator by a large margin.
 - `EsSPKF`, `EbSPKF`, `ESC-SPKF`, `EBiSPKF`, `Em7SPKF`, and `EDUKF` form a very tight SOC-RMSE cluster around `0.625%` to `0.629%`.
     - Their tuning clusters too, they share the same assumptions.
