@@ -12,6 +12,10 @@ Use this layer when you want to:
 - benchmark one or more estimators on the injected dataset
 - summarize and re-plot saved injection-study results later
 
+The estimator benchmark step is delegated to `runBenchmark.m`, so `scenario.estimatorSetSpec.tuning` may now be either:
+- a plain shared tuning struct
+- an autotuning profile spec pointing at a saved MAT file from `autotuning/results/`
+
 ## Default Scenario
 
 The default desktop-evaluation scenario is:
@@ -101,6 +105,26 @@ cfg.scenarios(1).injection_cases = struct( ...
 results = runInjectionStudy(cfg);
 ```
 
+## Using A Tuned Estimator Profile
+
+To benchmark injected cases with tuned covariances resolved from an autotuning MAT file:
+
+```matlab
+cfg = defaultInjectionConfig();
+cfg.scenarios(1).estimatorSetSpec.tuning = struct( ...
+    'kind', 'autotuning_profile', ...
+    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
+    'scenario_name', 'atl_bss_esc', ...
+    'selection_policy', 'best_objective', ...
+    'fallback_to_default', true);
+
+results = runInjectionStudy(cfg);
+```
+
+This is resolved per estimator inside `runBenchmark.m`. If the param file or an estimator entry is missing, `runBenchmark.m` warns and falls back to default/shared tuning when `fallback_to_default = true`.
+
+The autotuning profile is only a parameter source. It does not automatically expand the estimator list. `runInjectionStudy.m` still benchmarks only the estimators listed in `cfg.scenarios(1).estimatorSetSpec.estimator_names`, or the default Injection-layer subset if that field is left unchanged.
+
 Example custom perturbance case:
 
 ```matlab
@@ -126,11 +150,38 @@ Independent injection cases can run in parallel:
 cfg = defaultInjectionConfig();
 cfg.parallel.use_parallel = true;
 cfg.parallel.auto_start_pool = true;
+cfg.scenarios(1).estimatorSetSpec.tuning = struct( ...
+    'kind', 'autotuning_profile', ...
+    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
+    'scenario_name', 'atl_bss_esc', ...
+    'selection_policy', 'best_objective', ...
+    'fallback_to_default', true);
 
 results = runInjectionStudy(cfg);
 ```
 
 When parallel execution is unavailable, the layer falls back to serial mode and prints the reason.
+
+To run the default injection cases with the full tuned desktop-evaluation estimator profile and parallel execution:
+
+```matlab
+cfg = defaultInjectionConfig();
+cfg.parallel.use_parallel = true;
+cfg.parallel.auto_start_pool = true;
+cfg.scenarios(1).estimatorSetSpec.estimator_names = { ...
+    'ROM-EKF', ...
+    'ESC-SPKF', 'ESC-EKF', 'EaEKF', ...
+    'EacrSPKF', 'EnacrSPKF', 'EDUKF', ...
+    'EsSPKF', 'EbSPKF', 'EBiSPKF', 'Em7SPKF'};
+cfg.scenarios(1).estimatorSetSpec.tuning = struct( ...
+    'kind', 'autotuning_profile', ...
+    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
+    'scenario_name', 'atl_bss_esc', ...
+    'selection_policy', 'best_objective', ...
+    'fallback_to_default', true);
+
+results = runInjectionStudy(cfg);
+```
 
 To run the default study but benchmark only `iterEKF` (`ROM-EKF`) with parallel execution enabled:
 
@@ -195,3 +246,4 @@ results = runInjectionStudy(cfg);
 - The benchmark engine is still `runBenchmark` / `xKFeval`.
 - Dataset validation runs before the benchmark by default.
 - The default metric-voltage comparison uses the clean voltage trace stored as `voltage_v_true`.
+- Tuning-profile warnings and fallback behavior come from `runBenchmark.m`.

@@ -85,10 +85,16 @@ end
 paths = struct();
 paths.injection_root = injection_root;
 paths.repo_root = repo_root;
-paths.results_root_abs = resolveReadPath(cfg.output.results_root, repo_root);
-paths.datasets_root_abs = resolveReadPath(cfg.output.datasets_root, repo_root);
+paths.results_root_abs = resolveAbsolutePath(cfg.output.results_root, repo_root);
+paths.datasets_root_abs = resolveAbsolutePath(cfg.output.datasets_root, repo_root);
 if exist(paths.results_root_abs, 'dir') ~= 7, mkdir(paths.results_root_abs); end
 if exist(paths.datasets_root_abs, 'dir') ~= 7, mkdir(paths.datasets_root_abs); end
+cfg.output.results_root = paths.results_root_abs;
+cfg.output.datasets_root = paths.datasets_root_abs;
+if ~isempty(cfg.output.aggregate_results_file)
+    cfg.output.aggregate_results_file = resolveOutputPath( ...
+        cfg.output.aggregate_results_file, paths.results_root_abs, repo_root);
+end
 end
 
 function plan = buildPlan(cfg, paths)
@@ -234,15 +240,36 @@ else
 end
 end
 
+function path_out = resolveAbsolutePath(path_in, repo_root)
+path_in = char(path_in);
+if isempty(path_in)
+    path_out = path_in;
+    return;
+end
+if isAbsolutePath(path_in)
+    path_out = path_in;
+    return;
+end
+
+repo_candidate = fullfile(repo_root, path_in);
+if exist(repo_candidate, 'file') == 2 || exist(repo_candidate, 'dir') == 7
+    path_out = repo_candidate;
+    return;
+end
+
+path_out = fullfile(repo_root, path_in);
+end
+
 function path_out = resolveOutputPath(path_in, default_root, repo_root)
 if isempty(path_in)
     path_out = default_root;
 elseif isAbsolutePath(path_in)
     path_out = path_in;
 else
-    path_out = fullfile(default_root, path_in);
-    parent_dir = fileparts(path_out);
-    if ~isempty(parent_dir) && exist(parent_dir, 'dir') ~= 7
+    candidate = fullfile(default_root, path_in);
+    if isAbsolutePath(candidate)
+        path_out = candidate;
+    else
         path_out = fullfile(repo_root, path_in);
     end
 end
