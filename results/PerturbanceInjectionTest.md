@@ -78,7 +78,6 @@ The two injected cases represented here are:
 
 ## Observations
 
-- This saved run is materially different from the older untuned ATL injection summary. It uses the autotuned estimator profile, and the ranking changes substantially.
 - `ESC-EKF` is the strongest overall estimator in this saved study. It is best on SOC RMSE in both `noise` and `perturbance`, and it is also best on voltage RMSE in the `noise` case.
 - `EacrSPKF` becomes a strong tuned alternative here. It is second-best on SOC RMSE in the `noise` case and best on voltage RMSE in the `perturbance` case.
 - `ROM-EKF` is no longer the worst estimator in the tuned `noise` case, but it is still clearly behind the best ESC estimators and remains unusable on voltage RMSE in the `perturbance` case.
