@@ -247,7 +247,7 @@ With a tuning profile and parallel computing:
 cfg = struct();
 cfg.parallel.use_parallel = true;
 cfg.parallel.auto_start_pool = true;
-cfg.tuning = struct( ...
+cfg.estimatorSetSpec.tuning = struct( ...
     'kind', 'autotuning_profile', ...
     'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
     'scenario_name', 'atl_bss_esc', ...
@@ -255,6 +255,44 @@ cfg.tuning = struct( ...
     'fallback_to_default', true);
 runInitSocStudy([0 100], 10, cfg);
 ```
+
+Run the full 11-estimator desktop set with parallel computing:
+
+```matlab
+cfg = struct();
+cfg.parallel.use_parallel = true;
+cfg.parallel.auto_start_pool = true;
+cfg.estimatorSetSpec.estimator_names = { ...
+    'ROM-EKF', ...
+    'ESC-SPKF', 'ESC-EKF', 'EaEKF', ...
+    'EacrSPKF', 'EnacrSPKF', 'EDUKF', ...
+    'EsSPKF', 'EbSPKF', 'EBiSPKF', 'Em7SPKF'};
+cfg.estimatorSetSpec.tuning = struct( ...
+    'kind', 'autotuning_profile', ...
+    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
+    'scenario_name', 'atl_bss_esc', ...
+    'selection_policy', 'best_objective', ...
+    'fallback_to_default', true);
+runInitSocStudy([0 100], 10, cfg);
+```
+
+`runInitSocStudy.m` now accepts the estimator-selection entry points:
+- `cfg.estimatorSetSpec.estimator_names`
+- `cfg.estimatorSetSpec.tuning`
+- compatibility shim: `cfg.scenarios(1).estimatorSetSpec.*`
+
+If `cfg.estimatorSetSpec.registry_name = 'all'`, the wrapper expands to the full desktop estimator set:
+- `ROM-EKF`
+- `ESC-SPKF`
+- `ESC-EKF`
+- `EaEKF`
+- `EacrSPKF`
+- `EnacrSPKF`
+- `EDUKF`
+- `EsSPKF`
+- `EbSPKF`
+- `EBiSPKF`
+- `Em7SPKF`
 
 ### Noise and perturbance injection
 

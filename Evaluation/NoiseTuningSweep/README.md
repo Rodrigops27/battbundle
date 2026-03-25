@@ -68,6 +68,7 @@ Default `runNoiseCovStudy` sweep settings:
 - process-noise range: `[1e-3 1e2]`
 - sensor-noise range: `[1e-6 2e-1]`
 - step multiplier: `5`
+- parallel: disabled unless requested
 - save results: enabled
 
 ## How to run
@@ -92,9 +93,51 @@ Run the multi-estimator sweep with a custom estimator list:
 addpath(genpath('.'));
 
 cfg = struct();
-cfg.estimator_names = { ...
-    'iterEbSPKF', 'iterESCSPKF', 'iterEBiSPKF', ...
-    'iterEaEKF', 'iterEsSPKF', 'iterEDUKF', 'iterEKF'};
+cfg.estimatorSetSpec.estimator_names = { ...
+    'ROM-EKF', ...
+    'ESC-SPKF', 'ESC-EKF', 'EaEKF', ...
+    'EacrSPKF', 'EnacrSPKF', 'EDUKF', ...
+    'EsSPKF', 'EbSPKF', 'EBiSPKF', 'Em7SPKF'};
+
+results = runNoiseCovStudy([], [], [], cfg);
+```
+
+Run the full desktop estimator set with parallel execution:
+
+```matlab
+addpath(genpath('.'));
+
+cfg = struct();
+cfg.parallel.use_parallel = true;
+cfg.parallel.auto_start_pool = true;
+cfg.estimatorSetSpec.estimator_names = { ...
+    'ROM-EKF', ...
+    'ESC-SPKF', 'ESC-EKF', 'EaEKF', ...
+    'EacrSPKF', 'EnacrSPKF', 'EDUKF', ...
+    'EsSPKF', 'EbSPKF', 'EBiSPKF', 'Em7SPKF'};
+
+results = runNoiseCovStudy([], [], [], cfg);
+```
+
+Run the full desktop estimator set with an autotuning profile:
+
+```matlab
+addpath(genpath('.'));
+
+cfg = struct();
+cfg.parallel.use_parallel = true;
+cfg.parallel.auto_start_pool = true;
+cfg.estimatorSetSpec.estimator_names = { ...
+    'ROM-EKF', ...
+    'ESC-SPKF', 'ESC-EKF', 'EaEKF', ...
+    'EacrSPKF', 'EnacrSPKF', 'EDUKF', ...
+    'EsSPKF', 'EbSPKF', 'EBiSPKF', 'Em7SPKF'};
+cfg.estimatorSetSpec.tuning = struct( ...
+    'kind', 'autotuning_profile', ...
+    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
+    'scenario_name', 'atl_bss_esc', ...
+    'selection_policy', 'best_objective', ...
+    'fallback_to_default', true);
 
 results = runNoiseCovStudy([], [], [], cfg);
 ```
@@ -157,6 +200,14 @@ results = runOneEstSweeNoise([], [], [], cfg);
 - `runOneEstSweeNoise` / `oneEstSweeNoise` currently support `ROM-EKF` and `Em7SPKF` as the explicit single-estimator choices in code.
 - `oneEstSweeNoise` now supports `dataset_mode = 'esc'`, `dataset_mode = 'rom'`, and `dataset_mode = 'bus_raw'`.
 - `runNoiseCovStudy` and `sweepNoiseStudy` are path-independent from the repo root because they derive the repo path from the script location and use repo-relative defaults.
+- `runNoiseCovStudy` now accepts:
+  - `cfg.parallel.use_parallel`
+  - `cfg.parallel.auto_start_pool`
+  - `cfg.parallel.pool_size`
+  - `cfg.estimatorSetSpec.estimator_names`
+  - `cfg.estimatorSetSpec.tuning`
+  - compatibility shim: `cfg.scenarios(1).estimatorSetSpec.*`
+- `cfg.estimatorSetSpec.registry_name = 'all'` expands to the full desktop 11-estimator set in the wrapper.
 
 ## Outputs
 
@@ -185,9 +236,9 @@ Add `ROM-EKF` back into the multi-estimator sweep:
 addpath(genpath('.'));
 
 cfg = struct();
-cfg.estimator_names = { ...
-    'iterEKF', 'iterEbSPKF', 'iterESCSPKF', ...
-    'iterEBiSPKF', 'iterEaEKF', 'iterEsSPKF', 'iterEDUKF'};
+cfg.estimatorSetSpec.estimator_names = { ...
+    'ROM-EKF', 'EbSPKF', 'ESC-SPKF', ...
+    'EBiSPKF', 'EaEKF', 'EsSPKF', 'EDUKF'};
 
 results = runNoiseCovStudy([], [], [], cfg);
 ```
@@ -198,7 +249,7 @@ Run `ROM-EKF` by itself in the multi-estimator wrapper:
 addpath(genpath('.'));
 
 cfg = struct();
-cfg.estimator_names = {'iterEKF'};
+cfg.estimatorSetSpec.estimator_names = {'ROM-EKF'};
 
 results = runNoiseCovStudy([], [], [], cfg);
 ```
