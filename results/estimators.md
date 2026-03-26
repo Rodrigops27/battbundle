@@ -26,7 +26,7 @@ Both runs use `Evaluation/runBenchmark.m` and can be re-plotted with `Evaluation
 | `ATL BSS` | ESC-driven BSS synthetic data | `ATLmodel.mat` | `ROM_ATL20_beta.mat` | 11 |
 | `NMC30` | ROM-driven benchmark data | `NMC30model.mat` | `ROM_NMC30_HRA12.mat` | 11 |
 
-### ATL BSS benchmark
+### ATL 20 benchmark
 
 | Estimator | SOC RMSE (%) | SOC ME (%) | Voltage RMSE (mV) | Voltage ME (mV) |
 | --- | ---: | ---: | ---: | ---: |
