@@ -242,6 +242,8 @@ plotEscValidation(result_nmc);
   - The loaded model is not a full ESC model usable by `simCell`.
 - Unexpected temperature behavior
   - `ESCvalidation.m` uses one scalar temperature even if the source profile varies over time.
+- Small temperature mismatch between validation data and a single-temperature model
+  - `utility/ESCmgmt/getParamESC.m` includes a repo patch that allows a `1 degC` tolerance when the model contains only one temperature point. This is meant to avoid rejecting nearby cases such as `26 degC` data against a `25 degC` model.
 - OMT8 mismatch between dynamic fit and validation route
   - `OMTdynId.m` is a special single-profile fitting path and should not be treated as a generic `processDynamic.m` case.
 - TODO: MATLAB version and toolbox requirements are not explicit in code for every chemistry-specific script.

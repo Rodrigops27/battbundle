@@ -28,8 +28,10 @@ function theParam = getParamESC(paramName,temp,model)
 
   % if model contains data at only one temperature
   if isscalar(model.temps),
-    if model.temps ~= temp, % check whether requested data exists
-      error('Model does not contain requested data at this temperature');
+    % Repo patch: allow small temperature mismatch for single-temperature models.
+    % This avoids failing on nearby validation data such as 26 degC against a 25 degC model.
+    if abs(model.temps - temp) > 1.0, % allow 1 degC tolerance
+      error('Model does not contain requested data at this temperature (requested %.1f degC, model has %.1f degC)', temp, model.temps);
     end
     theParam = model.(fieldName);
     return
