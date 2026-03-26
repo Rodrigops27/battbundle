@@ -18,7 +18,7 @@ This repository can also be used to evaluate the claim that SOC estimator perfor
 
 This repository is organized as layered workflows:
 
-1. Build an Enhanced Self-Correcting (ESC) model in `ESC_Id/`.
+1. Build an Enhanced Self-Correcting (ESC) model, based on [1], in `ESC_Id/`.
 2. Validate that model with [`ESC_Id/ESCvalidation.m`](ESC_Id/ESCvalidation.m).
 3. Store released ESC or Reduced Order Model (ROM) artifacts as `.mat` model files in `models/`.
 4. Add or maintain estimator implementations and initializers in `estimators/`.
@@ -67,13 +67,13 @@ The full pipeline has been completed for the desktop evaluation scenario:
 - nominal voltage: 3.2 V
 - rated capacity: 20 Ah
 
-- dataset: BSS application based on [1] (ESC-driven) 25 degC evaluation dataset at [`Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`](Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat).
+- dataset: BSS application based on [2] (ESC-driven) 25 degC evaluation dataset at [`Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`](Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat).
 
 - workflow coverage: model validation, benchmark execution, robustness studies, and estimator selection
 
 Under this completed desktop-evaluation bundle, the current repo-level selection result is the validated estimator-model bundle documented in [`results/EstimatorSelection.md`](results/EstimatorSelection.md).
 
-The desktop evaluation scenario reveals SOC estimation drift in LFP cells; see [`results/DriftStudy.md`](results/DriftStudy.md) for details.
+The desktop evaluation scenario documents SOC estimation drift in the ATL cell under the hysteresis description used in the ESC model; see [`results/DriftStudy.md`](results/DriftStudy.md) for details.
 ![ATL BSS Estimation](assets/ATL%20BSS%20Estimation.png)
 
 * This repository can also be used to review the Bayes Optimization tuning quality, see [`results\BayesOptReview.md`](results/BayesOptReview.md) for details.
@@ -106,11 +106,15 @@ The desktop evaluation scenario reveals SOC estimation drift in LFP cells; see [
 
 See [`LICENSE`](LICENSE).
 
-## Data source
+## References
+
+[1] G. L. Plett, *Battery Management Systems, Volume II: Equivalent-Circuit Methods*. Artech House, 2016.
+
+### Data source
 
 This repository uses data from:
 
-[1] Jöst, Dominik; Palaniswamy, Lakshimi Narayanan; Quade, Katharina Lilith; Sauer, Dirk Uwe (2024).
+[2] Jöst, Dominik; Palaniswamy, Lakshimi Narayanan; Quade, Katharina Lilith; Sauer, Dirk Uwe (2024).
 *Dataset for Towards Robust State Estimation for LFP Batteries: Model-in-the-Loop Analysis with Hysteresis Modeling and Perspectives for Other Chemistries*.
 RWTH Aachen University.
 DOI: 10.18154/RWTH-2024-03667
