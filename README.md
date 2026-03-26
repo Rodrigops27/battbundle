@@ -1,9 +1,5 @@
-#  ECM parametrization and SOC Estimation Benchmark Toolchain
-
-MATLAB toolchain for:
-- building ESC battery models from OCV and dynamic data
-- validating fitted models against measured voltage traces
-- benchmarking ESC and ROM-based estimators on common datasets
+# ECM Parametrization and SOC Estimation Benchmark Toolchain
+This repository is distributed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0).
 
 ## Repository Purpose
 
@@ -16,51 +12,50 @@ The toolchain is designed to scale to additional models, datasets, and estimator
 
 For the current repo state, the intended output is a validated estimator-model bundle tied to a benchmark suite version, consistent with `results/EstimatorSelection.md`.
 
+## Architecture
+
 This repository is organized as layered workflows:
-- `ESC_Id/` builds and validates ESC models
-- `Evaluation/` benchmarks estimators and runs robustness studies
-- `estimators/` contains estimator implementations and initializers
-- `models/` stores released ESC and ROM model artifacts and ROM retuning tools
-- `results/` stores concise result summaries and regeneration notes
-- `utility/` contains shared simulation, plotting, profile, and example helpers
 
-The root README is intentionally short. Use the layer READMEs below for actual usage.
-
-## Documentation Tree
-
-- `README.md`
-  - project orientation and entry points
-- `ESC_Id/README.md`
-  - ESC modelling and ESC validation
-- `Evaluation/README.md`
-  - estimator benchmarking, injected tests, and study runners
-- `models/TunedModels/README.md`
-  - direct guide for ROM retuning and ROM validation
-- `docs/Estimators Design.md`
-  - code-traceable estimator architecture and implementation reference
-
-## First Run
-
-From the repository root in MATLAB:
-
-```matlab
-addpath(genpath('.'));
-```
-
-Typical workflow:
-
-1. Build or refresh an ESC model in `ESC_Id/`.
+1. Build an Enhanced Self-Correcting (ESC) model in `ESC_Id/`.
 2. Validate that model with `ESC_Id/ESCvalidation.m`.
-3. Place the final `.mat` model in `models/`.
-4. Benchmark estimators with `Evaluation/runBenchmark.m` or `Evaluation/mainEval.m`.
+3. Store released ESC or Reduced Order Model (ROM) artifacts as `.mat` model files in `models/`.
+4. Add or maintain estimator implementations and initializers in `estimators/`.
+5. Tune estimator covariance parameters with Bayes optimization in `autotuning/` when needed.
+6. Benchmark estimators with `Evaluation/runBenchmark.m`; use `Evaluation/mainEval.m` as a fixed example scenario.
+7. Run robustness studies such as:
+   - `Evaluation/initSOCs/`
+   - `Evaluation/NoiseTuningSweep/`
+   - `Evaluation/Injection/`
+8. Store concise result summaries in `results/`.
+9. Select the validated estimator-model bundle according to an explicit ranking criterion, for example `results/EstimatorSelection.md`.
 
-## Benchmark Roles
+- The `utility/` layer contains shared simulation, plotting, profile, and example helpers
 
-- The ATL20 benchmark using `models/ATLmodel.mat` with the ESC-driven BSS dataset in `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat` is the core desktop evaluation.
+### To add models or datasets
+
+For ESC modelling data, use `ESC_Id/DYN_Files` and/or `ESC_Id/OCV_Files`.
+These may also be mirrored into an external registry such as `data/Modelling`.
+
+Store released model artifacts in `models/`, add estimator implementations in `estimators/`, and place benchmark-ready evaluation datasets under the active evaluation-data registry, for example `data/Evaluation`.
+
+Explicit path overrides may be needed when using a relocated or external data registry with:
+- `Evaluation/runBenchmark.m`
+- `Evaluation/Injection/runInjectionStudy.m`
+- `Evaluation/initSOCs/runInitSocStudy.m`
+
+Additional refactoring may still be needed for:
+- `Evaluation/mainEval.m`
+- parts of `autotuning/runAutotuning.m`
+
+The layer documentation below includes examples for these explicit-path cases.
+
+## Benchmarks
+
+- The ATL20 benchmark using `models/ATLmodel.mat` with the ESC-driven BSS dataset in `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat` is the desktop evaluation.
 - The NMC30 benchmark using `models/NMC30model.mat` with the ROM-driven BSS dataset in `Evaluation/ROMSimData/datasets/rom_bus_coreBattery_dataset.mat` is the behavioral test and is useful for tuning.
 - Study wrappers in `Evaluation/` default to the ATL20 desktop-evaluation scenario unless overridden explicitly.
 
-## Desktop Evaluation
+### Desktop Evaluation
 
 The full pipeline has been completed for the desktop evaluation scenario:
 - model: `ATL20` via `models/ATLmodel.mat`
@@ -71,18 +66,27 @@ Under this completed desktop-evaluation bundle, the current repo-level selection
 
 ## Layer Guides
 
+- `README.md`
+  - project orientation and entry points
 - `ESC_Id/README.md`
+  - ESC modelling and ESC validation
 - `Evaluation/README.md`
-- `Evaluation/Injection/README.md`
+  - estimator benchmarking, injected tests, and study runners
 - `Evaluation/NoiseTuningSweep/README.md`
+  - covariance-tuning study guide and entry points
+- `Evaluation/Injection/README.md`
+  - injection-study configuration and custom path examples
 - `models/TunedModels/README.md`
+  - direct guide for ROM retuning and ROM validation
+- `docs/Estimators Design.md`
+  - code-traceable estimator architecture and implementation reference
+
 
 ## Repository Notes
 
 - Current sign convention is `+I = discharge`.
 - Final ESC and ROM model artifacts belong in `models/`.
 - Benchmark-ready datasets belong under `Evaluation/.../datasets/`.
-- Support folders such as `assets/`, `bin/`, `stdies/`, and `Test/` are not primary user-facing workflow layers.
 
 ## License
 

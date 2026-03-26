@@ -227,6 +227,43 @@ cfg.scenarios(1).estimator_names = {'ROM-EKF'};
 results = runAutotuning(cfg);
 ```
 
+## External Data Registry / Custom Paths
+
+If datasets or source benchmark assets live outside the default `Evaluation/...` layout, point the scenario fields at those paths explicitly.
+
+Example using an external top-level `data/` registry:
+
+```matlab
+cfg = defaultAutotuningConfig();
+
+cfg.scenarios(1).name = 'atl_bss_external';
+cfg.scenarios(1).datasetSpec = struct( ...
+    'dataset_file', fullfile('data', 'Evaluation', 'ESCSimData', 'datasets', 'esc_bus_coreBattery_dataset.mat'), ...
+    'dataset_variable', 'dataset', ...
+    'dataset_soc_field', 'soc_true', ...
+    'metric_soc_field', 'soc_true', ...
+    'metric_voltage_field', 'voltage_v', ...
+    'reference_name', 'ESC reference', ...
+    'voltage_name', 'ESC voltage', ...
+    'title_prefix', 'ATL BSS External');
+
+cfg.scenarios(1).modelSpec = struct( ...
+    'esc_model_file', fullfile('models', 'ATLmodel.mat'), ...
+    'rom_model_file', fullfile('models', 'ROM_ATL20_beta.mat'), ...
+    'tc', 25, ...
+    'chemistry_label', 'ATL', ...
+    'require_rom_match', true);
+
+cfg.scenarios(1).estimator_names = {'ESC-EKF', 'EsSPKF'};
+
+results = runAutotuning(cfg);
+```
+
+Notes:
+- `runAutotuning.m` normalizes scenario path fields recursively for names ending in `_file` or `_root`.
+- The most important override points are `cfg.scenarios(k).datasetSpec.*` and `cfg.scenarios(k).modelSpec.*`.
+- If you use custom builder configs with extra path fields, prefer names ending in `_file` or `_root` so they are normalized automatically.
+
 ## Choosing The Objective
 
 The default objective is `SocRmsePct`.
