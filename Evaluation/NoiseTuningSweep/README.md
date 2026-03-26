@@ -25,21 +25,21 @@ Out of scope:
 
 ## Main files
 
-- `runNoiseCovStudy.m`
+- [`runNoiseCovStudy.m`](runNoiseCovStudy.m)
   - wrapper for the multi-estimator covariance study
-- `sweepNoiseStudy.m`
+- [`sweepNoiseStudy.m`](sweepNoiseStudy.m)
   - core multi-estimator noise sweep engine
-- `runOneEstSweeNoise.m`
+- [`runOneEstSweeNoise.m`](runOneEstSweeNoise.m)
   - wrapper for a single-estimator covariance study
-- `oneEstSweeNoise.m`
+- [`oneEstSweeNoise.m`](oneEstSweeNoise.m)
   - core single-estimator sweep engine
-- `plotNoiseSweepSummary.m`
+- [`plotNoiseSweepSummary.m`](plotNoiseSweepSummary.m)
   - aggregate summary plotting helper for saved multi-estimator sweep results
-- `plotNoiseSweepHeatmaps.m`
+- [`plotNoiseSweepHeatmaps.m`](plotNoiseSweepHeatmaps.m)
   - per-estimator heatmap and 1D sweep plotting helper for saved multi-estimator sweep results
-- `printNoiseSweepSummary.m`
+- [`printNoiseSweepSummary.m`](printNoiseSweepSummary.m)
   - console summary helper for saved multi-estimator sweep results
-- `plotEaEkfCovarianceSweeps.m`
+- [`plotEaEkfCovarianceSweeps.m`](plotEaEkfCovarianceSweeps.m)
   - plotting helper for `EaEKF` covariance evolution from saved sweep results
 - `results/`
   - saved wrapper result files and optional exported figures
@@ -49,9 +49,9 @@ Out of scope:
 The default study scenario is the ATL desktop evaluation:
 
 - dataset mode: `esc`
-- dataset: `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`
-- ESC model: `models/ATLmodel.mat`
-- ROM model: `models/ROM_ATL20_beta.mat` only if `ROM-EKF` is explicitly selected
+- dataset: [`Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`](../ESCSimData/datasets/esc_bus_coreBattery_dataset.mat)
+- ESC model: [`models/ATLmodel.mat`](../../models/ATLmodel.mat)
+- ROM model: [`models/ROM_ATL20_beta.mat`](../../models/ROM_ATL20_beta.mat) only if `ROM-EKF` is explicitly selected
 
 Default `runNoiseCovStudy` estimator subset:
 
@@ -197,10 +197,10 @@ results = runOneEstSweeNoise([], [], [], cfg);
 
 ## Current limitations
 
-- `runOneEstSweeNoise` / `oneEstSweeNoise` currently support `ROM-EKF` and `Em7SPKF` as the explicit single-estimator choices in code.
-- `oneEstSweeNoise` now supports `dataset_mode = 'esc'`, `dataset_mode = 'rom'`, and `dataset_mode = 'bus_raw'`.
-- `runNoiseCovStudy` and `sweepNoiseStudy` are path-independent from the repo root because they derive the repo path from the script location and use repo-relative defaults.
-- `runNoiseCovStudy` now accepts:
+- [`runOneEstSweeNoise.m`](runOneEstSweeNoise.m) / [`oneEstSweeNoise.m`](oneEstSweeNoise.m) currently support `ROM-EKF` and `Em7SPKF` as the explicit single-estimator choices in code.
+- [`oneEstSweeNoise.m`](oneEstSweeNoise.m) now supports `dataset_mode = 'esc'`, `dataset_mode = 'rom'`, and `dataset_mode = 'bus_raw'`.
+- [`runNoiseCovStudy.m`](runNoiseCovStudy.m) and [`sweepNoiseStudy.m`](sweepNoiseStudy.m) are path-independent from the repo root because they derive the repo path from the script location and use repo-relative defaults.
+- [`runNoiseCovStudy.m`](runNoiseCovStudy.m) now accepts:
   - `cfg.parallel.use_parallel`
   - `cfg.parallel.auto_start_pool`
   - `cfg.parallel.pool_size`
@@ -212,17 +212,17 @@ results = runOneEstSweeNoise([], [], [], cfg);
 ## Outputs
 
 - Multi-estimator study results are returned as a struct in MATLAB.
-- `runNoiseCovStudy` saves a `.mat` result file under `Evaluation/NoiseTuningSweep/results/` unless `cfg.SaveResults = false`.
-- Use `cfg.results_file` to override the default output path for `runNoiseCovStudy`.
+- [`runNoiseCovStudy.m`](runNoiseCovStudy.m) saves a `.mat` result file under `Evaluation/NoiseTuningSweep/results/` unless `cfg.SaveResults = false`.
+- Use `cfg.results_file` to override the default output path for [`runNoiseCovStudy.m`](runNoiseCovStudy.m).
 - The wrappers also assign:
   - `noiseCovSweepResults` in the base workspace
   - `oneEstNoiseSweepResults` in the base workspace
 
 ## Related documentation
 
-- `Evaluation/README.md`
-- `results/estimatorsInitNoiseSweep .md`
-- `docs/estimators.md`
+- [`Evaluation/README.md`](../README.md)
+- [`results/estimatorsInitNoiseSweep.md`](../../results/estimatorsInitNoiseSweep.md)
+- [`docs/Estimators Design.md`](../../docs/Estimators%20Design.md)
 
 ## ROM-EKF note
 

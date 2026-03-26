@@ -10,12 +10,12 @@ This folder contains the scripts used to:
 - re-plot saved ROM validation results
 
 Current entry points:
-- `retuningROM.m`
-- `build_rom_models.m`
-- `retuningROMVal.m`
-- `validate_rom_models.m`
-- `plotRomValidation.m`
-- `extract_rom_results.m`
+- [`retuningROM.m`](retuningROM.m)
+- [`build_rom_models.m`](build_rom_models.m)
+- [`retuningROMVal.m`](retuningROMVal.m)
+- [`validate_rom_models.m`](validate_rom_models.m)
+- [`plotRomValidation.m`](plotRomValidation.m)
+- [`extract_rom_results.m`](extract_rom_results.m)
 
 ## Quick start
 
@@ -35,14 +35,14 @@ build_rom_models
 ```
 
 What it creates:
-- `models/ROM_OMT8_beta.mat`
-- `models/ROM_ATL20_beta.mat`
+- [`models/ROM_OMT8_beta.mat`](../ROM_OMT8_beta.mat)
+- [`models/ROM_ATL20_beta.mat`](../ROM_ATL20_beta.mat)
 
 What it uses:
-- base ROM: `models/ROM_NMC30_HRA.mat`
+- base ROM: [`models/ROM_NMC30_HRA.mat`](../ROM_NMC30_HRA.mat)
 - ESC source models:
-  - `models/OMTLIFEmodel.mat`
-  - `models/ATLmodel.mat`
+  - [`models/OMTLIFEmodel.mat`](../OMTLIFEmodel.mat)
+  - [`models/ATLmodel.mat`](../ATLmodel.mat)
 
 ## Build one ROM manually
 
@@ -63,10 +63,10 @@ cfg.tc = 25;
 ROM = retuningROM(fullfile('models', 'ROM_OMT8_beta.mat'), cfg);
 ```
 
-Defaults in `retuningROM.m`:
-- output file: `models/ROM_ATL20_beta.mat`
-- base ROM: `models/ROM_NMC30_HRA.mat`
-- ESC source model: `models/ATLmodel.mat`
+Defaults in [`retuningROM.m`](retuningROM.m):
+- output file: [`models/ROM_ATL20_beta.mat`](../ROM_ATL20_beta.mat)
+- base ROM: [`models/ROM_NMC30_HRA.mat`](../ROM_NMC30_HRA.mat)
+- ESC source model: [`models/ATLmodel.mat`](../ATLmodel.mat)
 - temperature: `25 degC`
 
 ## Validate ROM models
@@ -78,11 +78,11 @@ validate_rom_models
 ```
 
 What it validates:
-- `models/ROM_OMT8_beta.mat` against `models/OMTLIFEmodel.mat`
-- `models/ROM_ATL20_beta.mat` against `models/ATLmodel.mat`
+- [`models/ROM_OMT8_beta.mat`](../ROM_OMT8_beta.mat) against [`models/OMTLIFEmodel.mat`](../OMTLIFEmodel.mat)
+- [`models/ROM_ATL20_beta.mat`](../ROM_ATL20_beta.mat) against [`models/ATLmodel.mat`](../ATLmodel.mat)
 
 Saved output:
-- `models/TunedModels/ROM_validation_results.mat`
+- [`models/TunedModels/ROM_validation_results.mat`](ROM_validation_results.mat)
 
 ## Validate one ROM manually
 
@@ -98,7 +98,7 @@ cfg.show_plots = true;
 validation = retuningROMVal(cfg);
 ```
 
-Useful `retuningROMVal.m` options:
+Useful [`retuningROMVal.m`](retuningROMVal.m) options:
 - `rom_file`
 - `esc_model_file`
 - `tc`
@@ -110,7 +110,7 @@ Useful `retuningROMVal.m` options:
 Important default behavior:
 - if `ts` is empty, the ROM native sample time is used
 - if `dyn_file` is not provided, the script tries to use a chemistry-matched DYN `script1` profile from `ESC_Id/DYN_Files/...`
-- if no matching DYN file is found, it falls back to the synthetic script-1 profile from `utility/profiles/buildScript1NormalizedProfile.m`
+- if no matching DYN file is found, it falls back to the synthetic script-1 profile from [`utility/profiles/buildScript1NormalizedProfile.m`](../../utility/profiles/buildScript1NormalizedProfile.m)
 
 ## Plot results anytime
 
@@ -142,7 +142,7 @@ Plot titles are normalized to the form:
 extract_rom_results
 ```
 
-This reads `ROM_validation_results.mat` and prints a compact text summary of the saved metrics.
+This reads [`ROM_validation_results.mat`](ROM_validation_results.mat) and prints a compact text summary of the saved metrics.
 
 ## Files and outputs
 
@@ -153,10 +153,10 @@ Inputs expected by this folder:
 
 Outputs produced by this folder:
 - retuned ROM `.mat` files in `models/`
-- `ROM_validation_results.mat` in `models/TunedModels/`
+- [`ROM_validation_results.mat`](ROM_validation_results.mat) in `models/TunedModels/`
 
 ## Related docs
 
-- `results/ROMvalidation.md`
-- `ESC_Id/README.md`
-- `Evaluation/README.md`
+- [`results/ROMvalidation.md`](../../results/ROMvalidation.md)
+- [`ESC_Id/README.md`](../../ESC_Id/README.md)
+- [`Evaluation/README.md`](../../Evaluation/README.md)

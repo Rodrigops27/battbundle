@@ -2,7 +2,7 @@
 
 This layer owns noise and perturbance injection studies for the evaluation framework.
 
-It replaces the old `Evaluation/tests` workflow as the primary user-facing injection layer, while keeping the benchmark engine aligned with [`xKFeval.m`](bnchmrk/Evaluation/xKFeval.m) through [`runBenchmark.m`](bnchmrk/Evaluation/runBenchmark.m).
+It replaces the old `Evaluation/tests` workflow as the primary user-facing injection layer, while keeping the benchmark engine aligned with [`xKFeval.m`](../xKFeval.m) through [`runBenchmark.m`](../runBenchmark.m).
 
 ## Purpose
 
@@ -12,16 +12,16 @@ Use this layer when you want to:
 - benchmark one or more estimators on the injected dataset
 - summarize and re-plot saved injection-study results later
 
-The estimator benchmark step is delegated to `runBenchmark.m`, so `scenario.estimatorSetSpec.tuning` may now be either:
+The estimator benchmark step is delegated to [`runBenchmark.m`](../runBenchmark.m), so `scenario.estimatorSetSpec.tuning` may now be either:
 - a plain shared tuning struct
 - an autotuning profile spec pointing at a saved MAT file from `autotuning/results/`
 
 ## Default Scenario
 
 The default desktop-evaluation scenario is:
-- source dataset: `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`
-- ESC model: `models/ATLmodel.mat`
-- ROM model: `models/ROM_ATL20_beta.mat`
+- source dataset: [`Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`](../ESCSimData/datasets/esc_bus_coreBattery_dataset.mat)
+- ESC model: [`models/ATLmodel.mat`](../../models/ATLmodel.mat)
+- ROM model: [`models/ROM_ATL20_beta.mat`](../../models/ROM_ATL20_beta.mat)
 - default estimator set:
   `EsSPKF`, `ESC-SPKF`, `EaEKF`, `EbSPKF`, `EBiSPKF`, `EDUKF`, `Em7SPKF`, `ESC-EKF`
 - injection cases: `noise` and `perturbance`
@@ -46,18 +46,18 @@ In both cases, the layer stores the clean source traces as `current_a_true` / `v
 
 ## Main Files
 
-- [`runInjectionStudy.m`](bnchmrk/Evaluation/Injection/runInjectionStudy.m)
+- [`runInjectionStudy.m`](runInjectionStudy.m)
   Main API/configuration entry point.
-- [`defaultInjectionConfig.m`](bnchmrk/Evaluation/Injection/defaultInjectionConfig.m)
+- [`defaultInjectionConfig.m`](defaultInjectionConfig.m)
   Default ATL desktop scenario and default injection cases.
-- [`generateInjectedDataset.m`](bnchmrk/Evaluation/Injection/generateInjectedDataset.m)
+- [`generateInjectedDataset.m`](generateInjectedDataset.m)
   Dataset-generation helper for noise and perturbance cases.
-- [`validateInjectedDataset.m`](bnchmrk/Evaluation/Injection/validateInjectedDataset.m)
+- [`validateInjectedDataset.m`](validateInjectedDataset.m)
   Validation helper for clean-vs-injected traces.
-- [`printInjectionSummary.m`](bnchmrk/Evaluation/Injection/printInjectionSummary.m)
+- [`printInjectionSummary.m`](printInjectionSummary.m)
   Console summary helper.
-- [`plotInjectionResults.m`](bnchmrk/Evaluation/Injection/plotInjectionResults.m)
-  Re-plots saved benchmark results with [`plotEvalResults.m`](bnchmrk/Evaluation/plotEvalResults.m).
+- [`plotInjectionResults.m`](plotInjectionResults.m)
+  Re-plots saved benchmark results with [`plotEvalResults.m`](../plotEvalResults.m).
 
 ## Quick Start
 
@@ -121,9 +121,9 @@ cfg.scenarios(1).estimatorSetSpec.tuning = struct( ...
 results = runInjectionStudy(cfg);
 ```
 
-This is resolved per estimator inside `runBenchmark.m`. If the param file or an estimator entry is missing, `runBenchmark.m` warns and falls back to default/shared tuning when `fallback_to_default = true`.
+This is resolved per estimator inside [`runBenchmark.m`](../runBenchmark.m). If the param file or an estimator entry is missing, [`runBenchmark.m`](../runBenchmark.m) warns and falls back to default/shared tuning when `fallback_to_default = true`.
 
-The autotuning profile is only a parameter source. It does not automatically expand the estimator list. `runInjectionStudy.m` still benchmarks only the estimators listed in `cfg.scenarios(1).estimatorSetSpec.estimator_names`, or the default Injection-layer subset if that field is left unchanged.
+The autotuning profile is only a parameter source. It does not automatically expand the estimator list. [`runInjectionStudy.m`](runInjectionStudy.m) still benchmarks only the estimators listed in `cfg.scenarios(1).estimatorSetSpec.estimator_names`, or the default Injection-layer subset if that field is left unchanged.
 
 Example custom perturbance case:
 
@@ -178,7 +178,7 @@ results = runInjectionStudy(cfg);
 
 Notes:
 - `cfg.scenarios(1).source_dataset.dataset_file` is the clean dataset used to generate the injected cases.
-- `cfg.scenarios(1).modelSpec.*` is forwarded to `runBenchmark.m` for the post-injection estimator benchmark.
+- `cfg.scenarios(1).modelSpec.*` is forwarded to [`runBenchmark.m`](../runBenchmark.m) for the post-injection estimator benchmark.
 - If you want the dataset to be rebuilt instead of loaded, provide `builder_fcn` and `builder_cfg` in `source_dataset`.
 - If your source application profile also moved, point the chosen builder configuration at that new external path as well.
 
@@ -286,4 +286,4 @@ results = runInjectionStudy(cfg);
 - The benchmark engine is still `runBenchmark` / `xKFeval`.
 - Dataset validation runs before the benchmark by default.
 - The default metric-voltage comparison uses the clean voltage trace stored as `voltage_v_true`.
-- Tuning-profile warnings and fallback behavior come from `runBenchmark.m`.
+- Tuning-profile warnings and fallback behavior come from [`runBenchmark.m`](../runBenchmark.m).

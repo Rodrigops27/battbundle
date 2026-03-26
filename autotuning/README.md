@@ -14,37 +14,37 @@ Initial scope:
 
 Use this layer when you want to tune process-noise and sensor-noise covariance parameters for one or more estimators against a benchmark dataset without rewriting the evaluation loop.
 
-The autotuning layer reuses [`runBenchmark.m`](/bnchmrk/Evaluation/runBenchmark.m), so tuned results stay aligned with the standard evaluation contract and metrics table.
+The autotuning layer reuses [`runBenchmark.m`](../Evaluation/runBenchmark.m), so tuned results stay aligned with the standard evaluation contract and metrics table.
 
 ## Default Example
 
 The built-in default scenario is:
-- ESC model: `models/ATLmodel.mat`
-- dataset: `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`
+- ESC model: [`models/ATLmodel.mat`](../models/ATLmodel.mat)
+- dataset: [`Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`](../Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat)
 - estimator list: `{'ROM-EKF'}` (`iterEKF`)
 - objective: `SocRmsePct`
 
 ## Main Files
 
-- [`runAutotuning.m`](bnchmrk/autotuning/runAutotuning.m)
+- [`runAutotuning.m`](runAutotuning.m)
   Main entry point. Coordinates scenarios and estimators.
-- [`defaultAutotuningConfig.m`](bnchmrk/autotuning/defaultAutotuningConfig.m)
+- [`defaultAutotuningConfig.m`](defaultAutotuningConfig.m)
   Default scenario, estimator search-space definitions, and BayesOpt settings.
-- [`tuneEstimatorBayesopt.m`](bnchmrk/autotuning/tuneEstimatorBayesopt.m)
+- [`tuneEstimatorBayesopt.m`](tuneEstimatorBayesopt.m)
   BayesOpt engine for one estimator.
-- [`plotAutotuningHistory.m`](bnchmrk/autotuning/plotAutotuningHistory.m)
+- [`plotAutotuningHistory.m`](plotAutotuningHistory.m)
   Plots objective and covariance traces from a final result or checkpoint file.
-- [`plotAutotunedResults.m`](bnchmrk/autotuning/plotAutotunedResults.m)
-  Re-plots the saved best benchmark result using [`plotEvalResults.m`](bnchmrk/Evaluation/plotEvalResults.m).
-- [`plotAutotuningErrors.m`](bnchmrk/autotuning/plotAutotuningErrors.m)
-  Merges the saved best benchmark result of each autotuned estimator and calls [`plotEvalResults.m`](bnchmrk/Evaluation/plotEvalResults.m) to plot combined SOC-error and voltage-error figures across all tuned estimators.
-- [`plotAutotuningInnovationAcfPacf.m`](bnchmrk/autotuning/plotAutotuningInnovationAcfPacf.m)
-  Merges the saved best benchmark result of each autotuned estimator and calls [`plotInnovationAcfPacf.m`](bnchmrk/Evaluation/plotInnovationAcfPacf.m) to plot combined innovation ACF/PACF figures across all tuned estimators.
-- [`plotAttributes.m`](bnchmrk/autotuning/plotAttributes.m)
+- [`plotAutotunedResults.m`](plotAutotunedResults.m)
+  Re-plots the saved best benchmark result using [`plotEvalResults.m`](../Evaluation/plotEvalResults.m).
+- [`plotAutotuningErrors.m`](plotAutotuningErrors.m)
+  Merges the saved best benchmark result of each autotuned estimator and calls [`plotEvalResults.m`](../Evaluation/plotEvalResults.m) to plot combined SOC-error and voltage-error figures across all tuned estimators.
+- [`plotAutotuningInnovationAcfPacf.m`](plotAutotuningInnovationAcfPacf.m)
+  Merges the saved best benchmark result of each autotuned estimator and calls [`plotInnovationAcfPacf.m`](../Evaluation/plotInnovationAcfPacf.m) to plot combined innovation ACF/PACF figures across all tuned estimators.
+- [`plotAttributes.m`](plotAttributes.m)
   Merges the saved best benchmark result of each autotuned estimator and plots shared estimator attributes: combined `R0` traces, combined bias traces, and the `EaEKF` covariance plots from the autotuning validation helper.
-- [`plotAutotuningCovarianceValidation.m`](bnchmrk/autotuning/plotAutotuningCovarianceValidation.m)
+- [`plotAutotuningCovarianceValidation.m`](plotAutotuningCovarianceValidation.m)
   Replays the tuned `EaEKF` on the saved desktop-evaluation dataset and compares its tracked `SigmaW`/`SigmaV` against the constant tuned ESC-estimator covariances.
-- [`printAutotuningSummary.m`](bnchmrk/autotuning/printAutotuningSummary.m)
+- [`printAutotuningSummary.m`](printAutotuningSummary.m)
   Prints the compact summary table.
 
 ## Quick Start
@@ -106,7 +106,7 @@ plotAutotuningErrors( ...
     struct('plot_voltage_error', true));
 ```
 
-This helper loads each run's `best_benchmark_results.mat`, merges the estimators into one xKFeval-style results struct, and then reuses [`Evaluation/plotEvalResults.m`](bnchmrk/Evaluation/plotEvalResults.m). Use it when you want the same multi-estimator error figures as the evaluation layer.
+This helper loads each run's `best_benchmark_results.mat`, merges the estimators into one xKFeval-style results struct, and then reuses [`Evaluation/plotEvalResults.m`](../Evaluation/plotEvalResults.m). Use it when you want the same multi-estimator error figures as the evaluation layer.
 
 To plot innovation ACF/PACF across all autotuned estimators:
 
@@ -123,7 +123,7 @@ plotAutotuningInnovationAcfPacf( ...
     struct('max_lag', 40));
 ```
 
-This helper loads each run's `best_benchmark_results.mat`, merges the estimators into one xKFeval-style results struct, extracts `innovation_pre` from each estimator, and then reuses [`Evaluation/plotInnovationAcfPacf.m`](bnchmrk/Evaluation/plotInnovationAcfPacf.m).
+This helper loads each run's `best_benchmark_results.mat`, merges the estimators into one xKFeval-style results struct, extracts `innovation_pre` from each estimator, and then reuses [`Evaluation/plotInnovationAcfPacf.m`](../Evaluation/plotInnovationAcfPacf.m).
 
 To plot attribute figures from the autotuning aggregate:
 
@@ -156,7 +156,7 @@ Use this when the autotuning run has already finished and you want to reopen the
 
 This plot:
 - uses the aggregate autotuning MAT file as the single entry point
-- replays the tuned `EaEKF` on `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`
+- replays the tuned `EaEKF` on [`Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`](../Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat)
 - plots the `EaEKF` tracked `SigmaW` diagonal and `SigmaV`
 - adds EaEKF-only tracking figures for process and sensor covariance evolution
 - overlays the constant tuned ESC-estimator covariances as horizontal lines
@@ -260,7 +260,7 @@ results = runAutotuning(cfg);
 ```
 
 Notes:
-- `runAutotuning.m` normalizes scenario path fields recursively for names ending in `_file` or `_root`.
+- [`runAutotuning.m`](runAutotuning.m) normalizes scenario path fields recursively for names ending in `_file` or `_root`.
 - The most important override points are `cfg.scenarios(k).datasetSpec.*` and `cfg.scenarios(k).modelSpec.*`.
 - If you use custom builder configs with extra path fields, prefer names ending in `_file` or `_root` so they are normalized automatically.
 

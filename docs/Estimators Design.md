@@ -21,10 +21,10 @@ This document is based on the code paths currently present in this repository. E
 
 ## Shared Conventions
 
-- At the evaluation layer, all estimators consume measured voltage, measured current, temperature in `degC`, and sample interval `dt` (`Evaluation/xKFeval.m`, `README.md`).
-- Repo sign convention is `+I = discharge` (`README.md`).
-- All ESC-family estimators multiply charging current (`ik < 0`) by `etaParam` before the update (`estimators/iterESCSPKF.m`, `estimators/iterESCEKF.m`, `estimators/iterEaEKF.m`, `estimators/iterEDUKF.m`, `estimators/iterEsSPKF.m`, `estimators/iterEbSPKF.m`, `estimators/iterEBiSPKF.m`, `estimators/iterEacrSPKF.m`, `estimators/iterEnacrSPKF.m`, `estimators/Em7SPKF.m`).
-- User-facing benchmark outputs are normalized into the same result shape by `Evaluation/runBenchmark.m` and `Evaluation/xKFeval.m`: SOC, predicted voltage, bounds, innovation, plus optional `R0` and bias traces.
+- At the evaluation layer, all estimators consume measured voltage, measured current, temperature in `degC`, and sample interval `dt` ([`Evaluation/xKFeval.m`](../Evaluation/xKFeval.m), [`README.md`](../README.md)).
+- Repo sign convention is `+I = discharge` ([`README.md`](../README.md)).
+- All ESC-family estimators multiply charging current (`ik < 0`) by `etaParam` before the update ([`estimators/iterESCSPKF.m`](../estimators/iterESCSPKF.m), [`estimators/iterESCEKF.m`](../estimators/iterESCEKF.m), [`estimators/iterEaEKF.m`](../estimators/iterEaEKF.m), [`estimators/iterEDUKF.m`](../estimators/iterEDUKF.m), [`estimators/iterEsSPKF.m`](../estimators/iterEsSPKF.m), [`estimators/iterEbSPKF.m`](../estimators/iterEbSPKF.m), [`estimators/iterEBiSPKF.m`](../estimators/iterEBiSPKF.m), [`estimators/iterEacrSPKF.m`](../estimators/iterEacrSPKF.m), [`estimators/iterEnacrSPKF.m`](../estimators/iterEnacrSPKF.m), [`estimators/Em7SPKF.m`](../estimators/Em7SPKF.m)).
+- User-facing benchmark outputs are normalized into the same result shape by [`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m) and [`Evaluation/xKFeval.m`](../Evaluation/xKFeval.m): SOC, predicted voltage, bounds, innovation, plus optional `R0` and bias traces.
 
 ## Summary Table
 
@@ -58,37 +58,37 @@ For every estimator entry below, the sections `Best-case scenario / when this es
 SOC and voltage estimation against a compatible reduced-order electrochemical model.
 
 #### Core idea / mechanism
-Uses `initKF` + `iterEKF` to run an EKF over a ROM grid indexed by temperature and SOC, with either output blending or model blending available in the implementation. The repo's public entry points always initialize it with `blend = 'OutB'` (`Evaluation/runBenchmark.m`, `Evaluation/mainEval.m`, `Evaluation/Injection/runInjectionStudy.m`, `Evaluation/NoiseTuningSweep/sweepNoiseStudy.m`).
+Uses `initKF` + `iterEKF` to run an EKF over a ROM grid indexed by temperature and SOC, with either output blending or model blending available in the implementation. The repo's public entry points always initialize it with `blend = 'OutB'` ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m), [`Evaluation/mainEval.m`](../Evaluation/mainEval.m), [`Evaluation/Injection/runInjectionStudy.m`](../Evaluation/Injection/runInjectionStudy.m), [`Evaluation/NoiseTuningSweep/sweepNoiseStudy.m`](../Evaluation/NoiseTuningSweep/sweepNoiseStudy.m)).
 
 #### Assumptions it makes
-- A compatible `ROM` struct is available and contains `ROM.ROMmdls`, `tfData`, `xraData`, and `cellData` (`estimators/initKF.m`).
-- Each ROM `A` matrix is diagonal and its last state is an integrator; `B` must be all ones (`estimators/initKF.m`).
-- `runBenchmark.m` assumes ROM chemistry should match the ESC chemistry unless `modelSpec.require_rom_match` is disabled.
+- A compatible `ROM` struct is available and contains `ROM.ROMmdls`, `tfData`, `xraData`, and `cellData` ([`estimators/initKF.m`](../estimators/initKF.m)).
+- Each ROM `A` matrix is diagonal and its last state is an integrator; `B` must be all ones ([`estimators/initKF.m`](../estimators/initKF.m)).
+- [`runBenchmark.m`](../Evaluation/runBenchmark.m) assumes ROM chemistry should match the ESC chemistry unless `modelSpec.require_rom_match` is disabled.
 - No explicit current-bias or `R0` adaptation is implemented in the public benchmark wrapper.
 
 #### Required inputs / signals
-- Measured voltage, current, temperature, and sample interval via the benchmark step wrapper (`Evaluation/runBenchmark.m`, `Evaluation/xKFeval.m`).
+- Measured voltage, current, temperature, and sample interval via the benchmark step wrapper ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m), [`Evaluation/xKFeval.m`](../Evaluation/xKFeval.m)).
 - Initial SOC and covariance.
-- A compatible ROM file / struct (`README.md`, `Evaluation/runBenchmark.m`).
+- A compatible ROM file / struct ([`README.md`](../README.md), [`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m)).
 
 #### Optional inputs / tunable parameters
-- `blend` mode in `initKF`: `OutB`, `MdlB`, or the nonblend aliases handled as degenerate model-blend (`estimators/initKF.m`).
-- Benchmark tuning: `sigma_x0_rom_tail`, `sigma_w_ekf`, `sigma_v_ekf` (`Evaluation/runBenchmark.m`).
-- Initial SOC override through `estimatorSetSpec.soc0_percent` (`Evaluation/runBenchmark.m`).
+- `blend` mode in `initKF`: `OutB`, `MdlB`, or the nonblend aliases handled as degenerate model-blend ([`estimators/initKF.m`](../estimators/initKF.m)).
+- Benchmark tuning: `sigma_x0_rom_tail`, `sigma_w_ekf`, `sigma_v_ekf` ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m)).
+- Initial SOC override through `estimatorSetSpec.soc0_percent` ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m)).
 
 #### Expected outputs
-- User-facing benchmark outputs are SOC, predicted voltage, 3-sigma SOC bound, 3-sigma voltage bound, innovation, and innovation covariance proxy `sk` (`Evaluation/runBenchmark.m`, `Evaluation/xKFeval.m`).
-- Internally `iterEKF` returns a larger state/output vector; the repo wrapper maps `zk(end)` to SOC and `zk(end-1)` to voltage (`Evaluation/runBenchmark.m`).
+- User-facing benchmark outputs are SOC, predicted voltage, 3-sigma SOC bound, 3-sigma voltage bound, innovation, and innovation covariance proxy `sk` ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m), [`Evaluation/xKFeval.m`](../Evaluation/xKFeval.m)).
+- Internally `iterEKF` returns a larger state/output vector; the repo wrapper maps `zk(end)` to SOC and `zk(end-1)` to voltage ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m)).
 
 #### Estimated computation cost
 - qualitative: `high`
-- brief explanation of what drives the cost: Reconstructs nonlinear ROM variables and blends up to four neighboring ROM setpoints each step (`estimators/iterEKF.m`).
+- brief explanation of what drives the cost: Reconstructs nonlinear ROM variables and blends up to four neighboring ROM setpoints each step ([`estimators/iterEKF.m`](../estimators/iterEKF.m)).
 
 #### Common failure modes
-- Skipped entirely when no compatible ROM is available (`Evaluation/runBenchmark.m`, `README.md`).
-- ROM chemistry mismatch causes skip or error depending on `allow_rom_skip` (`Evaluation/runBenchmark.m`).
-- Repeated warning conditions can print `EKF is probably broken/lost` (`estimators/iterEKF.m`).
-- Large voltage residuals double `SigmaX` (`estimators/iterEKF.m`).
+- Skipped entirely when no compatible ROM is available ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m), [`README.md`](../README.md)).
+- ROM chemistry mismatch causes skip or error depending on `allow_rom_skip` ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m)).
+- Repeated warning conditions can print `EKF is probably broken/lost` ([`estimators/iterEKF.m`](../estimators/iterEKF.m)).
+- Large voltage residuals double `SigmaX` ([`estimators/iterEKF.m`](../estimators/iterEKF.m)).
 
 #### Best-case scenario / when this estimator is a good choice
 When you have a validated ROM for the same chemistry and want the repo's highest-fidelity baseline estimator.
@@ -97,8 +97,8 @@ When you have a validated ROM for the same chemistry and want the repo's highest
 When no compatible ROM is available, chemistry metadata does not match, or compute budget is much tighter than the ESC estimators allow.
 
 #### Implementation notes / gotchas from this repo
-- The active benchmark stack exposes `ROM-EKF`, not `ROM-SPKF` (`Evaluation/runBenchmark.m`).
-- The README's stable smoke test is explicitly `ROM-EKF` on the NMC30 ROM dataset (`README.md`).
+- The active benchmark stack exposes `ROM-EKF`, not `ROM-SPKF` ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m)).
+- The README's stable smoke test is explicitly `ROM-EKF` on the NMC30 ROM dataset ([`README.md`](../README.md)).
 - `initKF` accepts multiple blend modes, but the repo's shipped benchmark scripts always use `'OutB'`.
 
 ### `ROM-SPKF`
@@ -110,7 +110,7 @@ When no compatible ROM is available, chemistry metadata does not match, or compu
 Sigma-point counterpart to the ROM EKF.
 
 #### Core idea / mechanism
-Uses the same `initKF` ROM data structure as `ROM-EKF`, but updates it through `iterSPKF` instead of `iterEKF` (`estimators/initKF.m`, `estimators/iterSPKF.m`).
+Uses the same `initKF` ROM data structure as `ROM-EKF`, but updates it through `iterSPKF` instead of `iterEKF` ([`estimators/initKF.m`](../estimators/initKF.m), [`estimators/iterSPKF.m`](../estimators/iterSPKF.m)).
 
 #### Assumptions it makes
 - Same ROM structural assumptions as `ROM-EKF`.
@@ -125,7 +125,7 @@ Uses the same `initKF` ROM data structure as `ROM-EKF`, but updates it through `
 - Same `initKF` options as `ROM-EKF`, including blend mode and covariance choices.
 
 #### Expected outputs
-- `iterSPKF` returns an internal output vector `zk` and bounds `boundzk` (`estimators/iterSPKF.m`).
+- `iterSPKF` returns an internal output vector `zk` and bounds `boundzk` ([`estimators/iterSPKF.m`](../estimators/iterSPKF.m)).
 - Not explicit in code: no public `xKFeval` wrapper is provided for this estimator in the current repo.
 
 #### Estimated computation cost
@@ -133,9 +133,9 @@ Uses the same `initKF` ROM data structure as `ROM-EKF`, but updates it through `
 - brief explanation of what drives the cost: Sigma-point generation is layered on top of the same ROM nonlinear-variable reconstruction used by the ROM EKF.
 
 #### Common failure modes
-- Repeated warning conditions can print `SPKF is probably broken/lost` (`estimators/iterSPKF.m`).
-- Large residuals double `SigmaX` (`estimators/iterSPKF.m`).
-- The file contains the comment `GLP NEEDS OB/MB variants` near `getVariables`, which is a direct sign that this path is not fully cleaned up for current repo usage (`estimators/iterSPKF.m`).
+- Repeated warning conditions can print `SPKF is probably broken/lost` ([`estimators/iterSPKF.m`](../estimators/iterSPKF.m)).
+- Large residuals double `SigmaX` ([`estimators/iterSPKF.m`](../estimators/iterSPKF.m)).
+- The file contains the comment `GLP NEEDS OB/MB variants` near `getVariables`, which is a direct sign that this path is not fully cleaned up for current repo usage ([`estimators/iterSPKF.m`](../estimators/iterSPKF.m)).
 
 #### Best-case scenario / when this estimator is a good choice
 Only for local experimentation if you specifically want a ROM sigma-point filter and are comfortable wiring it yourself.
@@ -144,8 +144,8 @@ Only for local experimentation if you specifically want a ROM sigma-point filter
 When you want a repo-supported estimator path, benchmark integration, or existing test coverage.
 
 #### Implementation notes / gotchas from this repo
-- `runBenchmark.m`, `mainEval.m`, `runInjectionStudy.m`, and the sweep scripts do not expose it.
-- `iterSPKF.m` does not populate `lastInnovationPre` / `lastSk`, so it is not aligned with the current innovation-diagnostics plumbing used by `xKFeval`.
+- [`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m), [`Evaluation/mainEval.m`](../Evaluation/mainEval.m), [`Evaluation/Injection/runInjectionStudy.m`](../Evaluation/Injection/runInjectionStudy.m), and the sweep scripts do not expose it.
+- [`estimators/iterSPKF.m`](../estimators/iterSPKF.m) does not populate `lastInnovationPre` / `lastSk`, so it is not aligned with the current innovation-diagnostics plumbing used by `xKFeval`.
 - This estimator appears unused in the active repository workflows.
 
 ### `ESC-SPKF`
@@ -157,32 +157,32 @@ When you want a repo-supported estimator path, benchmark integration, or existin
 Baseline sigma-point ESC estimator for SOC and terminal voltage.
 
 #### Core idea / mechanism
-Runs an SPKF over the ESC state vector `[ir(1:nRC); h; soc]`, using sigma points built from `SigmaX`, process noise, and sensor noise (`estimators/initESCSPKF.m`, `estimators/iterESCSPKF.m`).
+Runs an SPKF over the ESC state vector `[ir(1:nRC); h; soc]`, using sigma points built from `SigmaX`, process noise, and sensor noise ([`estimators/initESCSPKF.m`](../estimators/initESCSPKF.m), [`estimators/iterESCSPKF.m`](../estimators/iterESCSPKF.m)).
 
 #### Assumptions it makes
-- A full ESC model is available with RC branches (`estimators/initESCSPKF.m`).
-- `R0` is fixed at the model value for the current temperature (`estimators/iterESCSPKF.m`).
+- A full ESC model is available with RC branches ([`estimators/initESCSPKF.m`](../estimators/initESCSPKF.m)).
+- `R0` is fixed at the model value for the current temperature ([`estimators/iterESCSPKF.m`](../estimators/iterESCSPKF.m)).
 - Current/voltage errors are treated as white-noise-like through `SigmaW` and `SigmaV`.
 - No explicit current-bias or `R0` drift state is modeled.
 
 #### Required inputs / signals
-- Measured voltage `vk`, current `ik`, temperature `Tk`, sample interval `deltat`, and an ESC model (`estimators/iterESCSPKF.m`).
+- Measured voltage `vk`, current `ik`, temperature `Tk`, sample interval `deltat`, and an ESC model ([`estimators/iterESCSPKF.m`](../estimators/iterESCSPKF.m)).
 
 #### Optional inputs / tunable parameters
 - State covariance `SigmaX0`.
 - Sensor/process noise variances `SigmaV`, `SigmaW`.
-- Benchmark defaults come from `sigma_v_esc`, `sigma_w_esc`, and `SigmaX0_*` in `Evaluation/runBenchmark.m`.
+- Benchmark defaults come from `sigma_v_esc`, `sigma_w_esc`, and `SigmaX0_*` in [`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m).
 
 #### Expected outputs
-- SOC, predicted voltage, SOC bound, voltage bound, innovation, and `sk` in the benchmark wrappers (`Evaluation/runBenchmark.m`, `Evaluation/xKFeval.m`).
+- SOC, predicted voltage, SOC bound, voltage bound, innovation, and `sk` in the benchmark wrappers ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m), [`Evaluation/xKFeval.m`](../Evaluation/xKFeval.m)).
 
 #### Estimated computation cost
 - qualitative: `medium`
 - brief explanation of what drives the cost: Small-state sigma-point propagation is more expensive than `ESC-EKF`, but still much lighter than the ROM estimators.
 
 #### Common failure modes
-- Residuals beyond `100 * SigmaY` zero the gain for that step (`estimators/iterESCSPKF.m`).
-- Residuals beyond `4 * SigmaY` multiply SOC covariance by `Qbump = 5` (`estimators/initESCSPKF.m`, `estimators/iterESCSPKF.m`).
+- Residuals beyond `100 * SigmaY` zero the gain for that step ([`estimators/iterESCSPKF.m`](../estimators/iterESCSPKF.m)).
+- Residuals beyond `4 * SigmaY` multiply SOC covariance by `Qbump = 5` ([`estimators/initESCSPKF.m`](../estimators/initESCSPKF.m), [`estimators/iterESCSPKF.m`](../estimators/iterESCSPKF.m)).
 - Current bias, correlated noise, or `R0` drift are unmodeled and can show up as persistent innovation error.
 
 #### Best-case scenario / when this estimator is a good choice
@@ -193,7 +193,7 @@ When the dominant error source is current-sensor bias, correlated noise, or chan
 
 #### Implementation notes / gotchas from this repo
 - `initESCSPKF` silently converts SOC from percent to `[0,1]` if `soc0 > 1`.
-- Charge current is corrected by `etaParam` when `ik < 0` (`estimators/iterESCSPKF.m`).
+- Charge current is corrected by `etaParam` when `ik < 0` ([`estimators/iterESCSPKF.m`](../estimators/iterESCSPKF.m)).
 - Hysteresis sign only updates when `|ik| > Q/100`, so very small currents reuse the previous sign state.
 
 ### `ESC-EKF`
@@ -205,7 +205,7 @@ When the dominant error source is current-sensor bias, correlated noise, or chan
 Lower-cost EKF version of the baseline ESC estimator.
 
 #### Core idea / mechanism
-Uses the same ESC state layout as `ESC-SPKF`, but performs EKF prediction/correction with an analytically built state matrix and a numerically differentiated OCV slope in the output Jacobian (`estimators/initESCSPKF.m`, `estimators/iterESCEKF.m`).
+Uses the same ESC state layout as `ESC-SPKF`, but performs EKF prediction/correction with an analytically built state matrix and a numerically differentiated OCV slope in the output Jacobian ([`estimators/initESCSPKF.m`](../estimators/initESCSPKF.m), [`estimators/iterESCEKF.m`](../estimators/iterESCEKF.m)).
 
 #### Assumptions it makes
 - Same full-ESC-model and fixed-`R0` assumptions as `ESC-SPKF`.
@@ -218,7 +218,7 @@ Uses the same ESC state layout as `ESC-SPKF`, but performs EKF prediction/correc
 - Same benchmark-facing tuning as `ESC-SPKF`: `SigmaX0_*`, `sigma_v_esc`, `sigma_w_esc`.
 
 #### Expected outputs
-- SOC, predicted voltage, SOC/voltage bounds, innovation, `sk` (`Evaluation/runBenchmark.m`, `Evaluation/xKFeval.m`).
+- SOC, predicted voltage, SOC/voltage bounds, innovation, `sk` ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m), [`Evaluation/xKFeval.m`](../Evaluation/xKFeval.m)).
 
 #### Estimated computation cost
 - qualitative: `low`
@@ -226,7 +226,7 @@ Uses the same ESC state layout as `ESC-SPKF`, but performs EKF prediction/correc
 
 #### Common failure modes
 - Linearization error can degrade accuracy around strong ESC nonlinearities.
-- Outliers can zero the gain or trigger covariance bumping (`estimators/iterESCEKF.m`).
+- Outliers can zero the gain or trigger covariance bumping ([`estimators/iterESCEKF.m`](../estimators/iterESCEKF.m)).
 - No explicit handling for current bias, correlated sensor noise, or `R0` drift.
 
 #### Best-case scenario / when this estimator is a good choice
@@ -236,8 +236,8 @@ When you need the fastest ESC estimator path and the fixed-parameter ESC model i
 When nonlinear behavior, sensor bias, or parameter drift dominate the error budget.
 
 #### Implementation notes / gotchas from this repo
-- This estimator reuses the `initESCSPKF` data structure; there is no separate `initESCEKF.m`.
-- OCV slope is approximated numerically with `ds = 1e-6` in `iterESCEKF.m`.
+- This estimator reuses the [`estimators/initESCSPKF.m`](../estimators/initESCSPKF.m) data structure; there is no separate `initESCEKF.m`.
+- OCV slope is approximated numerically with `ds = 1e-6` in [`estimators/iterESCEKF.m`](../estimators/iterESCEKF.m).
 - The benchmark and study stack exercises this estimator in `mainEval`, `runBenchmark`, `runInjectionStudy`, and `sweepNoiseStudy`.
 
 ### `EaEKF`
@@ -249,7 +249,7 @@ When nonlinear behavior, sensor bias, or parameter drift dominate the error budg
 Adaptive EKF that retunes process and sensor noise online.
 
 #### Core idea / mechanism
-Starts from the ESC-EKF state/update structure, then updates `SigmaW` and `SigmaV` using smoothed averages of innovation-driven covariance estimates stored in rolling buffers (`estimators/initEaEKF.m`, `estimators/iterEaEKF.m`).
+Starts from the ESC-EKF state/update structure, then updates `SigmaW` and `SigmaV` using smoothed averages of innovation-driven covariance estimates stored in rolling buffers ([`estimators/initEaEKF.m`](../estimators/initEaEKF.m), [`estimators/iterEaEKF.m`](../estimators/iterEaEKF.m)).
 
 #### Assumptions it makes
 - Same full ESC model and fixed-`R0` assumptions as `ESC-EKF`.
@@ -260,21 +260,21 @@ Starts from the ESC-EKF state/update structure, then updates `SigmaW` and `Sigma
 - Measured voltage, current, temperature, sample interval, ESC model.
 
 #### Optional inputs / tunable parameters
-- `alpha` smoothing factor, default `0.99` (`estimators/initEaEKF.m`).
-- `NW` and `NV` rolling-buffer lengths, default `500` each (`estimators/initEaEKF.m`).
-- Benchmark-facing initial covariances: `SigmaX0_*`, `sigma_v_esc`, `sigma_w_esc` (`Evaluation/runBenchmark.m`).
+- `alpha` smoothing factor, default `0.99` ([`estimators/initEaEKF.m`](../estimators/initEaEKF.m)).
+- `NW` and `NV` rolling-buffer lengths, default `500` each ([`estimators/initEaEKF.m`](../estimators/initEaEKF.m)).
+- Benchmark-facing initial covariances: `SigmaX0_*`, `sigma_v_esc`, `sigma_w_esc` ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m)).
 
 #### Expected outputs
 - Same benchmark outputs as `ESC-EKF`.
-- Final adapted `SigmaW` and `SigmaV` remain in `results.estimators(i).kfDataFinal`, and the repo has a dedicated plotting helper for them: `Evaluation/NoiseTuningSweep/plotEaEkfCovarianceSweeps.m`.
+- Final adapted `SigmaW` and `SigmaV` remain in `results.estimators(i).kfDataFinal`, and the repo has a dedicated plotting helper for them: [`Evaluation/NoiseTuningSweep/plotEaEkfCovarianceSweeps.m`](../Evaluation/NoiseTuningSweep/plotEaEkfCovarianceSweeps.m).
 
 #### Estimated computation cost
 - qualitative: `medium`
 - brief explanation of what drives the cost: EKF math is cheap, but each step also updates and averages covariance-estimation buffers.
 
 #### Common failure modes
-- If the run does not exceed the buffer lengths, the adaptive `SigmaW` / `SigmaV` updates do not execute (`estimators/iterEaEKF.m`).
-- `inferred`: On shorter or weakly exciting runs, the final adaptive covariances can remain dominated by their initialization; the repo added `plotEaEkfCovarianceSweeps.m` specifically to diagnose this.
+- If the run does not exceed the buffer lengths, the adaptive `SigmaW` / `SigmaV` updates do not execute ([`estimators/iterEaEKF.m`](../estimators/iterEaEKF.m)).
+- `inferred`: On shorter or weakly exciting runs, the final adaptive covariances can remain dominated by their initialization; the repo added [`plotEaEkfCovarianceSweeps.m`](../Evaluation/NoiseTuningSweep/plotEaEkfCovarianceSweeps.m) specifically to diagnose this.
 - Still does not model explicit current bias or `R0` drift.
 
 #### Best-case scenario / when this estimator is a good choice
@@ -285,7 +285,7 @@ When the run is short, the disturbance is really a structured bias/parameter pro
 
 #### Implementation notes / gotchas from this repo
 - No benchmark script in the repo overrides `alpha`, `NW`, or `NV`; all shipped runs appear to use the defaults.
-- `plotEaEkfCovarianceSweeps.m` diagnoses the final adapted covariances as either `convergent adaptive covariance estimation` or `initialization-dominated covariance scaling`.
+- [`plotEaEkfCovarianceSweeps.m`](../Evaluation/NoiseTuningSweep/plotEaEkfCovarianceSweeps.m) diagnoses the final adapted covariances as either `convergent adaptive covariance estimation` or `initialization-dominated covariance scaling`.
 
 ### `EacrSPKF`
 
@@ -296,7 +296,7 @@ When the run is short, the disturbance is really a structured bias/parameter pro
 ESC-SPKF variant that adds a correlated sensor-noise state.
 
 #### Core idea / mechanism
-On the first call, `iterEacrSPKF` augments the base ESC state with one extra state `x_corr` and adds it directly to the output equation. Its dynamics are `x_corr(k) = Af * x_corr(k-1) + w_corr(k-1)` (`estimators/iterEacrSPKF.m`).
+On the first call, `iterEacrSPKF` augments the base ESC state with one extra state `x_corr` and adds it directly to the output equation. Its dynamics are `x_corr(k) = Af * x_corr(k-1) + w_corr(k-1)` ([`estimators/iterEacrSPKF.m`](../estimators/iterEacrSPKF.m)).
 
 #### Assumptions it makes
 - Full ESC model with RC states.
@@ -308,7 +308,7 @@ On the first call, `iterEacrSPKF` augments the base ESC state with one extra sta
 
 #### Optional inputs / tunable parameters
 - Same base ESC-SPKF tuning as `ESC-SPKF`.
-- Optional `esckfData.eacrAf` scalar before first use; default is `1`, i.e. random-walk correlation state (`estimators/iterEacrSPKF.m`).
+- Optional `esckfData.eacrAf` scalar before first use; default is `1`, i.e. random-walk correlation state ([`estimators/iterEacrSPKF.m`](../estimators/iterEacrSPKF.m)).
 
 #### Expected outputs
 - Same user-facing outputs as `ESC-SPKF`.
@@ -341,7 +341,7 @@ When the real error source is current bias, `R0` drift, or broad process mismatc
 ESC-SPKF variant that models autocorrelated process mismatch.
 
 #### Core idea / mechanism
-On the first call, doubles the state dimension from `Nx0` to `2*Nx0` by appending a process-correlation state `x_proc`. The main state update becomes `x_main_new = x_main_nominal + x_proc_old`, while `x_proc_new = Af * x_proc_old + w` (`estimators/iterEnacrSPKF.m`).
+On the first call, doubles the state dimension from `Nx0` to `2*Nx0` by appending a process-correlation state `x_proc`. The main state update becomes `x_main_new = x_main_nominal + x_proc_old`, while `x_proc_new = Af * x_proc_old + w` ([`estimators/iterEnacrSPKF.m`](../estimators/iterEnacrSPKF.m)).
 
 #### Assumptions it makes
 - Full ESC model with RC states.
@@ -353,7 +353,7 @@ On the first call, doubles the state dimension from `Nx0` to `2*Nx0` by appendin
 
 #### Optional inputs / tunable parameters
 - Same base ESC-SPKF tuning as `ESC-SPKF`.
-- Optional `enacrAf` before first use; scalar expands to `Af * I`, matrix form is also accepted. Default is `0.98 * I` (`estimators/iterEnacrSPKF.m`).
+- Optional `enacrAf` before first use; scalar expands to `Af * I`, matrix form is also accepted. Default is `0.98 * I` ([`estimators/iterEnacrSPKF.m`](../estimators/iterEnacrSPKF.m)).
 
 #### Expected outputs
 - Same user-facing outputs as `ESC-SPKF`.
@@ -387,7 +387,7 @@ When compute budget is tight or the dominant issue is sensor bias instead of pro
 Dual ESC sigma-point filter that estimates SOC/state and `R0` together.
 
 #### Core idea / mechanism
-Uses two coupled sigma-point filters in `iterEDUKF`: a state SPKF for the ESC states and a parallel 1-state parameter filter for `R0`, both driven by the same voltage measurement (`estimators/initEDUKF.m`, `estimators/iterEDUKF.m`).
+Uses two coupled sigma-point filters in `iterEDUKF`: a state SPKF for the ESC states and a parallel 1-state parameter filter for `R0`, both driven by the same voltage measurement ([`estimators/initEDUKF.m`](../estimators/initEDUKF.m), [`estimators/iterEDUKF.m`](../estimators/iterEDUKF.m)).
 
 #### Assumptions it makes
 - Full ESC model with RC states.
@@ -400,11 +400,11 @@ Uses two coupled sigma-point filters in `iterEDUKF`: a state SPKF for the ESC st
 
 #### Optional inputs / tunable parameters
 - Base ESC state covariance / noise tuning.
-- `SigmaR0` and `SigmaWR0` for the `R0` branch (`Evaluation/runBenchmark.m`, `estimators/initEDUKF.m`).
+- `SigmaR0` and `SigmaWR0` for the `R0` branch ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m), [`estimators/initEDUKF.m`](../estimators/initEDUKF.m)).
 
 #### Expected outputs
 - SOC, predicted voltage, SOC/voltage bounds, innovation, `sk`.
-- `R0` estimate and `R0` bound through the benchmark wrappers (`Evaluation/runBenchmark.m`, `Evaluation/xKFeval.m`).
+- `R0` estimate and `R0` bound through the benchmark wrappers ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m), [`Evaluation/xKFeval.m`](../Evaluation/xKFeval.m)).
 
 #### Estimated computation cost
 - qualitative: `high`
@@ -423,7 +423,7 @@ When the dominant error is current-sensor bias or a parameter other than `R0`.
 
 #### Implementation notes / gotchas from this repo
 - `initEDUKF` is also reused to initialize `EsSPKF`; the step function decides which `R0` update logic is used.
-- The repo has a dedicated comparison script, `Evaluation/ABestComp.m`, for `EDUKF` vs `EsSPKF`.
+- The repo has a dedicated comparison script, [`Evaluation/ABestComp.m`](../Evaluation/ABestComp.m), for `EDUKF` vs `EsSPKF`.
 
 ### `EsSPKF`
 
@@ -434,7 +434,7 @@ When the dominant error is current-sensor bias or a parameter other than `R0`.
 ESC-SPKF with a simplified separate `R0` tracking branch.
 
 #### Core idea / mechanism
-Runs the normal ESC-SPKF state update first, then calls a local 1-state `R0SPKF` using the updated ESC state and the current voltage measurement (`estimators/iterEsSPKF.m`).
+Runs the normal ESC-SPKF state update first, then calls a local 1-state `R0SPKF` using the updated ESC state and the current voltage measurement ([`estimators/iterEsSPKF.m`](../estimators/iterEsSPKF.m)).
 
 #### Assumptions it makes
 - Same full ESC model assumptions as `ESC-SPKF`.
@@ -480,7 +480,7 @@ When the dominant problem is sensor bias, correlated noise, or a parameter drift
 ESC-SPKF with an explicit current-bias state inside the main filter state vector.
 
 #### Core idea / mechanism
-Augments the ESC state with one extra state `ib` and uses separate process-noise entries for current noise and bias random walk. Prediction and output use `currentEff = current - ib` (`estimators/iterEbSPKF.m`; local init helper `initEbSpkf` in `Evaluation/runBenchmark.m`).
+Augments the ESC state with one extra state `ib` and uses separate process-noise entries for current noise and bias random walk. Prediction and output use `currentEff = current - ib` ([`estimators/iterEbSPKF.m`](../estimators/iterEbSPKF.m); local init helper `initEbSpkf` in [`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m)).
 
 #### Assumptions it makes
 - Full ESC model with RC states.
@@ -493,11 +493,11 @@ Augments the ESC state with one extra state `ib` and uses separate process-noise
 #### Optional inputs / tunable parameters
 - Base ESC tuning: `SigmaX0`, `SigmaV`.
 - Separate current-noise and bias-noise variances through the local helper signature `initEbSpkf(..., sigma_w_current, sigma_w_bias, sigma_ib0, ...)`.
-- Benchmark defaults: `single_bias_process_var`, `current_bias_var0`, plus base ESC tuning (`Evaluation/runBenchmark.m`).
+- Benchmark defaults: `single_bias_process_var`, `current_bias_var0`, plus base ESC tuning ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m)).
 
 #### Expected outputs
 - SOC, predicted voltage, bounds, innovation.
-- Current-bias estimate and bound (`Evaluation/runBenchmark.m`, `Evaluation/xKFeval.m`).
+- Current-bias estimate and bound ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m), [`Evaluation/xKFeval.m`](../Evaluation/xKFeval.m)).
 
 #### Estimated computation cost
 - qualitative: `medium`
@@ -528,7 +528,7 @@ When the dominant issue is voltage bias, correlated voltage noise, or changing `
 Two-stage ESC-SPKF with a separate external bias (shaping) filter branch.
 
 #### Core idea / mechanism
-Runs a normal ESC-SPKF state update, then updates a separate bias estimate `bhat` using matrices `Bb`, `Cb`, `V`, and either dynamic or static `Ad`/`Cd` bias models (`estimators/initESCSPKF.m`, `estimators/iterEBiSPKF.m`).
+Runs a normal ESC-SPKF state update, then updates a separate bias estimate `bhat` using matrices `Bb`, `Cb`, `V`, and either dynamic or static `Ad`/`Cd` bias models ([`estimators/initESCSPKF.m`](../estimators/initESCSPKF.m), [`estimators/iterEBiSPKF.m`](../estimators/iterEBiSPKF.m)).
 
 #### Assumptions it makes
 - Full ESC model with RC states.
@@ -540,8 +540,8 @@ Runs a normal ESC-SPKF state update, then updates a separate bias estimate `bhat
 - Bias-filter fields created by `initESCSPKF(..., biasCfg)`.
 
 #### Optional inputs / tunable parameters
-- `biasCfg.nb`, `bhat0`, `SigmaB0`, `Bb`, `Cb`, `V0`, `currentBiasInd`, `biasModelStatic`, `Ad`, `Cd` (`estimators/initESCSPKF.m`).
-- The repo helper `initEbiSpkf` only sets `nb = 1`, `bhat0 = 0`, `SigmaB0 = sigma_ib0`, and `currentBiasInd = 1` (`Evaluation/runBenchmark.m` and similar script-local helpers).
+- `biasCfg.nb`, `bhat0`, `SigmaB0`, `Bb`, `Cb`, `V0`, `currentBiasInd`, `biasModelStatic`, `Ad`, `Cd` ([`estimators/initESCSPKF.m`](../estimators/initESCSPKF.m)).
+- The repo helper `initEbiSpkf` only sets `nb = 1`, `bhat0 = 0`, `SigmaB0 = sigma_ib0`, and `currentBiasInd = 1` ([`Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m) and similar script-local helpers).
 
 #### Expected outputs
 - SOC, predicted voltage, bounds, innovation.
@@ -576,7 +576,7 @@ When you expect the repo's default benchmark wiring to estimate current bias aut
 Method-7 ESC-SPKF that combines the external bias branch with a simplified `R0` SPKF.
 
 #### Core idea / mechanism
-Runs the same two-stage external bias machinery as `EBiSPKF`, then performs a simplified 1-state `R0` SPKF using the bias-corrected current (`estimators/Em7init.m`, `estimators/Em7SPKF.m`).
+Runs the same two-stage external bias machinery as `EBiSPKF`, then performs a simplified 1-state `R0` SPKF using the bias-corrected current ([`estimators/Em7init.m`](../estimators/Em7init.m), [`estimators/Em7SPKF.m`](../estimators/Em7SPKF.m)).
 
 #### Assumptions it makes
 - Full ESC model with RC states.
@@ -613,5 +613,5 @@ When you are willing to provide a real bias model and want both explicit bias tr
 When you expect the shipped benchmark initialization to estimate current bias automatically.
 
 #### Implementation notes / gotchas from this repo
-- This estimator is in the public registry and the initial-SOC sweep, and it is the only ESC estimator supported by the dedicated single-estimator noise sweep besides `ROM-EKF` (`Evaluation/NoiseTuningSweep/oneEstSweeNoise.m`).
+- This estimator is in the public registry and the initial-SOC sweep, and it is the only ESC estimator supported by the dedicated single-estimator noise sweep besides `ROM-EKF` ([`Evaluation/NoiseTuningSweep/oneEstSweeNoise.m`](../Evaluation/NoiseTuningSweep/oneEstSweeNoise.m)).
 - That extra study support does not fix the default zero-matrix bias-model issue described above.
