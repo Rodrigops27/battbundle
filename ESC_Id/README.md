@@ -252,8 +252,7 @@ plotEscValidation(result_nmc);
   - `../README.md`
 - Related layers:
   - `../Evaluation/README.md`
-  - `../models/README.md`
-  - `../utility/README.md`
+  - `../models/TunedModels/README.md`
 - Related scripts:
   - `DiagProcessOCV.m`
   - `processDynamic.m`

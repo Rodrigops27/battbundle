@@ -363,4 +363,4 @@ results = runBenchmark(datasetSpec, modelSpec, estimatorSetSpec, flags);
 - Tuning-profile warnings come from `runBenchmark.m` when a param file or estimator entry is missing and fallback tuning is used.
 - `mainEval.m` is an example scenario, not the only supported benchmark path.
 - Benchmark datasets should be normalized before use; raw measured profiles belong in source/application folders until converted.
-- Estimator-specific assumptions and failure modes are documented in `docs/estimators.md`.
+- Estimator-specific assumptions and failure modes are documented in `docs/Estimators Design.md`.
