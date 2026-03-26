@@ -1,10 +1,10 @@
-function fig_handle = plotDatasetSignals(datasetInput, cfg)
-% plotDatasetSignals Plot current, voltage, and SOC from a dataset.
+function fig_handles = plotDatasetSignals(datasetInput, cfg)
+% plotDatasetSignals Plot current, voltage, SOC, and correlation views from a dataset.
 %
 % Usage:
 %   plotDatasetSignals(dataset)
 %   plotDatasetSignals('path_to_dataset.mat')
-%   fig = plotDatasetSignals(datasetInput, cfg)
+%   figs = plotDatasetSignals(datasetInput, cfg)
 %
 % Inputs:
 %   datasetInput  Dataset struct or MAT file path containing a struct named
@@ -13,9 +13,12 @@ function fig_handle = plotDatasetSignals(datasetInput, cfg)
 %                  dataset_variable  preferred MAT variable name, default 'dataset'
 %                  figure_name       custom figure name
 %                  title_prefix      custom title prefix
+%                  show_normalized_correlations  create normalized
+%                               voltage/SOC and current/SOC figures with a
+%                               unity line, default false
 %
 % Output:
-%   fig_handle   Figure handle.
+%   fig_handles  Struct with created figure handles.
 
 if nargin < 1 || isempty(datasetInput)
     error('plotDatasetSignals:MissingInput', ...
@@ -30,8 +33,11 @@ dataset = loadDatasetInput(datasetInput, cfg.dataset_variable);
 
 [time_data, time_label] = getTimeAxis(dataset);
 soc_data = selectSocSignal(dataset);
+valid_corr = isfinite(dataset.current_a(:)) & isfinite(dataset.voltage_v(:)) & isfinite(soc_data(:));
 
-fig_handle = figure( ...
+fig_handles = struct();
+
+fig_handles.signals = figure( ...
     'Name', buildFigureName(dataset, cfg), ...
     'NumberTitle', 'off');
 
@@ -53,6 +59,76 @@ xlabel(time_label);
 ylabel('SOC [%]');
 
 linkaxes(ax, 'x');
+
+fig_handles.voltage_soc = figure( ...
+    'Name', sprintf('%s - Voltage vs SOC', buildBaseFigureName(dataset, cfg)), ...
+    'NumberTitle', 'off');
+if any(valid_corr)
+    plotCorrelationWithTrend( ...
+        100 * soc_data(valid_corr), ...
+        dataset.voltage_v(valid_corr), ...
+        time_data(valid_corr), ...
+        'SOC [%]', ...
+        'Voltage [V]', ...
+        sprintf('%sVoltage vs SOC', buildTitlePrefix(dataset, cfg)), ...
+        time_label);
+else
+    text(0.1, 0.5, 'No finite voltage/SOC pairs available', 'Units', 'normalized');
+    axis off;
+end
+
+fig_handles.current_soc = figure( ...
+    'Name', sprintf('%s - Current vs SOC', buildBaseFigureName(dataset, cfg)), ...
+    'NumberTitle', 'off');
+if any(valid_corr)
+    plotCorrelationWithTrend( ...
+        100 * soc_data(valid_corr), ...
+        dataset.current_a(valid_corr), ...
+        time_data(valid_corr), ...
+        'SOC [%]', ...
+        'Current [A]', ...
+        sprintf('%sCurrent vs SOC', buildTitlePrefix(dataset, cfg)), ...
+        time_label);
+else
+    text(0.1, 0.5, 'No finite current/SOC pairs available', 'Units', 'normalized');
+    axis off;
+end
+
+if cfg.show_normalized_correlations
+    fig_handles.voltage_soc_normalized = figure( ...
+        'Name', sprintf('%s - Voltage vs SOC (normalized)', buildBaseFigureName(dataset, cfg)), ...
+        'NumberTitle', 'off');
+    if any(valid_corr)
+        plotNormalizedCorrelation( ...
+            100 * soc_data(valid_corr), ...
+            dataset.voltage_v(valid_corr), ...
+            time_data(valid_corr), ...
+            'Normalized SOC', ...
+            'Normalized Voltage', ...
+            sprintf('%sVoltage vs SOC (normalized)', buildTitlePrefix(dataset, cfg)), ...
+            time_label);
+    else
+        text(0.1, 0.5, 'No finite voltage/SOC pairs available', 'Units', 'normalized');
+        axis off;
+    end
+
+    fig_handles.current_soc_normalized = figure( ...
+        'Name', sprintf('%s - Current vs SOC (normalized)', buildBaseFigureName(dataset, cfg)), ...
+        'NumberTitle', 'off');
+    if any(valid_corr)
+        plotNormalizedCorrelation( ...
+            100 * soc_data(valid_corr), ...
+            dataset.current_a(valid_corr), ...
+            time_data(valid_corr), ...
+            'Normalized SOC', ...
+            'Normalized Current', ...
+            sprintf('%sCurrent vs SOC (normalized)', buildTitlePrefix(dataset, cfg)), ...
+            time_label);
+    else
+        text(0.1, 0.5, 'No finite current/SOC pairs available', 'Units', 'normalized');
+        axis off;
+    end
+end
 end
 
 function cfg = normalizeConfig(cfg)
@@ -64,6 +140,65 @@ if ~isfield(cfg, 'figure_name')
 end
 if ~isfield(cfg, 'title_prefix')
     cfg.title_prefix = '';
+end
+if ~isfield(cfg, 'show_normalized_correlations') || isempty(cfg.show_normalized_correlations)
+    cfg.show_normalized_correlations = false;
+end
+end
+
+function plotCorrelationWithTrend(x_data, y_data, color_data, x_label, y_label, plot_title, color_label)
+scatter(x_data, y_data, 10, color_data, 'filled');
+grid on;
+xlabel(x_label);
+ylabel(y_label);
+title(plot_title);
+cb = colorbar;
+cb.Label.String = color_label;
+hold on;
+addLinearTrendLine(x_data, y_data);
+hold off;
+end
+
+function plotNormalizedCorrelation(x_data, y_data, color_data, x_label, y_label, plot_title, color_label)
+x_norm = minMaxNormalize(x_data);
+y_norm = minMaxNormalize(y_data);
+
+scatter(x_norm, y_norm, 10, color_data, 'filled');
+grid on;
+xlabel(x_label);
+ylabel(y_label);
+title(plot_title);
+cb = colorbar;
+cb.Label.String = color_label;
+hold on;
+plot([0 1], [0 1], '--', 'Color', [0.35 0.35 0.35], 'LineWidth', 1.1);
+addLinearTrendLine(x_norm, y_norm);
+hold off;
+xlim([0 1]);
+ylim([0 1]);
+end
+
+function addLinearTrendLine(x_data, y_data)
+valid_fit = isfinite(x_data) & isfinite(y_data);
+x_fit = x_data(valid_fit);
+y_fit = y_data(valid_fit);
+if numel(x_fit) < 2 || all(x_fit == x_fit(1))
+    return;
+end
+
+coeffs = polyfit(x_fit, y_fit, 1);
+x_line = linspace(min(x_fit), max(x_fit), 100);
+y_line = polyval(coeffs, x_line);
+plot(x_line, y_line, 'k-', 'LineWidth', 1.4);
+end
+
+function data_norm = minMaxNormalize(data)
+data_min = min(data);
+data_max = max(data);
+if ~isfinite(data_min) || ~isfinite(data_max) || data_max <= data_min
+    data_norm = zeros(size(data));
+else
+    data_norm = (data - data_min) ./ (data_max - data_min);
 end
 end
 
@@ -136,23 +271,31 @@ error('plotDatasetSignals:MissingSoc', ...
 end
 
 function fig_name = buildFigureName(dataset, cfg)
+fig_name = sprintf('%s - Signals', buildBaseFigureName(dataset, cfg));
+end
+
+function fig_name = buildBaseFigureName(dataset, cfg)
 if ~isempty(cfg.figure_name)
     fig_name = cfg.figure_name;
 elseif isfield(dataset, 'name') && ~isempty(dataset.name)
-    fig_name = sprintf('Dataset Signals - %s', dataset.name);
+    fig_name = char(dataset.name);
 else
-    fig_name = 'Dataset Signals';
+    fig_name = 'Dataset';
 end
 end
 
 function title_text = buildAxisTitle(dataset, cfg)
+title_text = sprintf('%sSignals', buildTitlePrefix(dataset, cfg));
+end
+
+function prefix = buildTitlePrefix(dataset, cfg)
 if ~isempty(cfg.title_prefix)
-    title_text = cfg.title_prefix;
+    prefix = [cfg.title_prefix ' '];
 elseif isfield(dataset, 'title_prefix') && ~isempty(dataset.title_prefix)
-    title_text = sprintf('%s Dataset Signals', dataset.title_prefix);
+    prefix = sprintf('%s Dataset ', dataset.title_prefix);
 elseif isfield(dataset, 'name') && ~isempty(dataset.name)
-    title_text = sprintf('%s Dataset Signals', dataset.name);
+    prefix = sprintf('%s Dataset ', dataset.name);
 else
-    title_text = 'Dataset Signals';
+    prefix = 'Dataset ';
 end
 end
