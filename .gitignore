@@ -3,3 +3,8 @@
 *.autosave
 *.tmp
 *.log
+
+# Generated benchmark and sweep outputs
+*.fig
+*_benchmark_results.mat
+runNoiseCovStudy_*.mat

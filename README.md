@@ -11,6 +11,7 @@ A bundle consists of an estimator, its dependent model, pinned datasets, evaluat
 The toolchain is designed to scale to additional models, datasets, and estimators without changing the top-level workflow shape. New bundles can reuse the same model-validation, benchmark, robustness-study, and results-reporting layers.
 
 For the current repo state, the intended output is a validated estimator-model bundle tied to a benchmark suite version, consistent with [`results/EstimatorSelection.md`](results/EstimatorSelection.md).
+
 This repository can also be used to evaluate the claim that SOC estimator performance drifts over time in chemistries with flat open-circuit-voltage (OCV) plateaus.
 
 ## Architecture
@@ -74,6 +75,8 @@ Under this completed desktop-evaluation bundle, the current repo-level selection
 
 The desktop evaluation scenario reveals SOC estimation drift in LFP cells; see [`results/DriftStudy.md`](results/DriftStudy.md) for details.
 ![ATL BSS Estimation](assets/ATL%20BSS%20Estimation.png)
+
+* This repository can also be used to review the Bayes Optimization tuning quality, see [`results\BayesOptReview.md`](results/BayesOptReview.md) for details.
 
 ## Layer Guides
 
