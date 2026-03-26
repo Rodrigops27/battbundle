@@ -28,8 +28,6 @@ The default study scenario in this layer is the ATL20 desktop evaluation:
   - covariance-tuning study guide and entry points.
 - `Injection/README.md`
   - Noise-injection and perturbance-injection study guide and entry points.
-- `tests/runInjTest.m`
-  - Legacy compatibility wrapper forwarding to `Injection/runInjectionStudy.m`.
 - `plotInnovationAcfPacf.m`
   - Innovation plotting helper.
 - `printEstimatorBiasMetrics.m`
@@ -43,13 +41,11 @@ Save benchmark-ready `.mat` files containing a `dataset` struct under one of:
 - `Evaluation/ROMSimData/datasets/`
 - `Evaluation/ESCSimData/datasets/`
 - `Evaluation/Injection/datasets/`
-- `Evaluation/tests/datasets/`
 
 Use:
 - `ROMSimData/datasets/` for ROM-driven reference datasets
 - `ESCSimData/datasets/` for ESC-driven reference datasets
 - `Injection/datasets/` for the renamed user-facing injection-study datasets
-- `tests/datasets/` for legacy perturbed, injected-noise, or injected-fault cases
 
 ### Raw measured application profiles
 

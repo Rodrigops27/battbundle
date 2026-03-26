@@ -58,7 +58,7 @@ For every estimator entry below, the sections `Best-case scenario / when this es
 SOC and voltage estimation against a compatible reduced-order electrochemical model.
 
 #### Core idea / mechanism
-Uses `initKF` + `iterEKF` to run an EKF over a ROM grid indexed by temperature and SOC, with either output blending or model blending available in the implementation. The repo's public entry points always initialize it with `blend = 'OutB'` (`Evaluation/runBenchmark.m`, `Evaluation/mainEval.m`, `Evaluation/tests/runInjTest.m`, `Evaluation/NoiseTuningSweep/sweepNoiseStudy.m`).
+Uses `initKF` + `iterEKF` to run an EKF over a ROM grid indexed by temperature and SOC, with either output blending or model blending available in the implementation. The repo's public entry points always initialize it with `blend = 'OutB'` (`Evaluation/runBenchmark.m`, `Evaluation/mainEval.m`, `Evaluation/Injection/runInjectionStudy.m`, `Evaluation/NoiseTuningSweep/sweepNoiseStudy.m`).
 
 #### Assumptions it makes
 - A compatible `ROM` struct is available and contains `ROM.ROMmdls`, `tfData`, `xraData`, and `cellData` (`estimators/initKF.m`).
@@ -144,7 +144,7 @@ Only for local experimentation if you specifically want a ROM sigma-point filter
 When you want a repo-supported estimator path, benchmark integration, or existing test coverage.
 
 #### Implementation notes / gotchas from this repo
-- `runBenchmark.m`, `mainEval.m`, `runInjTest.m`, and the sweep scripts do not expose it.
+- `runBenchmark.m`, `mainEval.m`, `runInjectionStudy.m`, and the sweep scripts do not expose it.
 - `iterSPKF.m` does not populate `lastInnovationPre` / `lastSk`, so it is not aligned with the current innovation-diagnostics plumbing used by `xKFeval`.
 - This estimator appears unused in the active repository workflows.
 
@@ -238,7 +238,7 @@ When nonlinear behavior, sensor bias, or parameter drift dominate the error budg
 #### Implementation notes / gotchas from this repo
 - This estimator reuses the `initESCSPKF` data structure; there is no separate `initESCEKF.m`.
 - OCV slope is approximated numerically with `ds = 1e-6` in `iterESCEKF.m`.
-- The benchmark/test stack exercises this estimator in `mainEval`, `runBenchmark`, `runInjTest`, and `sweepNoiseStudy`.
+- The benchmark and study stack exercises this estimator in `mainEval`, `runBenchmark`, `runInjectionStudy`, and `sweepNoiseStudy`.
 
 ### `EaEKF`
 
@@ -376,7 +376,7 @@ When compute budget is tight or the dominant issue is sensor bias instead of pro
 #### Implementation notes / gotchas from this repo
 - Like `EacrSPKF`, it performs one-time internal augmentation rather than using a dedicated init function.
 - Default `Af` is `0.98 * I`; the repo does not override it in its benchmark scripts.
-- This estimator is exercised more broadly than `EacrSPKF`: it appears in `mainEval`, `runBenchmark`, `sweepInitSocStudy`, `runInjTest`, and `sweepNoiseStudy`.
+- This estimator is exercised more broadly than `EacrSPKF`: it appears in `mainEval`, `runBenchmark`, `sweepInitSocStudy`, `runInjectionStudy`, and `sweepNoiseStudy`.
 
 ### `EDUKF`
 
@@ -468,7 +468,7 @@ When you want `R0` tracking but do not need the heavier dual-filter structure of
 When the dominant problem is sensor bias, correlated noise, or a parameter drift other than `R0`.
 
 #### Implementation notes / gotchas from this repo
-- This estimator is used more broadly than `EDUKF`: it appears in `runBenchmark`, `ABestComp`, `sweepInitSocStudy`, `runInjTest`, and `sweepNoiseStudy`.
+- This estimator is used more broadly than `EDUKF`: it appears in `runBenchmark`, `ABestComp`, `sweepInitSocStudy`, `runInjectionStudy`, and `sweepNoiseStudy`.
 - Its initializer is still `initEDUKF`, which is easy to miss if you search only for `EsSPKF` names.
 
 ### `EbSPKF`
@@ -517,7 +517,7 @@ When the dominant issue is voltage bias, correlated voltage noise, or changing `
 #### Implementation notes / gotchas from this repo
 - There is no standalone `estimators/initEbSPKF.m`; the benchmark scripts each define a local `initEbSpkf` helper.
 - The helper fixes `currentNoiseInd = 1` and `biasNoiseInd = 2`.
-- This estimator is included in `runBenchmark`, `mainEval`, `sweepInitSocStudy`, `runInjTest`, and `sweepNoiseStudy`.
+- This estimator is included in `runBenchmark`, `mainEval`, `sweepInitSocStudy`, `runInjectionStudy`, and `sweepNoiseStudy`.
 
 ### `EBiSPKF`
 
@@ -564,7 +564,7 @@ When you expect the repo's default benchmark wiring to estimate current bias aut
 
 #### Implementation notes / gotchas from this repo
 - This is the clearest "appears incomplete / experimental" estimator in the active registry.
-- It is present in `runBenchmark`, `mainEval`, and `sweepNoiseStudy`, but not in `runInjTest` or `sweepInitSocStudy`.
+- It is present in `runBenchmark`, `mainEval`, and `sweepNoiseStudy`, but not in `runInjectionStudy` or `sweepInitSocStudy`.
 - The bias-model hooks are real, but the shipped helpers do not populate them.
 
 ### `Em7SPKF`
