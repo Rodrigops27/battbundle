@@ -20,9 +20,26 @@ Scenario:
 | Estimators reported here | `ROM-EKF`, `ESC-SPKF`, `ESC-EKF`, `EaEKF`, `EacrSPKF`, `EnacrSPKF`, `EDUKF`, `EsSPKF`, `EbSPKF`, `EBiSPKF`, `Em7SPKF` |
 | Tuning source | `autotuning_profile` |
 
+### Tuned Covariances
+
+| Estimator | Process field | Best process noise | Sensor field | Best sensor noise | Best objective |
+| --- | --- | ---: | --- | ---: | ---: |
+| `ROM-EKF` | `sigma_w_ekf` | 88.2064 | `sigma_v_ekf` | 0.144378 | 9.1362 |
+| `ESC-SPKF` | `sigma_w_esc` | 0.128351 | `sigma_v_esc` | 2.9555e-06 | 0.6263 |
+| `ESC-EKF` | `sigma_w_esc` | 0.0127887 | `sigma_v_esc` | 0.199838 | 0.5955 |
+| `EaEKF` | `sigma_w_esc` | 1.0136e-06 | `sigma_v_esc` | 1.8651e-08 | 0.7271 |
+| `EDUKF` | `sigma_w_esc` | 0.0172961 | `sigma_v_esc` | 1.1831e-08 | 0.6287 |
+| `EsSPKF` | `sigma_w_esc` | 0.076504 | `sigma_v_esc` | 4.9287e-08 | 0.6246 |
+| `EbSPKF` | `sigma_w_esc` | 0.0210635 | `sigma_v_esc` | 4.1610e-05 | 0.6261 |
+| `EBiSPKF` | `sigma_w_esc` | 0.0285229 | `sigma_v_esc` | 1.0085e-08 | 0.6268 |
+| `Em7SPKF` | `sigma_w_esc` | 0.0830619 | `sigma_v_esc` | 1.0013e-08 | 0.6275 |
+| `EacrSPKF` | `sigma_w_esc` | 1.0251e-06 | `sigma_v_esc` | 0.199504 | 0.6567 |
+| `EnacrSPKF` | `sigma_w_esc` | 1.0309e-06 | `sigma_v_esc` | 1.0226e-08 | 10.4370 |
+
 The two injected cases represented here are:
 - `noise`: `15 mV` voltage noise target standard deviation and `+-5%` samplewise current scaling
 - `perturbance`: current gain `1.1`, current offset `0.1 A`, voltage gain fault `6e-4`, and voltage offset `2 mV`
+
 
 ## Results
 

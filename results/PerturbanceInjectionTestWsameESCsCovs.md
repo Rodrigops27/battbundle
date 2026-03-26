@@ -15,16 +15,25 @@ This summary reports the ATL desktop-evaluation injection study. The source data
 | Injection cases reported here | `noise`, `perturbance` |
 | Estimators reported here | `ROM-EKF`, `ESC-SPKF`, `ESC-EKF`, `EaEKF`, `EacrSPKF`, `EnacrSPKF`, `EDUKF`, `EsSPKF`, `EbSPKF`, `EBiSPKF`, `Em7SPKF` |
 
-### Covariances used in this study
+### Tuned Covariances
 
-The saved benchmark results indicate that this run did **not** use the autotuning profile. It used the shared benchmark tuning values:
+The benchmark uses the shared tuning values:
 
 | Parameter | Value |
 | --- | ---: |
-| `sigma_w_esc` | `1e-3` |
-| `sigma_v_esc` | `1e-3` |
-| `sigma_w_ekf` | `1e2` |
-| `sigma_v_ekf` | `1e-3` |
+| tuning.sigma_x0_rom_tail | 2e6 |
+| tuning.sigma_w_ekf | 1e2 |
+| tuning.sigma_v_ekf | 1e-3 |
+| tuning.SigmaX0_rc | 1e-6 |
+| tuning.SigmaX0_hk | 1e-6 |
+| tuning.SigmaX0_soc | 1e-3 |
+| tuning.sigma_w_esc | 1e-3 |
+| tuning.sigma_v_esc | 1e-3 |
+| tuning.SigmaR0 | 1e-6 |
+| tuning.SigmaWR0 | 1e-16 |
+| tuning.current_bias_var0 | 1e-5 |
+| tuning.single_bias_process_var | 1e-8 |
+
 
 So this document is the correct untuned or shared-covariance injection reference for the ATL bundle.
 
