@@ -7,15 +7,25 @@
 
 ## 2. Scope
 
-- In scope: OCV processing, chemistry-specific ESC fitting scripts, reusable dynamic-identification helpers, ESC validation, and ESC validation plotting.
+- In scope: OCV processing, chemistry-specific ESC fitting scripts, reusable dynamic-identification helpers, OCV-fit metrics and plotting, dynamic-fit metrics and plotting, ESC validation, and ESC validation plotting.
 - Out of scope: estimator benchmarking, injected-noise studies, ROM benchmarking, and benchmark dataset comparison tables. Those belong in [`../Evaluation/README.md`](../Evaluation/README.md).
 
 ## 3. Directory structure
 
 - [`DiagProcessOCV.m`](DiagProcessOCV.m)
   - Generic OCV-processing entry point.
+- [`processOCV.m`](processOCV.m)
+  - Legacy OCV-processing entry point using resistance blending.
 - [`processDynamic.m`](processDynamic.m)
   - Generic dynamic ESC parameter-identification routine for lab-style `DYNData`.
+- [`computeOcvModelMetrics.m`](computeOcvModelMetrics.m)
+  - Generic OCV-fit metrics function for `DiagProcessOCV` and legacy `processOCV` outputs.
+- [`plotOcvModelFit.m`](plotOcvModelFit.m)
+  - Generic OCV-fit plotting function against raw OCV references.
+- [`computeDynamicModelMetrics.m`](computeDynamicModelMetrics.m)
+  - Layer entry point for dynamic-fit metrics. Wraps [`ESCvalidation.m`](ESCvalidation.m).
+- [`plotDynamicModelFit.m`](plotDynamicModelFit.m)
+  - Layer entry point for dynamic-fit plotting. Wraps [`plotEscValidation.m`](plotEscValidation.m).
 - [`ESCvalidation.m`](ESCvalidation.m)
   - Main ESC validation harness.
 - [`runESCvalidation.m`](runESCvalidation.m)
@@ -23,13 +33,15 @@
 - [`validate_models.m`](validate_models.m)
   - Convenience validation script for the repo's main ESC models.
 - [`plotEscValidation.m`](plotEscValidation.m)
-  - Plot saved ESC validation results.
+  - Plot saved dynamic-fit or ESC validation results.
 - [`extract_results.m`](extract_results.m)
   - Prints selected values from saved ESC validation results.
-- `OCV_Files/`
-  - OCV source files and OCV-model intermediate artifacts.
-- `DYN_Files/`
-  - Dynamic identification datasets saved in DYN-style layout.
+- `ATL20/`
+  - ATL-specific OCV and full-ESC model builders.
+- `OCV_models/`
+  - Intermediate OCV model `.mat` files used by dynamic identification.
+- `results/`
+  - Saved OCV-fit, dynamic-fit, and ESC-validation results. Includes chemistry-specific result wrappers such as `results/OCV/`.
 - `NMC30/`
   - NMC30-specific OCV and dynamic-identification scripts.
 - `OMTLIFE8AHC-HP/`
@@ -74,6 +86,12 @@ validate_models
   - Builds the NMC30 OCV model.
 - [`NMC30/NMC30DynParIdROMsim.m`](NMC30/NMC30DynParIdROMsim.m)
   - Builds the NMC30 full ESC model from its special dynamic-identification path.
+- [`ATL20/buildATLmodelOcv.m`](ATL20/buildATLmodelOcv.m)
+  - Builds the legacy ATL OCV model with [`processOCV.m`](processOCV.m).
+- [`ATL20/buildATL20modelOcv.m`](ATL20/buildATL20modelOcv.m)
+  - Builds the ATL20 diagonal-average OCV model with [`DiagProcessOCV.m`](DiagProcessOCV.m).
+- [`ATL20/buildATLmodel.m`](ATL20/buildATLmodel.m)
+  - Builds the full ATL ESC model from `ATL_DYN` data and the legacy ATL OCV model.
 - [`OMTLIFE8AHC-HP/OMTLIFEocv.m`](OMTLIFE8AHC-HP/OMTLIFEocv.m)
   - Builds the OMT8 OCV model.
 - [`OMTLIFE8AHC-HP/OMTdynId.m`](OMTLIFE8AHC-HP/OMTdynId.m)
@@ -113,19 +131,22 @@ validate_models
 
 ## 7. Datasets
 
-- Add OCV source data under `ESC_Id/OCV_Files/<CHEMISTRY>/`.
-- Add reusable dynamic identification datasets under `ESC_Id/DYN_Files/<CHEMISTRY>_DYN/`.
+- Keep source modeling data separate from code under `data/Modelling/`.
+- Add OCV source data under `data/Modelling/OCV_Files/<CHEMISTRY>/`.
+- Add reusable dynamic identification datasets under `data/Modelling/DYN_Files/<CHEMISTRY>_DYN/`.
+- Save intermediate OCV model artifacts under `ESC_Id/OCV_models/`.
 - Keep measured validation profiles in the owning application folder when that is the source of truth.
   - Current repo example: [`Evaluation/OMTLIFE8AHC-HP/Bus_CoreBatteryData_Data.mat`](../Evaluation/OMTLIFE8AHC-HP/Bus_CoreBatteryData_Data.mat)
 - DYN naming convention used in this repo:
   - `<CHEMISTRY>_DYN_P25.mat`
   - `<CHEMISTRY>_DYN_N10.mat`
 - Current examples:
-  - [`ESC_Id/DYN_Files/NMC30_DYN/NMC30_DYN_P25.mat`](DYN_Files/NMC30_DYN/NMC30_DYN_P25.mat)
-  - `ESC_Id/DYN_Files/OMT8_DYN/OMT8_DYN_P25.mat`
-  - [`ESC_Id/DYN_Files/ATL_DYN/ATL_DYN_40_P25.mat`](DYN_Files/ATL_DYN/ATL_DYN_40_P25.mat)
+  - [`data/Modelling/DYN_Files/ATL_DYN/ATL_DYN_40_P25.mat`](../data/Modelling/DYN_Files/ATL_DYN/ATL_DYN_40_P25.mat)
+  - [`data/Modelling/OCV_Files/ATL20/ATL_OCV/ATL_OCV_P25.mat`](../data/Modelling/OCV_Files/ATL20/ATL_OCV/ATL_OCV_P25.mat)
+  - [`ESC_Id/OCV_models/ATLmodel-ocv.mat`](OCV_models/ATLmodel-ocv.mat)
+  - [`ESC_Id/OCV_models/ATL20model-ocv.mat`](OCV_models/ATL20model-ocv.mat)
 - OCV patching for OMT8:
-  - [`ESC_Id/OCV_Files/OMTLIFE8AHC-HP/DataPrep/patchLfpOcvInterpTail.m`](OCV_Files/OMTLIFE8AHC-HP/DataPrep/patchLfpOcvInterpTail.m) reads [`LFP_OCV_interp.mat`](OCV_Files/OMTLIFE8AHC-HP/LFP_OCV_interp.mat) and writes [`LFP_OCV_interp_tailPatched.mat`](OCV_Files/OMTLIFE8AHC-HP/LFP_OCV_interp_tailPatched.mat).
+  - [`OMTLIFE8AHC-HP/OMTLIFEocv.m`](OMTLIFE8AHC-HP/OMTLIFEocv.m) is the current chemistry-specific OCV builder for OMT8.
 
 ## 8. How to run
 
@@ -145,6 +166,23 @@ addpath(genpath('.'));
 cd ESC_Id
 OMTLIFE8AHC-HP.OMTLIFEocv
 OMTLIFE8AHC-HP.OMTdynId
+```
+
+- Standard run, ATL legacy OCV plus full ESC:
+
+```matlab
+addpath(genpath('.'));
+cd ESC_Id/ATL20
+buildATLmodelOcv
+buildATLmodel
+```
+
+- Standard run, ATL diagonal-average OCV:
+
+```matlab
+addpath(genpath('.'));
+cd ESC_Id/ATL20
+buildATL20modelOcv
 ```
 
 - Validation run:
@@ -179,6 +217,16 @@ batch = runESCvalidation(jobs);
 
 ## 9. Validation tools
 
+- OCV-fit tools:
+  - [`computeOcvModelMetrics.m`](computeOcvModelMetrics.m)
+    - Computes OCV RMSE, mean error, MAE, and max-absolute error against raw OCV references.
+  - [`plotOcvModelFit.m`](plotOcvModelFit.m)
+    - Plots raw OCV references, charge/discharge traces, and fitted OCV curves.
+- Dynamic-fit tools:
+  - [`computeDynamicModelMetrics.m`](computeDynamicModelMetrics.m)
+    - Computes dynamic-fit metrics by calling [`ESCvalidation.m`](ESCvalidation.m) on a full ESC model and dynamic dataset.
+  - [`plotDynamicModelFit.m`](plotDynamicModelFit.m)
+    - Plots dynamic-fit results by calling [`plotEscValidation.m`](plotEscValidation.m).
 - [`ESCvalidation.m`](ESCvalidation.m)
   - Validates one model against one or more normalized cases and returns voltage RMSE, mean error, MAE, max-absolute error, and legacy 95% to 5% window RMSE.
 - [`runESCvalidation.m`](runESCvalidation.m)
@@ -189,9 +237,12 @@ batch = runESCvalidation(jobs);
   - Reads saved validation results and prints a text summary.
 
 Expected outputs:
+- in-memory OCV validation struct from [`computeOcvModelMetrics.m`](computeOcvModelMetrics.m)
+- in-memory dynamic-fit struct from [`computeDynamicModelMetrics.m`](computeDynamicModelMetrics.m)
 - in-memory results struct from [`ESCvalidation.m`](ESCvalidation.m)
 - in-memory batch struct from [`runESCvalidation.m`](runESCvalidation.m)
-- [`ESC_Id/ESC_validation_results.mat`](ESC_validation_results.mat) when [`validate_models.m`](validate_models.m) is used
+- [`ESC_Id/results/ESC_validation_results.mat`](results/ESC_validation_results.mat) when [`validate_models.m`](validate_models.m) is used
+- chemistry-specific saved result files under `ESC_Id/results/` and `ESC_Id/results/OCV/`
 
 ## 10. Study / experiment tools
 
@@ -203,14 +254,24 @@ Expected outputs:
 
 ## 11. Plotting
 
-- Plot during validation by setting `enabledPlot = true` in [`ESCvalidation.m`](ESCvalidation.m).
-- Re-plot saved results with [`plotEscValidation.m`](plotEscValidation.m).
+- Plot dynamic-fit or ESC-validation results during validation by setting `enabledPlot = true` in [`ESCvalidation.m`](ESCvalidation.m).
+- Re-plot saved dynamic-fit or ESC-validation results with [`plotEscValidation.m`](plotEscValidation.m).
+- Plot OCV-fit results with [`plotOcvModelFit.m`](plotOcvModelFit.m).
+- [`plotEscValidation.m`](plotEscValidation.m) is the dynamic-fit plotting function in this layer.
 
 ```matlab
 addpath(genpath('.'));
 cd ESC_Id
-load('ESC_validation_results.mat');
+load(fullfile('results','ESC_validation_results.mat'));
 plotEscValidation(result_nmc);
+```
+
+```matlab
+validation = computeOcvModelMetrics( ...
+    fullfile('ESC_Id','OCV_models','ATLmodel-ocv.mat'), ...
+    fullfile('data','Modelling','OCV_Files','ATL20','ATL_OCV'), ...
+    struct('data_prefix','ATL','cell_id','ATL','min_v',2.0,'max_v',3.75,'ocv_method','resistanceBlend'));
+plotOcvModelFit(validation);
 ```
 
 - Current plot content:
@@ -221,14 +282,23 @@ plotEscValidation(result_nmc);
 
 ## 12. Results
 
-- Final ESC models are saved in `models/`, not in `ESC_Id/`.
+- Intermediate OCV models are saved in `ESC_Id/OCV_models/`.
+  - Example: [`ESC_Id/OCV_models/ATLmodel-ocv.mat`](OCV_models/ATLmodel-ocv.mat)
+  - Example: [`ESC_Id/OCV_models/ATL20model-ocv.mat`](OCV_models/ATL20model-ocv.mat)
+- Final ESC models are saved in `models/`, not in `ESC_Id/`, and these final `.mat` files should remain light parameter-only model files.
   - Example: [`models/NMC30model.mat`](../models/NMC30model.mat)
+  - Example: [`models/ATLmodel.mat`](../models/ATLmodel.mat)
   - Example: [`models/OMTLIFEmodel.mat`](../models/OMTLIFEmodel.mat)
+- OCV-fit and dynamic-fit validation artifacts belong in `ESC_Id/results/`, not in the final model files.
 - Validation results saved by [`validate_models.m`](validate_models.m) go to:
-  - [`ESC_Id/ESC_validation_results.mat`](ESC_validation_results.mat)
+  - [`ESC_Id/results/ESC_validation_results.mat`](results/ESC_validation_results.mat)
+- ATL build example:
+  - [`ESC_Id/ATL20/buildATLmodelOcv.m`](ATL20/buildATLmodelOcv.m) saves `ATLmodel-ocv.mat` plus `ocv_validation`
+  - [`ESC_Id/ATL20/buildATLmodel.m`](ATL20/buildATLmodel.m) saves light [`models/ATLmodel.mat`](../models/ATLmodel.mat) plus [`ESC_Id/results/ATLmodel_identification_results.mat`](results/ATLmodel_identification_results.mat)
 - Validation output format:
   - a top-level results struct with `cases`, `summary_table`, and `metrics`
 - Result meaning:
+  - OCV-fit metrics use raw OCV reference minus fitted OCV prediction
   - `voltage_rmse_mv` is the main whole-trace voltage-fit metric
   - `legacy_window_rmse_mv` preserves the older 95% to 5% OCV-window comparison
   - `voltage_mean_error_mv` is the bias term
@@ -257,6 +327,11 @@ plotEscValidation(result_nmc);
   - [`../models/TunedModels/README.md`](../models/TunedModels/README.md)
 - Related scripts:
   - [`DiagProcessOCV.m`](DiagProcessOCV.m)
+  - [`processOCV.m`](processOCV.m)
+  - [`computeOcvModelMetrics.m`](computeOcvModelMetrics.m)
+  - [`plotOcvModelFit.m`](plotOcvModelFit.m)
   - [`processDynamic.m`](processDynamic.m)
+  - [`computeDynamicModelMetrics.m`](computeDynamicModelMetrics.m)
+  - [`plotDynamicModelFit.m`](plotDynamicModelFit.m)
   - [`ESCvalidation.m`](ESCvalidation.m)
   - [`plotEscValidation.m`](plotEscValidation.m)
