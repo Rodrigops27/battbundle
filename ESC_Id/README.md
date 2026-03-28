@@ -14,6 +14,8 @@
 
 - [`DiagProcessOCV.m`](DiagProcessOCV.m)
   - Generic OCV-processing entry point.
+- [`VavgProcessOCV.m`](VavgProcessOCV.m)
+  - OCV-processing entry point using voltage averaging.
 - [`processOCV.m`](processOCV.m)
   - Legacy OCV-processing entry point using resistance blending.
 - [`processDynamic.m`](processDynamic.m)
@@ -217,6 +219,13 @@ batch = runESCvalidation(jobs);
 
 ## 9. Validation tools
 
+- OCV identification in this layer is a two-step workflow:
+  - Step 1: a selected OCV estimator reconstructs a per-temperature `rawocv` curve, shown in plots as `Approximate OCV from data`.
+  - Step 2: those per-temperature `rawocv` curves are used to fit the shared ESC temperature model `OCV(z,T) = OCV0(z) + T*OCVrel(z)`.
+- Current OCV estimator entry points:
+  - [`processOCV.m`](processOCV.m) for the legacy resistance-blend method
+  - [`VavgProcessOCV.m`](VavgProcessOCV.m) for the voltage-average method
+  - [`DiagProcessOCV.m`](DiagProcessOCV.m) for the diagonal-average method
 - OCV-fit tools:
   - [`computeOcvModelMetrics.m`](computeOcvModelMetrics.m)
     - Computes OCV RMSE, mean error, MAE, and max-absolute error against raw OCV references.
@@ -298,7 +307,10 @@ plotOcvModelFit(validation);
 - Validation output format:
   - a top-level results struct with `cases`, `summary_table`, and `metrics`
 - Result meaning:
-  - OCV-fit metrics use raw OCV reference minus fitted OCV prediction
+  - OCV-fit metrics use method-specific `rawocv` reference minus fitted OCV prediction
+  - `rawocv` is the per-temperature approximate OCV reconstructed by the chosen OCV method before fitting `OCV0` and `OCVrel`
+  - OCV-fit metrics are method-relative, not absolute-truth-relative
+  - RMSE values from different OCV estimators are therefore not directly comparable unless the models are re-evaluated against the same common reference
   - `voltage_rmse_mv` is the main whole-trace voltage-fit metric
   - `legacy_window_rmse_mv` preserves the older 95% to 5% OCV-window comparison
   - `voltage_mean_error_mv` is the bias term

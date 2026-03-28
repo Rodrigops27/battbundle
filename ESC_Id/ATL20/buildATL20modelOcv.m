@@ -3,7 +3,7 @@
 %   runs ESC_Id/DiagProcessOCV, and saves ATL20model-ocv.mat to
 %   ESC_Id/OCV_models.
 
-clearvars
+clearvars 
 close all
 clc
 
@@ -23,7 +23,15 @@ data_prefix = 'ATL';
 model_name = 'ATL20';
 min_v = 2.0;
 max_v = 3.75;
-save_plots = false;
+if ~exist('save_plots', 'var') || isempty(save_plots)
+    save_plots = false;
+end
+if ~exist('debug_plots', 'var') || isempty(debug_plots)
+    debug_plots = false;
+end
+if ~exist('diag_type', 'var') || isempty(diag_type)
+    diag_type = 'useAvg';
+end
 
 if exist(ocv_data_dir, 'dir') ~= 7
     error('buildATL20modelOcv:MissingFolder', ...
@@ -33,7 +41,7 @@ if exist(output_dir, 'dir') ~= 7
     mkdir(output_dir);
 end
 
-if ~save_plots
+if ~(save_plots || debug_plots)
     previous_visibility = get(groot, 'defaultFigureVisible');
     restore_visibility = onCleanup(@() set(groot, 'defaultFigureVisible', previous_visibility)); %#ok<NASGU>
     set(groot, 'defaultFigureVisible', 'off');
@@ -89,12 +97,12 @@ for k = 1:numel(temps_degC)
     fprintf('Loaded %s\n', filename);
 end
 
-model = DiagProcessOCV(data, model_name, min_v, max_v, save_plots);
+model = VavgProcessOCV(data, model_name, min_v, max_v, save_plots, debug_plots);
 ocv_validation = computeOcvModelMetrics(model, data, struct( ...
     'cell_id', model_name, ...
     'min_v', min_v, ...
     'max_v', max_v, ...
-    'ocv_method', 'diagAverage'));
+    'ocv_method', 'voltageAverage'));
 model.metrics.ocv = ocv_validation.models(1).metrics;
 model.metrics.ocv_summary_table = ocv_validation.models(1).summary_table;
 

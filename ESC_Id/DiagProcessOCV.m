@@ -1,4 +1,4 @@
-% function model=DiagProcessOCV(data,cellID,minV,maxV,savePlots)
+% function model=DiagProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots,diagType)
 %
 % Inputs:
 %   data = cell-test data passed in from runProcessOCV
@@ -6,20 +6,39 @@
 %   minV = minimum cell voltage to use in OCV relationship
 %   maxV = maximum cell voltage to use in OCV relationship
 %   savePlots = 0 or 1 ... set to "1" to save plots as files
+%   debugPlots = 0 or 1 ... set to "1" to show diagonal-averaging debug plots
+%   diagType = 'useAvg', 'useDis', or 'useChg'
 % Output:
 %   model = data structure with information for recreating OCV
 %
 % This function follows the same test-processing structure as processOCV.m
 % but reconstructs the OCV curve via diagonal averaging of charge and
 % discharge traces rather than via resistance blending.
+%
+% Reference implementation adapted from "estimateOCV.m", developed by:
+% Prof. Gregory L. Plett and Prof. M. Scott Trimboli University of Colorado
+% Colorado Springs (UCCS) as part of the Physics-Based Reduced-Order Model
+% framework for lithium-ion batteries (see: Battery Management Systems,
+% Volume III: Physics-Based Methods, Artech House, 2024).
+% (Functions mirrored: setupIndsLocs, setupBlend, simStep, shortWarn)
+% License:
+%   This file is distributed under the Creative Commons Attribution-ShareAlike
+%   4.0 International License (CC BY-SA 4.0).
+% -------------------------------------------------------------------------
+% Known failure mode: if diagonal lag shifts leave only a mid-SOC overlap
+% between shifted charge/discharge curves, rawocv is dominated by tail
+% extrapolation and can stretch badly near 0%/100% SOC. A robust fix is to
+% construct rawocv only on the valid overlap interval and fill the tails
+% from measured branches rather than extrapolating the diagonal estimate.
 
-% Copyright (c) 2015 by Gregory L. Plett of the University of Colorado
-% Colorado Springs (UCCS). This work is licensed under a Creative Commons
-% Attribution-NonCommercial-ShareAlike 4.0 Intl. License, v. 1.0.
-% It is provided "as is", without express or implied warranty, for
-% educational and informational purposes only.
+function model=DiagProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots,diagType)
+  if nargin < 6 || isempty(debugPlots)
+    debugPlots = false;
+  end
+  if nargin < 7 || isempty(diagType)
+    diagType = 'useAvg';
+  end
 
-function model=DiagProcessOCV(data,cellID,minV,maxV,savePlots)
   filetemps = [data.temp]; filetemps = filetemps(:);
   numtemps = length(filetemps);
 
@@ -39,7 +58,7 @@ function model=DiagProcessOCV(data,cellID,minV,maxV,savePlots)
     'rawocv', []), numtemps, 1);
   eta = zeros(size(filetemps));
   Q   = zeros(size(filetemps));
-  config = defaultDiagConfig(minV,maxV);
+  config = defaultDiagConfig(minV,maxV,debugPlots,diagType);
 
   k = ind25;
   totDisAh = data(k).script1.disAh(end) + ...
@@ -176,6 +195,10 @@ function filedatum = buildDiagFiledata(testdata, cellID, Q25, config)
   diagData.interp = makeDiagInterpData(diagData.orig, config);
 
   [diagZ, diagU] = OCV_diagonalAverage(diagData, config);
+  if config.retain_voltage_grid_output
+    diagZ = linearinterp(diagU, diagZ, diagData.interp.stdV);
+    diagU = diagData.interp.stdV;
+  end
 
   filedatum.temp = testdata.temp;
   filedatum.disZ = disZ(:);
@@ -189,33 +212,36 @@ function interpData = makeDiagInterpData(orig, config)
   stdV = (config.vmin:config.du:config.vmax).';
   stdZ = (0:config.dz:1).';
 
-  [disVuniq, disVidx] = unique(orig.disV(:),'stable');
-  disZuniqV = orig.disZ(disVidx);
-  [chgVuniq, chgVidx] = unique(orig.chgV(:),'stable');
-  chgZuniqV = orig.chgZ(chgVidx);
-
-  [disZuniq, disZidx] = unique(orig.disZ(:),'stable');
-  disVuniqZ = orig.disV(disZidx);
-  [chgZuniq, chgZidx] = unique(orig.chgZ(:),'stable');
-  chgVuniqZ = orig.chgV(chgZidx);
-
   interpData.stdV = stdV;
-  interpData.disZ = interp1(disVuniq,disZuniqV,stdV,'linear','extrap');
-  interpData.chgZ = interp1(chgVuniq,chgZuniqV,stdV,'linear','extrap');
+  interpData.disZ = linearinterp(orig.disV,orig.disZ,stdV);
+  interpData.chgZ = linearinterp(orig.chgV,orig.chgZ,stdV);
 
   interpData.stdZ = stdZ;
-  interpData.disV = interp1(disZuniq,disVuniqZ,stdZ,'linear','extrap');
-  interpData.chgV = interp1(chgZuniq,chgVuniqZ,stdZ,'linear','extrap');
+  interpData.disV = linearinterp(orig.disZ,orig.disV,stdZ);
+  interpData.chgV = linearinterp(orig.chgZ,orig.chgV,stdZ);
 end
 
-function config = defaultDiagConfig(vmin,vmax)
+function config = defaultDiagConfig(vmin,vmax,debugPlots,diagType)
+  if nargin < 3 || isempty(debugPlots)
+    debugPlots = false;
+  end
+  if nargin < 4 || isempty(diagType)
+    diagType = 'useAvg';
+  end
+  valid_types = {'useAvg', 'useDis', 'useChg'};
+  if ~any(strcmp(diagType, valid_types))
+    error('DiagProcessOCV:BadDiagType', ...
+      'diagType must be one of: %s', strjoin(valid_types, ', '));
+  end
+
   config = struct();
   config.vmin = vmin;
   config.vmax = vmax;
   config.du = 0.002;
   config.dz = 0.002;
-  config.datype = 'useAvg';
-  config.debug = false;
+  config.datype = diagType;
+  config.debug = logical(debugPlots);
+  config.retain_voltage_grid_output = false;
   config.daxcorrfiltv = @(stdV) find(stdV >= vmin & stdV <= vmax);
   config.daxcorrfiltz = @(stdZ) find(stdZ >= 0 & stdZ <= 1);
 end
@@ -229,6 +255,8 @@ function [Z, U] = OCV_diagonalAverage(data, config)
   disV = data.interp.disV;
   chgV = data.interp.chgV;
 
+  % First, find cross-correlations for U vs dZdV
+  % That is, differential capacities versus U
   du = mean(diff(stdV));
   intervals = config.daxcorrfiltv(stdV);
   if ~iscell(intervals), intervals = {intervals}; end
@@ -242,7 +270,25 @@ function [Z, U] = OCV_diagonalAverage(data, config)
     lagU(k) = lagU(k,1);
   end
   lagU = mean(lagU);
+  if config.debug
+    dzdv1 = roughdiff(disZ,stdV);
+    dzdv3 = roughdiff(chgZ,stdV);
+    figure;
+    plot(stdV,abs(dzdv1),stdV,abs(dzdv3));
+    set(gca,'colororderindex',1); hold on
+    plot(stdV+lagU/2,abs(dzdv1),'--',...
+      stdV-lagU/2,abs(dzdv3),'--');
+    xlabel('Voltage'); 
+    ylabel('Absolute dZ/dU'); 
+    legend('Discharge','Charge','Shift dis','Shift chg'); 
+    title( ...
+        sprintf('%s Cell @ %.2f\\circC', ...
+            data.name,data.TdegC));
+    xlim([config.vmin config.vmax]); grid on
+    drawnow;
+  end
 
+  % Second, find cross-correlations for Z vs dZdV
   dz = mean(diff(stdZ));
   intervals = config.daxcorrfiltz(stdZ);
   if ~iscell(intervals), intervals = {intervals}; end
@@ -256,7 +302,25 @@ function [Z, U] = OCV_diagonalAverage(data, config)
     lagZ(k) = lagZ(k,1);
   end
   lagZ = mean(lagZ);
+  if config.debug
+    dzdv1 = roughdiff(stdZ,disV);
+    dzdv3 = roughdiff(stdZ,chgV);
+    figure;
+    plot(stdZ,abs(dzdv1),stdZ,abs(dzdv3));
+    set(gca,'colororderindex',1); hold on
+    plot(stdZ+lagZ/2,abs(dzdv1),'--',...
+      stdZ-lagZ/2,abs(dzdv3),'--');
+    xlabel('Relative composition'); 
+    ylabel('Absolute dZ/dU'); 
+    legend('Discharge','Charge','Shift dis','Shift chg'); 
+    title( ...
+        sprintf('%s Cell @ %.2f\\circC', ...
+            data.name,data.TdegC));
+    xlim([0 1]); grid on
+    drawnow;
+  end
 
+  % Interpolate ocv (using discharge data only)
   uuD = data.orig.disV + lagU/2;
   zzD = data.orig.disZ + lagZ/2;
   U4D = interp1(zzD,uuD,stdZ,'linear','extrap');
@@ -264,11 +328,11 @@ function [Z, U] = OCV_diagonalAverage(data, config)
   zzC = data.orig.chgZ - lagZ/2;
   U4C = interp1(zzC,uuC,stdZ,'linear','extrap');
   switch config.datype
-    case 'useDis'
+    case 'useDis' % base off of discharge data
       U4 = U4D;
-    case 'useChg'
+    case 'useChg' % base off of charge data
       U4 = U4C;
-    otherwise
+    otherwise  % 'useAvg' average the basis
       U4 = (U4C + U4D)/2;
   end
 
@@ -276,22 +340,33 @@ function [Z, U] = OCV_diagonalAverage(data, config)
   U = U4;
 end
 
-function dy = roughdiff(y,x)
-  y = y(:);
-  x = x(:);
-  if numel(y) ~= numel(x)
+function dZ = roughdiff(Z,U)
+  Z = Z(:);
+  U = U(:);
+  if numel(Z) ~= numel(U)
     error('roughdiff requires vectors of equal length.');
   end
-  if numel(y) < 2
-    dy = zeros(size(y));
+  if numel(Z) < 2
+    dZ = zeros(size(Z));
     return;
   end
 
-  dy = zeros(size(y));
-  dy(1) = (y(2)-y(1))/(x(2)-x(1));
-  dy(end) = (y(end)-y(end-1))/(x(end)-x(end-1));
-  for k = 2:numel(y)-1
-    dy(k) = (y(k+1)-y(k-1))/(x(k+1)-x(k-1));
+  % Collapse adjacent repeated denominator points before differentiating.
+  run_start = [true; diff(U) ~= 0];
+  run_id = cumsum(run_start);
+  n_runs = run_id(end);
+  Uc = accumarray(run_id, U, [n_runs 1], @mean);
+  Zc = accumarray(run_id, Z, [n_runs 1], @mean);
+
+  if numel(Uc) < 2
+    dZ = zeros(size(Z));
+    return;
   end
-  dy(~isfinite(dy)) = 0;
+
+  dUc = diff(Uc);
+  dZc = diff(Zc)./dUc;
+  dZc(~isfinite(dZc)) = 0;
+  dZc = ([dZc(1);dZc]+[dZc;dZc(end)])/2; % Avg of fwd/bkwd diffs
+
+  dZ = dZc(run_id);
 end

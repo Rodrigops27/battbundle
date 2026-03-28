@@ -19,7 +19,8 @@ function validation = computeOcvModelMetrics(model_inputs, data_input, cfg)
 %                   .temps_degC
 %                   .min_v
 %                   .max_v
-%                   .ocv_method   'diagAverage' or 'resistanceBlend'
+%                   .ocv_method   'diagAverage', 'resistanceBlend', or
+%                                 'voltageAverage'
 %
 % Output:
 %   validation    Struct with per-model OCV metrics and raw-fit references.
@@ -231,6 +232,8 @@ switch cfg.ocv_method
         [filedata, eta, Q] = buildDiagReference(data, cfg.cell_id, cfg.min_v, cfg.max_v);
     case 'resistanceblend'
         [filedata, eta, Q] = buildLegacyReference(data, cfg.min_v, cfg.max_v);
+    case 'voltageaverage'
+        [filedata, eta, Q] = buildVavgReference(data);
     otherwise
         error('computeOcvModelMetrics:UnsupportedMethod', ...
             'Unsupported ocv_method "%s".', cfg.ocv_method);
@@ -325,6 +328,47 @@ min_v = min_v; %#ok<NASGU>
 max_v = max_v; %#ok<NASGU>
 end
 
+function [filedata, eta, Q] = buildVavgReference(data)
+filetemps = [data.temp];
+numtemps = numel(filetemps);
+ind25 = find(filetemps == 25, 1, 'first');
+if isempty(ind25)
+    error('computeOcvModelMetrics:Missing25C', 'Must have a test at 25degC');
+end
+not25 = find(filetemps ~= 25);
+
+filedata = repmat(struct('temp', [], 'disZ', [], 'disV', [], 'chgZ', [], 'chgV', [], 'rawocv', []), numtemps, 1);
+eta = zeros(size(filetemps));
+Q = zeros(size(filetemps));
+
+k = ind25;
+totDisAh = data(k).script1.disAh(end) + data(k).script2.disAh(end) + data(k).script3.disAh(end) + data(k).script4.disAh(end);
+totChgAh = data(k).script1.chgAh(end) + data(k).script2.chgAh(end) + data(k).script3.chgAh(end) + data(k).script4.chgAh(end);
+eta25 = totDisAh / totChgAh;
+eta(k) = eta25;
+data(k).script1.chgAh = data(k).script1.chgAh * eta25;
+data(k).script2.chgAh = data(k).script2.chgAh * eta25;
+data(k).script3.chgAh = data(k).script3.chgAh * eta25;
+data(k).script4.chgAh = data(k).script4.chgAh * eta25;
+
+Q25 = data(k).script1.disAh(end) + data(k).script2.disAh(end) - data(k).script1.chgAh(end) - data(k).script2.chgAh(end);
+Q(k) = Q25;
+filedata(k) = buildVavgFiledata(data(k), Q25);
+
+for k = not25
+    data(k).script2.chgAh = data(k).script2.chgAh * eta25;
+    data(k).script4.chgAh = data(k).script4.chgAh * eta25;
+    eta(k) = (data(k).script1.disAh(end) + data(k).script2.disAh(end) + ...
+        data(k).script3.disAh(end) + data(k).script4.disAh(end) - ...
+        data(k).script2.chgAh(end) - data(k).script4.chgAh(end)) / ...
+        (data(k).script1.chgAh(end) + data(k).script3.chgAh(end));
+    data(k).script1.chgAh = eta(k) * data(k).script1.chgAh;
+    data(k).script3.chgAh = eta(k) * data(k).script3.chgAh;
+    Q(k) = data(k).script1.disAh(end) + data(k).script2.disAh(end) - data(k).script1.chgAh(end) - data(k).script2.chgAh(end);
+    filedata(k) = buildVavgFiledata(data(k), Q25);
+end
+end
+
 function filedatum = buildLegacyFiledata(testdata, Q25, SOC)
 indD = find(testdata.script1.step == 2);
 IR1Da = testdata.script1.voltage(indD(1)-1) - testdata.script1.voltage(indD(1));
@@ -363,6 +407,31 @@ filedatum.disV = testdata.script1.voltage(indD);
 filedatum.chgZ = chgZ(:);
 filedatum.chgV = testdata.script3.voltage(indC);
 filedatum.rawocv = interp1([zChg; zDis], [vChg; vDis], SOC, 'linear', 'extrap').';
+end
+
+function filedatum = buildVavgFiledata(testdata, Q25)
+indD = find(testdata.script1.step == 2);
+indC = find(testdata.script3.step == 2);
+
+disZ = 1 - testdata.script1.disAh(indD) / Q25;
+disZ = disZ + (1 - disZ(1));
+chgZ = testdata.script3.chgAh(indC) / Q25;
+chgZ = chgZ - chgZ(1);
+
+disV = testdata.script1.voltage(indD);
+chgV = testdata.script3.voltage(indC);
+
+stdZ = (0:0.002:1).';
+avgDisV = linearinterp(disZ, disV, stdZ);
+avgChgV = linearinterp(chgZ, chgV, stdZ);
+avgU = (avgChgV + avgDisV) / 2;
+
+filedatum.temp = testdata.temp;
+filedatum.disZ = disZ(:);
+filedatum.disV = disV(:);
+filedatum.chgZ = chgZ(:);
+filedatum.chgV = chgV(:);
+filedatum.rawocv = interp1(stdZ, avgU, 0:0.005:1, 'linear', 'extrap').';
 end
 
 function filedatum = buildDiagFiledata(testdata, cell_id, Q25, config)
