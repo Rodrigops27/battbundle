@@ -455,36 +455,26 @@ diag_data.orig.chgZ = chgZ(:);
 diag_data.orig.chgV = chgV(:);
 diag_data.interp = makeDiagInterpData(diag_data.orig, config);
 
-[diagZ, diagU] = ocvDiagonalAverage(diag_data, config);
+[diagZ, diagU, diagInfo] = ocvDiagonalAverage(diag_data, config);
 
 filedatum.temp = testdata.temp;
 filedatum.disZ = disZ(:);
 filedatum.disV = disV(:);
 filedatum.chgZ = chgZ(:);
 filedatum.chgV = chgV(:);
-filedatum.rawocv = interp1(diagZ, diagU, 0:0.005:1, 'linear', 'extrap').';
+filedatum.rawocv = buildOverlapLimitedRawOcv(diag_data, diagZ, diagU, diagInfo);
 end
 
 function interp_data = makeDiagInterpData(orig, config)
 stdV = (config.vmin:config.du:config.vmax).';
 stdZ = (0:config.dz:1).';
 
-[disVuniq, disVidx] = unique(orig.disV(:), 'stable');
-disZuniqV = orig.disZ(disVidx);
-[chgVuniq, chgVidx] = unique(orig.chgV(:), 'stable');
-chgZuniqV = orig.chgZ(chgVidx);
-
-[disZuniq, disZidx] = unique(orig.disZ(:), 'stable');
-disVuniqZ = orig.disV(disZidx);
-[chgZuniq, chgZidx] = unique(orig.chgZ(:), 'stable');
-chgVuniqZ = orig.chgV(chgZidx);
-
 interp_data.stdV = stdV;
-interp_data.disZ = interp1(disVuniq, disZuniqV, stdV, 'linear', 'extrap');
-interp_data.chgZ = interp1(chgVuniq, chgZuniqV, stdV, 'linear', 'extrap');
+interp_data.disZ = linearinterp(orig.disV, orig.disZ, stdV);
+interp_data.chgZ = linearinterp(orig.chgV, orig.chgZ, stdV);
 interp_data.stdZ = stdZ;
-interp_data.disV = interp1(disZuniq, disVuniqZ, stdZ, 'linear', 'extrap');
-interp_data.chgV = interp1(chgZuniq, chgVuniqZ, stdZ, 'linear', 'extrap');
+interp_data.disV = linearinterp(orig.disZ, orig.disV, stdZ);
+interp_data.chgV = linearinterp(orig.chgZ, orig.chgV, stdZ);
 end
 
 function config = defaultDiagConfig(vmin, vmax)
@@ -495,11 +485,12 @@ config.du = 0.002;
 config.dz = 0.002;
 config.datype = 'useAvg';
 config.debug = false;
+config.retain_voltage_grid_output = false;
 config.daxcorrfiltv = @(stdV) find(stdV >= vmin & stdV <= vmax);
 config.daxcorrfiltz = @(stdZ) find(stdZ >= 0 & stdZ <= 1);
 end
 
-function [Z, U] = ocvDiagonalAverage(data, config)
+function [Z, U, info] = ocvDiagonalAverage(data, config)
 stdV = data.interp.stdV;
 disZ = data.interp.disZ;
 chgZ = data.interp.chgZ;
@@ -516,8 +507,8 @@ for idx = 1:numel(intervals)
     dzdv1 = roughdiff(disZ(ind), stdV(ind));
     dzdv3 = roughdiff(chgZ(ind), stdV(ind));
     [c, lag] = xcorr(dzdv1, dzdv3);
-    lagU(idx) = abs(lag(c == max(c)) * du);
-    lagU(idx) = lagU(idx, 1);
+    lagPeak = abs(lag(c == max(c)) * du);
+    lagU(idx) = lagPeak(1);
 end
 lagU = mean(lagU);
 
@@ -530,29 +521,37 @@ for idx = 1:numel(intervals)
     dzdv1 = roughdiff(stdZ(ind), disV(ind));
     dzdv3 = roughdiff(stdZ(ind), chgV(ind));
     [c, lag] = xcorr(dzdv1, dzdv3);
-    lagZ(idx) = abs(lag(c == max(c)) * dz);
-    lagZ(idx) = lagZ(idx, 1);
+    lagPeak = abs(lag(c == max(c)) * dz);
+    lagZ(idx) = lagPeak(1);
 end
 lagZ = mean(lagZ);
 
 uuD = data.orig.disV + lagU / 2;
 zzD = data.orig.disZ + lagZ / 2;
-U4D = interp1(zzD, uuD, stdZ, 'linear', 'extrap');
+U4D = interp1(zzD, uuD, stdZ, 'linear', NaN);
 uuC = data.orig.chgV - lagU / 2;
 zzC = data.orig.chgZ - lagZ / 2;
-U4C = interp1(zzC, uuC, stdZ, 'linear', 'extrap');
+U4C = interp1(zzC, uuC, stdZ, 'linear', NaN);
+overlapMask = isfinite(U4D) & isfinite(U4C);
+U4 = NaN(size(stdZ));
 
 switch config.datype
     case 'useDis'
-        U4 = U4D;
+        U4(overlapMask) = U4D(overlapMask);
     case 'useChg'
-        U4 = U4C;
+        U4(overlapMask) = U4C(overlapMask);
     otherwise
-        U4 = (U4C + U4D) / 2;
+        U4(overlapMask) = (U4C(overlapMask) + U4D(overlapMask)) / 2;
 end
 
 Z = stdZ;
 U = U4;
+info = struct();
+info.overlapMask = overlapMask;
+info.U4D = U4D;
+info.U4C = U4C;
+info.lagU = lagU;
+info.lagZ = lagZ;
 end
 
 function dy = roughdiff(y, x)
@@ -565,13 +564,61 @@ if numel(y) < 2
     dy = zeros(size(y));
     return;
 end
-dy = zeros(size(y));
-dy(1) = (y(2) - y(1)) / (x(2) - x(1));
-dy(end) = (y(end) - y(end - 1)) / (x(end) - x(end - 1));
-for idx = 2:numel(y) - 1
-    dy(idx) = (y(idx + 1) - y(idx - 1)) / (x(idx + 1) - x(idx - 1));
+
+run_start = [true; diff(x) ~= 0];
+run_id = cumsum(run_start);
+n_runs = run_id(end);
+xc = accumarray(run_id, x, [n_runs 1], @mean);
+yc = accumarray(run_id, y, [n_runs 1], @mean);
+
+if numel(xc) < 2
+    dy = zeros(size(y));
+    return;
 end
-dy(~isfinite(dy)) = 0;
+
+dxc = diff(xc);
+dyc = diff(yc) ./ dxc;
+dyc(~isfinite(dyc)) = 0;
+dyc = ([dyc(1); dyc] + [dyc; dyc(end)]) / 2;
+dy = dyc(run_id);
+end
+
+function rawocv = buildOverlapLimitedRawOcv(diag_data, diagZ, diagU, diagInfo)
+stdZ = diagZ(:);
+lowTail = diag_data.interp.chgV(:);
+highTail = diag_data.interp.disV(:);
+rawStd = NaN(size(stdZ));
+
+overlapIdx = find(diagInfo.overlapMask(:));
+if isempty(overlapIdx)
+    warning('computeOcvModelMetrics:NoDiagonalOverlap', ...
+        ['No valid diagonal overlap remained after shifting; falling back ' ...
+         'to simple voltage averaging on the standard SOC grid.']);
+    rawStd = (lowTail + highTail) / 2;
+else
+    firstIdx = overlapIdx(1);
+    lastIdx = overlapIdx(end);
+    rawStd(overlapIdx) = diagU(overlapIdx);
+
+    lowOffset = rawStd(firstIdx) - lowTail(firstIdx);
+    highOffset = rawStd(lastIdx) - highTail(lastIdx);
+
+    if firstIdx > 1
+        rawStd(1:firstIdx-1) = lowTail(1:firstIdx-1) + lowOffset;
+    end
+    if lastIdx < numel(stdZ)
+        rawStd(lastIdx+1:end) = highTail(lastIdx+1:end) + highOffset;
+    end
+
+    missingIdx = find(~isfinite(rawStd));
+    if ~isempty(missingIdx)
+        validIdx = find(isfinite(rawStd));
+        rawStd(missingIdx) = interp1(stdZ(validIdx), rawStd(validIdx), ...
+            stdZ(missingIdx), 'linear', 'extrap');
+    end
+end
+
+rawocv = interp1(stdZ, rawStd, 0:0.005:1, 'linear');
 end
 
 function metrics = computeErrorMetrics(error_v)

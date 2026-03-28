@@ -1,9 +1,8 @@
 % script buildATL20modelOcv.m
 %   Loads ATL OCV test files from data/Modelling/OCV_Files/ATL20/ATL_OCV,
-%   runs ESC_Id/DiagProcessOCV, and saves ATL20model-ocv.mat to
+%   runs ESC_Id/VavgProcessOCV, and saves ATL20model-ocv.mat to
 %   ESC_Id/OCV_models.
 
-clearvars 
 close all
 clc
 
@@ -18,19 +17,18 @@ addpath(repo_root);
 addpath(genpath(fullfile(repo_root, 'utility')));
 addpath(genpath(esc_root));
 
-temps_degC = [-25 -15 -5 5 15 25 35 45];
 data_prefix = 'ATL';
 model_name = 'ATL20';
 min_v = 2.0;
 max_v = 3.75;
+if ~exist('temps_degC', 'var') || isempty(temps_degC)
+    temps_degC = [-25 -15 -5 5 15 25 35 45];
+end
 if ~exist('save_plots', 'var') || isempty(save_plots)
     save_plots = false;
 end
 if ~exist('debug_plots', 'var') || isempty(debug_plots)
     debug_plots = false;
-end
-if ~exist('diag_type', 'var') || isempty(diag_type)
-    diag_type = 'useAvg';
 end
 
 if exist(ocv_data_dir, 'dir') ~= 7
@@ -49,7 +47,7 @@ end
 
 fprintf('\n');
 fprintf('============================================================\n');
-fprintf('  Build ATL20 OCV model with DiagProcessOCV\n');
+fprintf('  Build ATL20 OCV model with VavgProcessOCV\n');
 fprintf('============================================================\n\n');
 fprintf('Source folder: %s\n', ocv_data_dir);
 fprintf('Output file : %s\n\n', output_file);
@@ -98,8 +96,22 @@ for k = 1:numel(temps_degC)
 end
 
 model = VavgProcessOCV(data, model_name, min_v, max_v, save_plots, debug_plots);
+if numel(temps_degC) == 1
+    temp_degC = temps_degC(1);
+    soc_grid = model.SOC(:);
+    ocv_at_temp = model.OCV0(:) + temp_degC * model.OCVrel(:);
+    model.temps = temp_degC;
+    model.OCV0 = ocv_at_temp;
+    model.OCVrel = zeros(size(ocv_at_temp));
+    [ocv_unique, unique_idx] = unique(ocv_at_temp, 'stable');
+    soc_unique = soc_grid(unique_idx);
+    model.OCV = linspace(min(ocv_at_temp) - 0.01, max(ocv_at_temp) + 0.01, 201).';
+    model.SOC0 = interp1(ocv_unique, soc_unique, model.OCV, 'linear', 'extrap');
+    model.SOCrel = zeros(size(model.OCV));
+end
 ocv_validation = computeOcvModelMetrics(model, data, struct( ...
     'cell_id', model_name, ...
+    'temps_degC', temps_degC, ...
     'min_v', min_v, ...
     'max_v', max_v, ...
     'ocv_method', 'voltageAverage'));

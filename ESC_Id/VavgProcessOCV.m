@@ -114,7 +114,9 @@ function model=VavgProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots)
   socs = [];
   for T = filetemps'
     v1 = OCVfromSOCtemp(z,T,model);
-    socs = [socs; interp1(v1,z,v)]; %#ok<AGROW>
+    [v1uniq, uniqIdx] = unique(v1(:), 'stable');
+    zuniq = z(uniqIdx);
+    socs = [socs; interp1(v1uniq, zuniq, v, 'linear', 'extrap')]; %#ok<AGROW>
   end
 
   SOC0 = zeros(size(v)); SOCrel = SOC0;

@@ -50,7 +50,8 @@ for temp_idx = 1:numel(temps_degC)
     ylabel('OCV (V)');
     xlim([0 100]);
     ylim([cfg.min_v - 0.1 cfg.max_v + 0.1]);
-    title(sprintf('%s OCV fit at temp = %g degC', cfg.title_prefix, tc));
+    title(sprintf('%s OCV fit at temp = %g degC [%s]', ...
+        cfg.title_prefix, tc, validation.reference.ocv_method));
     grid on
 
     metric_lines = metric_lines(~cellfun(@isempty, metric_lines));
