@@ -1,7 +1,6 @@
 % script buildATL20modelOcv.m
-%   Loads ATL OCV test files from data/Modelling/OCV_Files/ATL20/ATL_OCV,
-%   runs ESC_Id/VavgProcessOCV, and saves ATL20model-ocv.mat to
-%   ESC_Id/OCV_models.
+%   Builds the ATL20 OCV model from ATL OCV test data. This is a
+%   chemistry-specific wrapper around ESC_Id/runOcvIdentification.m.
 
 close all
 clc
@@ -9,20 +8,39 @@ clc
 script_dir = fileparts(mfilename('fullpath'));
 esc_root = fileparts(script_dir);
 repo_root = fileparts(esc_root);
-ocv_data_dir = fullfile(repo_root, 'data', 'Modelling', 'OCV_Files', 'ATL20', 'ATL_OCV');
-output_dir = fullfile(esc_root, 'OCV_models');
-output_file = fullfile(output_dir, 'ATL20model-ocv.mat');
 
-addpath(repo_root);
-addpath(genpath(fullfile(repo_root, 'utility')));
-addpath(genpath(esc_root));
-
-data_prefix = 'ATL';
-model_name = 'ATL20';
-min_v = 2.0;
-max_v = 3.75;
-if ~exist('temps_degC', 'var') || isempty(temps_degC)
-    temps_degC = [-25 -15 -5 5 15 25 35 45];
+if ~exist('ocv_data_dir', 'var') || isempty(ocv_data_dir)
+    ocv_data_dir = fullfile(repo_root, 'data', 'Modelling', 'OCV_Files', 'ATL20', 'ATL_OCV');
+end
+if ~exist('engine', 'var') || isempty(engine)
+    engine = 'voltageAverage';
+end
+if ~exist('diag_type', 'var') || isempty(diag_type)
+    diag_type = 'useAvg';
+end
+if ~exist('temperature_scope', 'var') || isempty(temperature_scope)
+    if exist('temps_degC', 'var') && ~isempty(temps_degC)
+        if isnumeric(temps_degC) && isscalar(temps_degC)
+            temperature_scope = 'single';
+        else
+            temperature_scope = 'selected';
+        end
+    else
+        temperature_scope = 'all';
+    end
+end
+if ~exist('desired_temperature', 'var') || isempty(desired_temperature)
+    if exist('temps_degC', 'var') && ~isempty(temps_degC)
+        desired_temperature = temps_degC;
+    else
+        desired_temperature = [];
+    end
+end
+if ~exist('min_v', 'var') || isempty(min_v)
+    min_v = 2.0;
+end
+if ~exist('max_v', 'var') || isempty(max_v)
+    max_v = 3.75;
 end
 if ~exist('save_plots', 'var') || isempty(save_plots)
     save_plots = false;
@@ -30,95 +48,34 @@ end
 if ~exist('debug_plots', 'var') || isempty(debug_plots)
     debug_plots = false;
 end
-
-if exist(ocv_data_dir, 'dir') ~= 7
-    error('buildATL20modelOcv:MissingFolder', ...
-        'OCV data folder not found: %s', ocv_data_dir);
+if ~exist('output_file', 'var') || isempty(output_file)
+    output_file = fullfile(esc_root, 'OCV_models', 'ATL20model-ocv.mat');
 end
-if exist(output_dir, 'dir') ~= 7
-    mkdir(output_dir);
+if ~exist('results_file', 'var') || isempty(results_file)
+    results_file = fullfile(esc_root, 'results', 'ATL20_ocv_identification_results.mat');
 end
 
-if ~(save_plots || debug_plots)
-    previous_visibility = get(groot, 'defaultFigureVisible');
-    restore_visibility = onCleanup(@() set(groot, 'defaultFigureVisible', previous_visibility)); %#ok<NASGU>
-    set(groot, 'defaultFigureVisible', 'off');
-end
+cfg = struct();
+cfg.run_name = 'ATL20 OCV identification';
+cfg.ocv_data_input = ocv_data_dir;
+cfg.data_prefix = 'ATL';
+cfg.cell_id = 'ATL20';
+cfg.engine = engine;
+cfg.diag_type = diag_type;
+cfg.temperature_scope = temperature_scope;
+cfg.desired_temperature = desired_temperature;
+cfg.min_v = min_v;
+cfg.max_v = max_v;
+cfg.save_plots = save_plots;
+cfg.debug_plots = debug_plots;
+cfg.output = struct( ...
+    'save_model', true, ...
+    'save_results', false, ...
+    'include_model_struct', false, ...
+    'model_output_file', output_file, ...
+    'results_file', results_file);
 
-fprintf('\n');
-fprintf('============================================================\n');
-fprintf('  Build ATL20 OCV model with VavgProcessOCV\n');
-fprintf('============================================================\n\n');
-fprintf('Source folder: %s\n', ocv_data_dir);
-fprintf('Output file : %s\n\n', output_file);
+build_results = runOcvIdentification(cfg);
+save(results_file, 'build_results');
 
-data = repmat(struct( ...
-    'temp', [], ...
-    'script1', [], ...
-    'script2', [], ...
-    'script3', [], ...
-    'script4', []), numel(temps_degC), 1);
-
-for k = 1:numel(temps_degC)
-    tc = temps_degC(k);
-    if tc < 0
-        filename = fullfile(ocv_data_dir, sprintf('%s_OCV_N%02d.mat', data_prefix, abs(tc)));
-    else
-        filename = fullfile(ocv_data_dir, sprintf('%s_OCV_P%02d.mat', data_prefix, tc));
-    end
-
-    if ~exist(filename, 'file')
-        error('buildATL20modelOcv:MissingFile', ...
-            'Required OCV file not found: %s', filename);
-    end
-
-    src = load(filename, 'OCVData');
-    if ~isfield(src, 'OCVData')
-        error('buildATL20modelOcv:MissingOCVData', ...
-            'File does not contain OCVData: %s', filename);
-    end
-
-    required_scripts = {'script1', 'script2', 'script3', 'script4'};
-    for n = 1:numel(required_scripts)
-        if ~isfield(src.OCVData, required_scripts{n})
-            error('buildATL20modelOcv:MissingScript', ...
-                'File %s is missing OCVData.%s', filename, required_scripts{n});
-        end
-    end
-
-    data(k).temp = tc;
-    data(k).script1 = src.OCVData.script1;
-    data(k).script2 = src.OCVData.script2;
-    data(k).script3 = src.OCVData.script3;
-    data(k).script4 = src.OCVData.script4;
-
-    fprintf('Loaded %s\n', filename);
-end
-
-model = VavgProcessOCV(data, model_name, min_v, max_v, save_plots, debug_plots);
-if numel(temps_degC) == 1
-    temp_degC = temps_degC(1);
-    soc_grid = model.SOC(:);
-    ocv_at_temp = model.OCV0(:) + temp_degC * model.OCVrel(:);
-    model.temps = temp_degC;
-    model.OCV0 = ocv_at_temp;
-    model.OCVrel = zeros(size(ocv_at_temp));
-    [ocv_unique, unique_idx] = unique(ocv_at_temp, 'stable');
-    soc_unique = soc_grid(unique_idx);
-    model.OCV = linspace(min(ocv_at_temp) - 0.01, max(ocv_at_temp) + 0.01, 201).';
-    model.SOC0 = interp1(ocv_unique, soc_unique, model.OCV, 'linear', 'extrap');
-    model.SOCrel = zeros(size(model.OCV));
-end
-ocv_validation = computeOcvModelMetrics(model, data, struct( ...
-    'cell_id', model_name, ...
-    'temps_degC', temps_degC, ...
-    'min_v', min_v, ...
-    'max_v', max_v, ...
-    'ocv_method', 'voltageAverage'));
-model.metrics.ocv = ocv_validation.models(1).metrics;
-model.metrics.ocv_summary_table = ocv_validation.models(1).summary_table;
-
-save(output_file, 'model', 'ocv_validation');
-
-fprintf('\nSaved ATL20 OCV model to:\n  %s\n', output_file);
-fprintf('Stored fields: %s\n', strjoin(fieldnames(model).', ', '));
+fprintf('Saved ATL20 OCV build results to:\n  %s\n', results_file);

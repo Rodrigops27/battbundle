@@ -18,8 +18,12 @@
   - OCV-processing entry point using voltage averaging.
 - [`processOCV.m`](processOCV.m)
   - Legacy OCV-processing entry point using resistance blending.
+- [`runOcvIdentification.m`](runOcvIdentification.m)
+  - Configurable API-style wrapper around the OCV engines in this layer.
 - [`processDynamic.m`](processDynamic.m)
   - Generic dynamic ESC parameter-identification routine for lab-style `DYNData`.
+- [`runDynamicIdentification.m`](runDynamicIdentification.m)
+  - Configurable API-style wrapper around [`processDynamic.m`](processDynamic.m).
 - [`computeOcvModelMetrics.m`](computeOcvModelMetrics.m)
   - Generic OCV-fit metrics function for `DiagProcessOCV` and legacy `processOCV` outputs.
 - [`plotOcvModelFit.m`](plotOcvModelFit.m)
@@ -78,6 +82,40 @@ batch = runESCvalidation( ...
 - [`validate_models.m`](validate_models.m)
   - Repo convenience smoke test for the main ESC models.
 
+- [`runOcvIdentification.m`](runOcvIdentification.m)
+  - Configurable OCV-identification entry point around [`VavgProcessOCV.m`](VavgProcessOCV.m), [`DiagProcessOCV.m`](DiagProcessOCV.m), and [`processOCV.m`](processOCV.m).
+
+```matlab
+addpath(genpath('.'));
+cfg = struct();
+cfg.run_name = 'ATL20 OCV identification';
+cfg.ocv_data_input = fullfile('data', 'Modelling', 'OCV_Files', 'ATL20', 'ATL_OCV');
+cfg.data_prefix = 'ATL';
+cfg.cell_id = 'ATL20';
+cfg.engine = 'voltageAverage';
+cfg.temperature_scope = 'single';
+cfg.desired_temperature = 25;
+cfg.output.model_output_file = fullfile('ESC_Id', 'OCV_models', 'ATL20model-ocv.mat');
+results = runOcvIdentification(cfg);
+```
+
+- [`runDynamicIdentification.m`](runDynamicIdentification.m)
+  - Configurable dynamic-identification entry point around [`processDynamic.m`](processDynamic.m).
+
+```matlab
+addpath(genpath('.'));
+cfg = struct();
+cfg.run_name = 'ATL20 P25 ESC identification';
+cfg.ocv_model_input = fullfile('ESC_Id', 'OCV_models', 'ATL20model-ocv.mat');
+cfg.dynamic_input = fullfile('data', 'Modelling', 'DYN_Files', 'ATL_DYN');
+cfg.desired_temperature = 25;
+cfg.numpoles = 2;
+cfg.do_hysteresis = true;
+cfg.output.model_output_file = fullfile('models', 'ATL20model_P25.mat');
+cfg.output.results_file = fullfile('ESC_Id', 'results', 'ATL20model_P25_identification_results.mat');
+results = runDynamicIdentification(cfg);
+```
+
 ```matlab
 addpath(genpath('.'));
 cd ESC_Id
@@ -91,9 +129,9 @@ validate_models
 - [`ATL20/buildATLmodelOcv.m`](ATL20/buildATLmodelOcv.m)
   - Builds the legacy ATL OCV model with [`processOCV.m`](processOCV.m).
 - [`ATL20/buildATL20modelOcv.m`](ATL20/buildATL20modelOcv.m)
-  - Builds the ATL20 diagonal-average OCV model with [`DiagProcessOCV.m`](DiagProcessOCV.m).
+  - Builds the ATL20 OCV model by calling [`runOcvIdentification.m`](runOcvIdentification.m).
 - [`ATL20/buildATLmodel.m`](ATL20/buildATLmodel.m)
-  - Builds the full ATL ESC model from `ATL_DYN` data and the legacy ATL OCV model.
+  - Builds the full ATL ESC model from `ATL_DYN` data and the legacy ATL OCV model by calling [`runDynamicIdentification.m`](runDynamicIdentification.m).
 - [`OMTLIFE8AHC-HP/OMTLIFEocv.m`](OMTLIFE8AHC-HP/OMTLIFEocv.m)
   - Builds the OMT8 OCV model.
 - [`OMTLIFE8AHC-HP/OMTdynId.m`](OMTLIFE8AHC-HP/OMTdynId.m)
@@ -227,11 +265,15 @@ batch = runESCvalidation(jobs);
   - [`VavgProcessOCV.m`](VavgProcessOCV.m) for the voltage-average method
   - [`DiagProcessOCV.m`](DiagProcessOCV.m) for the diagonal-average method
 - OCV-fit tools:
+  - [`runOcvIdentification.m`](runOcvIdentification.m)
+    - Loads OCV test data, chooses one OCV engine, optionally collapses to one selected temperature, saves the intermediate OCV model, and stores OCV-fit results.
   - [`computeOcvModelMetrics.m`](computeOcvModelMetrics.m)
     - Computes OCV RMSE, mean error, MAE, and max-absolute error against raw OCV references.
   - [`plotOcvModelFit.m`](plotOcvModelFit.m)
     - Plots raw OCV references, charge/discharge traces, and fitted OCV curves.
 - Dynamic-fit tools:
+  - [`runDynamicIdentification.m`](runDynamicIdentification.m)
+    - Loads an OCV model plus selected dynamic datasets, calls [`processDynamic.m`](processDynamic.m), saves a light ESC model, and stores dynamic-fit results.
   - [`computeDynamicModelMetrics.m`](computeDynamicModelMetrics.m)
     - Computes dynamic-fit metrics by calling [`ESCvalidation.m`](ESCvalidation.m) on a full ESC model and dynamic dataset.
   - [`plotDynamicModelFit.m`](plotDynamicModelFit.m)

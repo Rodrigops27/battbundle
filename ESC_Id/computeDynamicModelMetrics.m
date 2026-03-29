@@ -13,5 +13,21 @@ if isfield(cfg, 'enabled_plot') && ~isempty(cfg.enabled_plot)
     enabled_plot = logical(cfg.enabled_plot);
 end
 
+model_input = normalizeModelInput(model_input);
 results = ESCvalidation(model_input, data_input, enabled_plot);
+end
+
+function model_input = normalizeModelInput(model_input)
+if ~isstruct(model_input)
+    return;
+end
+
+if isfield(model_input, 'model') || isfield(model_input, 'nmc30_model')
+    return;
+end
+
+required = {'QParam', 'RCParam', 'RParam', 'R0Param', 'MParam', 'M0Param', 'GParam', 'etaParam'};
+if all(isfield(model_input, required))
+    model_input = struct('model', model_input);
+end
 end
