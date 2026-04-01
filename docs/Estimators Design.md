@@ -1,6 +1,6 @@
 # Estimator Designs
 
-This document is based on the code paths currently present in this repository. Every claim below is traceable to code, benchmark wiring, or existing repo docs.
+This document is the estimator algorithm-design guide for battbundle: it explains each estimator’s core logic, tracked quantities, assumptions, tuning parameters, best-use cases, and likely failure modes, so benchmark results and final estimator selection can be interpreted in the context of estimator design.
 
 ## Inventory
 
