@@ -74,7 +74,7 @@ if cfg.output.save_results
     end
 
     autotuning_results.saved_results_file = aggregate_results_file;
-    save(aggregate_results_file, 'autotuning_results');
+    save(aggregate_results_file, 'autotuning_results'); % For large files 
 end
 
 if nargout == 0
@@ -100,6 +100,8 @@ end
 paths = struct();
 paths.autotuning_root = here;
 paths.repo_root = repo_root;
+suite_versions = collectScenarioSuiteVersions(cfg.scenarios);
+paths.registry = ensureDataRegistryLayout(repo_root, 'suite_versions', suite_versions);
 paths.results_root_abs = resolveAbsolutePath(cfg.output.results_root, repo_root);
 if exist(paths.results_root_abs, 'dir') ~= 7
     mkdir(paths.results_root_abs);
@@ -170,7 +172,7 @@ for idx = 1:numel(fields)
     if ischar(value) || (isstring(value) && isscalar(value))
         value_char = char(value);
         if looksLikePathField(fields{idx}) && ~isempty(value_char)
-            cfg_out.(fields{idx}) = resolveAbsolutePath(value_char, repo_root);
+            cfg_out.(fields{idx}) = resolveScenarioPath(fields{idx}, value_char, repo_root);
         end
     elseif isstruct(value)
         cfg_out.(fields{idx}) = normalizeScenarioPaths(value, repo_root);
@@ -180,6 +182,38 @@ end
 
 function tf = looksLikePathField(field_name)
 tf = endsWith(lower(field_name), '_file') || endsWith(lower(field_name), '_root');
+end
+
+function path_out = resolveScenarioPath(field_name, value_char, repo_root)
+field_key = lower(char(field_name));
+if contains(field_key, 'dataset')
+    path_out = resolveEvaluationDatasetPath(value_char, repo_root, 'access', 'benchmark', 'must_exist', false);
+elseif contains(field_key, 'profile')
+    path_out = resolveEvaluationDatasetPath(value_char, repo_root, 'access', 'builder', 'must_exist', false);
+else
+    path_out = resolveAbsolutePath(value_char, repo_root);
+end
+end
+
+function suite_versions = collectScenarioSuiteVersions(scenarios)
+suite_versions = {};
+for idx = 1:numel(scenarios)
+    if isfield(scenarios(idx), 'suite_version') && ~isempty(scenarios(idx).suite_version)
+        suite_versions{end + 1} = char(scenarios(idx).suite_version); %#ok<AGROW>
+        continue;
+    end
+    if isfield(scenarios(idx), 'datasetSpec') && isfield(scenarios(idx).datasetSpec, 'dataset_file')
+        dataset_path = strrep(char(scenarios(idx).datasetSpec.dataset_file), '\', '/');
+        tokens = regexp(dataset_path, 'data/evaluation/processed/([^/]+)/', 'tokens', 'once');
+        if isempty(tokens)
+            tokens = regexp(dataset_path, 'data/evaluation/derived/([^/]+)/', 'tokens', 'once');
+        end
+        if ~isempty(tokens)
+            suite_versions{end + 1} = tokens{1}; %#ok<AGROW>
+        end
+    end
+end
+suite_versions = unique(suite_versions, 'stable');
 end
 
 function estimator_cfg = resolveEstimatorConfig(estimator_cfgs, estimator_name)
@@ -238,18 +272,30 @@ if isAbsolutePath(path_in)
     path_out = path_in;
     return;
 end
-
-candidate = fullfile(default_root, path_in);
-if isAbsolutePath(candidate)
-    path_out = candidate;
-else
+if looksLikeRepoRelativePath(path_in, repo_root)
     path_out = fullfile(repo_root, path_in);
+else
+    path_out = fullfile(default_root, path_in);
 end
 end
 
 function tf = isAbsolutePath(path_in)
 path_in = char(path_in);
 tf = numel(path_in) >= 2 && path_in(2) == ':';
+end
+
+function tf = looksLikeRepoRelativePath(path_in, repo_root)
+path_in = strrep(char(path_in), '/', filesep);
+parts = regexp(path_in, ['\' filesep '+'], 'split');
+parts = parts(~cellfun(@isempty, parts));
+if isempty(parts)
+    tf = false;
+    return;
+end
+
+top_level = parts{1};
+tf = exist(fullfile(repo_root, top_level), 'file') == 2 || ...
+    exist(fullfile(repo_root, top_level), 'dir') == 7;
 end
 
 function out = mergeStructDefaults(in, defaults)

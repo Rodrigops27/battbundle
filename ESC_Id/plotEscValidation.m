@@ -15,7 +15,7 @@ function plotEscValidation(results)
 %
 % Example:
 %   Load and plot previous results:
-%     load('ESC_validation_results.mat');
+%     load(fullfile('data', 'modelling', 'derived', 'validation_results', 'esc', 'ESC_validation_results.mat'));
 %     plotEscValidation(result_atl);
 
 if nargin < 1 || isempty(results)

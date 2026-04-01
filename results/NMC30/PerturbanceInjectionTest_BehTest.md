@@ -8,7 +8,7 @@ This summary reports the rerun of the NMC30 behavior-test injection study using 
 | --- | --- |
 | Study layer | `Evaluation/Injection/` |
 | Core script | `Evaluation/Injection/runInjectionStudy.m` |
-| Source dataset | `Evaluation/ROMSimData/datasets/rom_bus_coreBattery_dataset.mat` |
+| Source dataset | `data/evaluation/processed/behavioral_nmc30_bss_v1/nominal/rom_bus_coreBattery_dataset.mat` |
 | ESC model | `models/NMC30model.mat` |
 | ROM model | `models/ROM_NMC30_HRA12.mat` |
 | Scenario label | `nmc30_behavior_test` |

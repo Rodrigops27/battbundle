@@ -49,7 +49,8 @@ if ~isdeployed
     if isempty(here)
         here = pwd;
     end
-    cd(here);
+else
+    here = fileparts(mfilename('fullpath'));
 end
 
 repo_root = fileparts(fileparts(here));
@@ -216,7 +217,6 @@ end
 end
 
 function cfg = normalizeStudyConfig(cfg, repo_root, input_meta)
-evaluation_root = fullfile(repo_root, 'Evaluation');
 tuning_defaults = defaultNoiseTuning();
 
 cfg.tc = getCfg(cfg, 'tc', 25);
@@ -232,11 +232,11 @@ cfg.NoiseSummaryfigs = getCfg(cfg, 'NoiseSummaryfigs', false);
 cfg.PlotSocRmsefigs = getCfg(cfg, 'PlotSocRmsefigs', true);
 cfg.PlotVoltageRmsefigs = getCfg(cfg, 'PlotVoltageRmsefigs', true);
 cfg.esc_dataset_file = getCfg(cfg, 'esc_dataset_file', ...
-    fullfile(evaluation_root, 'ESCSimData', 'datasets', 'esc_bus_coreBattery_dataset.mat'));
+    fullfile(repo_root, 'data', 'evaluation', 'processed', 'desktop_atl20_bss_v1', 'nominal', 'esc_bus_coreBattery_dataset.mat'));
 cfg.rom_dataset_file = getCfg(cfg, 'rom_dataset_file', ...
-    fullfile(evaluation_root, 'ROMSimData', 'datasets', 'rom_bus_coreBattery_dataset.mat'));
+    fullfile(repo_root, 'data', 'evaluation', 'processed', 'behavioral_nmc30_bss_v1', 'nominal', 'rom_bus_coreBattery_dataset.mat'));
 cfg.raw_bus_file = getCfg(cfg, 'raw_bus_file', ...
-    fullfile(evaluation_root, 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat'));
+    fullfile(repo_root, 'data', 'evaluation', 'raw', 'omtlife8ahc_hp', 'Bus_CoreBatteryData_Data.mat'));
 cfg.rom_file = getCfg(cfg, 'rom_file', ...
     firstExistingFileOrEmpty({ ...
     fullfile(repo_root, 'models', 'ROM_ATL20_beta.mat')}));
@@ -249,6 +249,9 @@ cfg.esc_model_file = getCfg(cfg, 'esc_model_file', ...
 cfg.tuning = getCfg(cfg, 'tuning', tuning_defaults);
 cfg.tuning = mergeStructDefaults(cfg.tuning, tuning_defaults);
 cfg = resolveEstimatorSelectionConfig(cfg, input_meta);
+cfg.esc_dataset_file = resolveEvaluationDatasetPath(cfg.esc_dataset_file, repo_root, 'access', 'benchmark', 'must_exist', false);
+cfg.rom_dataset_file = resolveEvaluationDatasetPath(cfg.rom_dataset_file, repo_root, 'access', 'benchmark', 'must_exist', false);
+cfg.raw_bus_file = resolveEvaluationDatasetPath(cfg.raw_bus_file, repo_root, 'access', 'builder', 'must_exist', false);
 end
 
 function cfg = resolveEstimatorSelectionConfig(cfg, input_meta)

@@ -10,7 +10,7 @@ clear; clc; close all;
 script_dir = fileparts(mfilename('fullpath'));
 nmc30_parent = fileparts(script_dir);  % NMC30/ -> ESC_Id/
 repo_root = fileparts(nmc30_parent);    % ESC_Id/ -> bnchmrk/
-ocv_output_dir = fullfile(nmc30_parent, 'OCV_Files', 'NMC30');
+ocv_output_dir = fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'nmc30');
 
 % Use bnchmrk path setup (root + selected folders and subfolders).
 addpath(repo_root);

@@ -1,0 +1,232 @@
+{
+  "artifact_class": "summary",
+  "kind": "benchmark_summary",
+  "layer": "evaluation",
+  "created_on": "2026-03-30 21:50:25",
+  "suite_version": "desktop_atl20_bss_v1",
+  "scenario_id": "atl20_p25_bundle",
+  "summary_json_file": "results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle__summary.json",
+  "summary_markdown_file": "results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle__summary.md",
+  "heavy_results_file": "Evaluation/results/atl20_p25_bundle_benchmark_results.mat",
+  "figure_root": "results/figures/evaluation/desktop_atl20_bss_v1/atl20_p25_bundle",
+  "dataset_file": "data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat",
+  "esc_model_file": "models/ATL20model_P25.mat",
+  "rom_model_file": "models/ROM_ATL20_beta.mat",
+  "chemistry_label": "ATL20",
+  "estimator_names": [
+    "ROM-EKF",
+    "ESC-SPKF",
+    "ESC-EKF",
+    "EaEKF",
+    "EacrSPKF",
+    "EnacrSPKF",
+    "EDUKF",
+    "EsSPKF",
+    "EbSPKF",
+    "EBiSPKF",
+    "Em7SPKF"
+  ],
+  "tuning_profile_file": "autotuning/results/atl20_p25_bundle_autotuning_results.mat",
+  "metrics_table": [
+    {
+      "Estimator": "ROM-EKF",
+      "SocRmsePct": 9.6005630247712848,
+      "SocMePct": 0.058109585298340448,
+      "SocMssdPct2": 9.7076468143691283E-6,
+      "VoltageRmseMv": 48.636970255136063,
+      "VoltageMeMv": -4.5645828272968894,
+      "VoltageMssdMv2": 0.012757828949543583
+    },
+    {
+      "Estimator": "ESC-SPKF",
+      "SocRmsePct": 7.6611526921630659,
+      "SocMePct": 7.007689089333093,
+      "SocMssdPct2": 1.905458080719154E-6,
+      "VoltageRmseMv": 20.404425229793155,
+      "VoltageMeMv": -1.7088365672547359,
+      "VoltageMssdMv2": 0.11086249937971651
+    },
+    {
+      "Estimator": "ESC-EKF",
+      "SocRmsePct": 8.6148940885363849,
+      "SocMePct": 7.6773399136805862,
+      "SocMssdPct2": 1.549607407406147E-6,
+      "VoltageRmseMv": 12.884952914583339,
+      "VoltageMeMv": -1.5186577024482497,
+      "VoltageMssdMv2": 0.09444559359060202
+    },
+    {
+      "Estimator": "EaEKF",
+      "SocRmsePct": 9.83254755343041,
+      "SocMePct": 8.8945979659883712,
+      "SocMssdPct2": 0.0062932673359400743,
+      "VoltageRmseMv": 0.048230972437743762,
+      "VoltageMeMv": -0.00011461030830747486,
+      "VoltageMssdMv2": 0.24207887709324954
+    },
+    {
+      "Estimator": "EacrSPKF",
+      "SocRmsePct": 0.4965517046623425,
+      "SocMePct": -0.1192469456411037,
+      "SocMssdPct2": 0.00022758259131882631,
+      "VoltageRmseMv": 1.1706045139719123,
+      "VoltageMeMv": 0.23494987622797578,
+      "VoltageMssdMv2": 0.22002448361639881
+    },
+    {
+      "Estimator": "EnacrSPKF",
+      "SocRmsePct": 13.425067444214649,
+      "SocMePct": 9.2332994421470023,
+      "SocMssdPct2": 4.8457475078086105,
+      "VoltageRmseMv": 23.035372626909844,
+      "VoltageMeMv": 17.539442713911907,
+      "VoltageMssdMv2": 1.7929225298021598
+    },
+    {
+      "Estimator": "EDUKF",
+      "SocRmsePct": 5.6459466891768262,
+      "SocMePct": 2.1552214556189964,
+      "SocMssdPct2": 0.00038609624428583423,
+      "VoltageRmseMv": 7.7864731489060031,
+      "VoltageMeMv": -0.24287099659937772,
+      "VoltageMssdMv2": 74.485749498729589
+    },
+    {
+      "Estimator": "EsSPKF",
+      "SocRmsePct": 8.2608385669554689,
+      "SocMePct": 7.8750802714558992,
+      "SocMssdPct2": 1.660142945570849E-6,
+      "VoltageRmseMv": 12.54635633821237,
+      "VoltageMeMv": -0.81625461814822176,
+      "VoltageMssdMv2": 0.24816548519372053
+    },
+    {
+      "Estimator": "EbSPKF",
+      "SocRmsePct": 8.4407180940614328,
+      "SocMePct": 7.6415935396356991,
+      "SocMssdPct2": 1.967190086894149E-6,
+      "VoltageRmseMv": 20.361538742206605,
+      "VoltageMeMv": -0.86761909117989344,
+      "VoltageMssdMv2": 0.11043137740601901
+    },
+    {
+      "Estimator": "EBiSPKF",
+      "SocRmsePct": 7.8222121600160328,
+      "SocMePct": 7.38039170269109,
+      "SocMssdPct2": 1.6678731458078647E-6,
+      "VoltageRmseMv": 12.724083059493202,
+      "VoltageMeMv": -1.447602519211854,
+      "VoltageMssdMv2": 0.11082816417336387
+    },
+    {
+      "Estimator": "Em7SPKF",
+      "SocRmsePct": 7.5931310726944385,
+      "SocMePct": 7.124768865240898,
+      "SocMssdPct2": 1.6262237438075737E-6,
+      "VoltageRmseMv": 16.13718886724406,
+      "VoltageMeMv": -1.488177410880545,
+      "VoltageMssdMv2": 0.3029110393810785
+    }
+  ],
+  "summary_table": [
+    {
+      "Estimator": "ROM-EKF",
+      "SocRmsePct": 9.6005630247712848,
+      "SocMePct": 0.058109585298340448,
+      "SocMssdPct2": 9.7076468143691283E-6,
+      "VoltageRmseMv": 48.636970255136063,
+      "VoltageMeMv": -4.5645828272968894,
+      "VoltageMssdMv2": 0.012757828949543583
+    },
+    {
+      "Estimator": "ESC-SPKF",
+      "SocRmsePct": 7.6611526921630659,
+      "SocMePct": 7.007689089333093,
+      "SocMssdPct2": 1.905458080719154E-6,
+      "VoltageRmseMv": 20.404425229793155,
+      "VoltageMeMv": -1.7088365672547359,
+      "VoltageMssdMv2": 0.11086249937971651
+    },
+    {
+      "Estimator": "ESC-EKF",
+      "SocRmsePct": 8.6148940885363849,
+      "SocMePct": 7.6773399136805862,
+      "SocMssdPct2": 1.549607407406147E-6,
+      "VoltageRmseMv": 12.884952914583339,
+      "VoltageMeMv": -1.5186577024482497,
+      "VoltageMssdMv2": 0.09444559359060202
+    },
+    {
+      "Estimator": "EaEKF",
+      "SocRmsePct": 9.83254755343041,
+      "SocMePct": 8.8945979659883712,
+      "SocMssdPct2": 0.0062932673359400743,
+      "VoltageRmseMv": 0.048230972437743762,
+      "VoltageMeMv": -0.00011461030830747486,
+      "VoltageMssdMv2": 0.24207887709324954
+    },
+    {
+      "Estimator": "EacrSPKF",
+      "SocRmsePct": 0.4965517046623425,
+      "SocMePct": -0.1192469456411037,
+      "SocMssdPct2": 0.00022758259131882631,
+      "VoltageRmseMv": 1.1706045139719123,
+      "VoltageMeMv": 0.23494987622797578,
+      "VoltageMssdMv2": 0.22002448361639881
+    },
+    {
+      "Estimator": "EnacrSPKF",
+      "SocRmsePct": 13.425067444214649,
+      "SocMePct": 9.2332994421470023,
+      "SocMssdPct2": 4.8457475078086105,
+      "VoltageRmseMv": 23.035372626909844,
+      "VoltageMeMv": 17.539442713911907,
+      "VoltageMssdMv2": 1.7929225298021598
+    },
+    {
+      "Estimator": "EDUKF",
+      "SocRmsePct": 5.6459466891768262,
+      "SocMePct": 2.1552214556189964,
+      "SocMssdPct2": 0.00038609624428583423,
+      "VoltageRmseMv": 7.7864731489060031,
+      "VoltageMeMv": -0.24287099659937772,
+      "VoltageMssdMv2": 74.485749498729589
+    },
+    {
+      "Estimator": "EsSPKF",
+      "SocRmsePct": 8.2608385669554689,
+      "SocMePct": 7.8750802714558992,
+      "SocMssdPct2": 1.660142945570849E-6,
+      "VoltageRmseMv": 12.54635633821237,
+      "VoltageMeMv": -0.81625461814822176,
+      "VoltageMssdMv2": 0.24816548519372053
+    },
+    {
+      "Estimator": "EbSPKF",
+      "SocRmsePct": 8.4407180940614328,
+      "SocMePct": 7.6415935396356991,
+      "SocMssdPct2": 1.967190086894149E-6,
+      "VoltageRmseMv": 20.361538742206605,
+      "VoltageMeMv": -0.86761909117989344,
+      "VoltageMssdMv2": 0.11043137740601901
+    },
+    {
+      "Estimator": "EBiSPKF",
+      "SocRmsePct": 7.8222121600160328,
+      "SocMePct": 7.38039170269109,
+      "SocMssdPct2": 1.6678731458078647E-6,
+      "VoltageRmseMv": 12.724083059493202,
+      "VoltageMeMv": -1.447602519211854,
+      "VoltageMssdMv2": 0.11082816417336387
+    },
+    {
+      "Estimator": "Em7SPKF",
+      "SocRmsePct": 7.5931310726944385,
+      "SocMePct": 7.124768865240898,
+      "SocMssdPct2": 1.6262237438075737E-6,
+      "VoltageRmseMv": 16.13718886724406,
+      "VoltageMeMv": -1.488177410880545,
+      "VoltageMssdMv2": 0.3029110393810785
+    }
+  ]
+}

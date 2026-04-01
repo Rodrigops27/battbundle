@@ -23,7 +23,7 @@ for indID = 1:length(cellIDs), % process each cell type
   cellID = cellIDs{indID};     % get cell identifier
   
   % Read model OCV file, previously computed by runProcessOCV
-  modelFile = sprintf('../OCV_Files/%smodel-ocv.mat',cellID);
+  modelFile = sprintf('../../data/modelling/derived/ocv_models/misc/%smodel-ocv.mat',cellID);
   if ~exist(modelFile,'file'),
     error(['File "%s" not found.\n' ...
       'Please change folders so that "%s" points to a valid model '...

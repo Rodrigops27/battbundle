@@ -30,7 +30,6 @@ if ~isdeployed
     if isempty(here)
         here = pwd;
     end
-    cd(here);
 else
     here = fileparts(mfilename('fullpath'));
 end
@@ -71,9 +70,9 @@ function cfg = normalizeConfig(cfg, evaluation_root, repo_root)
 cfg.tc = getCfg(cfg, 'tc', 25);
 cfg.ts = getCfg(cfg, 'ts', 1);
 cfg.dataset_file = getCfg(cfg, 'dataset_file', ...
-    fullfile(evaluation_root, 'ROMSimData', 'datasets', 'rom_bus_coreBattery_dataset.mat'));
+    fullfile(repo_root, 'data', 'evaluation', 'processed', 'behavioral_nmc30_bss_v1', 'nominal', 'rom_bus_coreBattery_dataset.mat'));
 cfg.profile_file = getCfg(cfg, 'profile_file', ...
-    fullfile(evaluation_root, 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat'));
+    fullfile(repo_root, 'data', 'evaluation', 'raw', 'omtlife8ahc_hp', 'Bus_CoreBatteryData_Data.mat'));
 cfg.esc_model_file = getCfg(cfg, 'esc_model_file', ...
     firstExistingFile({ ...
     fullfile(repo_root, 'models', 'NMC30model.mat'), ...
@@ -88,8 +87,8 @@ cfg.R0figs = getCfg(cfg, 'R0figs', true);
 cfg.ComparisonFigs = getCfg(cfg, 'ComparisonFigs', true);
 cfg.Verbose = getCfg(cfg, 'Verbose', true);
 
-cfg.dataset_file = resolveOutputPath(cfg.dataset_file, evaluation_root);
-cfg.profile_file = resolveExistingPath(cfg.profile_file, evaluation_root);
+cfg.dataset_file = resolveEvaluationDatasetPath(cfg.dataset_file, repo_root, 'access', 'benchmark', 'must_exist', false);
+cfg.profile_file = resolveEvaluationDatasetPath(cfg.profile_file, repo_root, 'access', 'builder', 'must_exist', false);
 end
 
 function evalDataset = buildEvalDataset(dataset, model, cfg)

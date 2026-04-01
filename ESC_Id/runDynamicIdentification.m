@@ -4,18 +4,18 @@ function identification_results = runDynamicIdentification(cfg)
 % This function is the API-style wrapper around processDynamic. It accepts
 % an OCV model plus one or more dynamic-identification datasets, optionally
 % filters by temperature, runs processDynamic, saves a light ESC model, and
-% stores dynamic-fit metrics/results under ESC_Id/results.
+% stores reusable dynamic-fit metrics/results under data/modelling/derived.
 %
 % Example:
 %   cfg = struct();
 %   cfg.run_name = 'ATL20 P25 ESC identification';
-%   cfg.ocv_model_input = fullfile('ESC_Id', 'OCV_models', 'ATL20model-ocv.mat');
-%   cfg.dynamic_input = fullfile('data', 'Modelling', 'DYN_Files', 'ATL_DYN');
+%   cfg.ocv_model_input = fullfile('data', 'modelling', 'derived', 'ocv_models', 'atl20', 'ATL20model-ocv-vavgFT.mat');
+%   cfg.dynamic_input = fullfile('data', 'modelling', 'processed', 'dynamic', 'atl20');
 %   cfg.desired_temperature = 25;
 %   cfg.numpoles = 2;
 %   cfg.do_hysteresis = true;
 %   cfg.output.model_output_file = fullfile('models', 'ATL20model_P25.mat');
-%   cfg.output.results_file = fullfile('ESC_Id', 'results', 'ATL20model_P25_identification_results.mat');
+%   cfg.output.results_file = fullfile('data', 'modelling', 'derived', 'identification_results', 'atl20', 'ATL20model_P25_identification_results.mat');
 %   results = runDynamicIdentification(cfg);
 
 if nargin < 1 || isempty(cfg)
@@ -119,7 +119,7 @@ defaults.output = struct( ...
     'enabled_plots', false, ...
     'include_model_struct', false, ...
     'model_output_file', fullfile('models', 'ESCmodel.mat'), ...
-    'results_file', fullfile('ESC_Id', 'results', 'ESCmodel_identification_results.mat'));
+    'results_file', fullfile('data', 'modelling', 'derived', 'identification_results', 'misc', 'ESCmodel_identification_results.mat'));
 end
 
 function [cfg, paths] = normalizeConfig(cfg, esc_root, repo_root)
@@ -137,20 +137,21 @@ if isempty(cfg.dynamic_input)
 end
 
 if ischar(cfg.ocv_model_input) || (isstring(cfg.ocv_model_input) && isscalar(cfg.ocv_model_input))
-    cfg.ocv_model_input = resolveAbsolutePath(char(cfg.ocv_model_input), repo_root);
+    cfg.ocv_model_input = resolveModellingDatasetPath(char(cfg.ocv_model_input), repo_root, 'must_exist', true);
 end
 if ischar(cfg.dynamic_input) || (isstring(cfg.dynamic_input) && isscalar(cfg.dynamic_input))
-    cfg.dynamic_input = resolveAbsolutePath(char(cfg.dynamic_input), repo_root);
+    cfg.dynamic_input = resolveModellingDatasetPath(char(cfg.dynamic_input), repo_root, 'must_exist', true);
 end
 if ischar(cfg.ocv_validation_input) || (isstring(cfg.ocv_validation_input) && isscalar(cfg.ocv_validation_input))
-    cfg.ocv_validation_input = resolveAbsolutePath(char(cfg.ocv_validation_input), repo_root);
+    cfg.ocv_validation_input = resolveModellingDatasetPath(char(cfg.ocv_validation_input), repo_root, 'must_exist', true);
 end
 
 paths = struct();
 paths.esc_root = esc_root;
 paths.repo_root = repo_root;
 paths.model_output_file_abs = resolveOutputPath(cfg.output.model_output_file, repo_root);
-paths.results_file_abs = resolveOutputPath(cfg.output.results_file, repo_root);
+paths.results_file_abs = resolveModellingDatasetPath( ...
+    resolveOutputPath(cfg.output.results_file, repo_root), repo_root, 'must_exist', false);
 
 cfg.output.model_output_file = paths.model_output_file_abs;
 cfg.output.results_file = paths.results_file_abs;

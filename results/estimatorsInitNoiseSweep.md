@@ -9,7 +9,7 @@ This result summarizes the multi-estimator noise-covariance sweep on the ATL des
 | Study layer | `Evaluation/NoiseTuningSweep/` |
 | Core scripts | `runNoiseCovStudy.m`, `sweepNoiseStudy.m` |
 | Dataset mode | ESC-driven BSS synthetic dataset |
-| Dataset | `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat` |
+| Dataset | `data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat` |
 | ESC model | `models/ATLmodel.mat` |
 | Sweep mode | `grid` |
 | `sigma_w` range | `0.001, 0.005, 0.025, 0.125, 0.625, 3.12, 15.6, 78.1, 100` |

@@ -1,0 +1,139 @@
+{
+  "artifact_class": "summary",
+  "kind": "noise_cov_summary",
+  "layer": "evaluation",
+  "suite_version": "desktop_atl20_bss_v1",
+  "scenario_id": "atl20_p25_bundle_noise_cov_study_group2",
+  "created_on": "2026-03-31T00:00:00+02:00",
+  "summary_json_file": "results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_noise_cov_study_group2__summary.json",
+  "summary_markdown_file": "results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_noise_cov_study_group2__summary.md",
+  "heavy_results_file": "",
+  "saved_results_file": "",
+  "dataset_mode": "esc",
+  "sweep_mode": "grid",
+  "total_runs": 81,
+  "elapsed_seconds": null,
+  "sigma_w_values": [0.001, 0.005, 0.025, 0.125, 0.625, 3.12, 15.6, 78.1, 100.0],
+  "sigma_v_values": [0.000001, 0.000005, 0.000025, 0.000125, 0.000625, 0.00313, 0.0156, 0.0781, 0.2],
+  "n_sigma_w": 9,
+  "n_sigma_v": 9,
+  "estimator_names": ["EDUKF", "EsSPKF", "EbSPKF", "EBiSPKF", "Em7SPKF"],
+  "summary_table": [
+    {
+      "Estimator": "EDUKF",
+      "BestSigmaW": 0.625,
+      "BestSigmaV": 0.2,
+      "BestSocRmsePct": 0.55113,
+      "BestSocMePct": 0.4706,
+      "BestSocMssdPct2": 1.5283e-06,
+      "VoltageRmseMvAtBestSoc": 2.6035,
+      "VoltageMeMvAtBestSoc": -0.080215,
+      "VoltageMssdMv2AtBestSoc": 0.11212
+    },
+    {
+      "Estimator": "EsSPKF",
+      "BestSigmaW": 0.625,
+      "BestSigmaV": 0.2,
+      "BestSocRmsePct": 0.55113,
+      "BestSocMePct": 0.4706,
+      "BestSocMssdPct2": 1.5283e-06,
+      "VoltageRmseMvAtBestSoc": 2.6035,
+      "VoltageMeMvAtBestSoc": -0.080212,
+      "VoltageMssdMv2AtBestSoc": 0.11212
+    },
+    {
+      "Estimator": "EbSPKF",
+      "BestSigmaW": 0.125,
+      "BestSigmaV": 0.2,
+      "BestSocRmsePct": 0.6274,
+      "BestSocMePct": 0.54911,
+      "BestSocMssdPct2": 1.5276e-06,
+      "VoltageRmseMvAtBestSoc": 0.84519,
+      "VoltageMeMvAtBestSoc": -0.0042576,
+      "VoltageMssdMv2AtBestSoc": 0.11099
+    },
+    {
+      "Estimator": "EBiSPKF",
+      "BestSigmaW": 0.625,
+      "BestSigmaV": 0.2,
+      "BestSocRmsePct": 0.55371,
+      "BestSocMePct": 0.47385,
+      "BestSocMssdPct2": 1.5287e-06,
+      "VoltageRmseMvAtBestSoc": 2.6044,
+      "VoltageMeMvAtBestSoc": -0.080062,
+      "VoltageMssdMv2AtBestSoc": 0.11102
+    },
+    {
+      "Estimator": "Em7SPKF",
+      "BestSigmaW": 0.625,
+      "BestSigmaV": 0.2,
+      "BestSocRmsePct": 0.55113,
+      "BestSocMePct": 0.4706,
+      "BestSocMssdPct2": 1.5283e-06,
+      "VoltageRmseMvAtBestSoc": 2.6035,
+      "VoltageMeMvAtBestSoc": -0.080212,
+      "VoltageMssdMv2AtBestSoc": 0.11212
+    }
+  ],
+  "aggregate_summary": [
+    {
+      "Estimator": "EDUKF",
+      "MeanSocRmsePct": 2.237,
+      "BestSocRmsePct": 0.551,
+      "WorstSocRmsePct": 23.844,
+      "MeanSocMssdPct2": 3.9e-05,
+      "MeanVoltageRmseMv": 5.65,
+      "BestVoltageRmseMv": 0.02,
+      "WorstVoltageRmseMv": 54.91,
+      "MeanVoltageMssdMv2": 46.2718
+    },
+    {
+      "Estimator": "EsSPKF",
+      "MeanSocRmsePct": 1.476,
+      "BestSocRmsePct": 0.551,
+      "WorstSocRmsePct": 4.033,
+      "MeanSocMssdPct2": 2.0e-06,
+      "MeanVoltageRmseMv": 4.86,
+      "BestVoltageRmseMv": 0.02,
+      "WorstVoltageRmseMv": 23.23,
+      "MeanVoltageMssdMv2": 0.1736
+    },
+    {
+      "Estimator": "EbSPKF",
+      "MeanSocRmsePct": 1.864,
+      "BestSocRmsePct": 0.627,
+      "WorstSocRmsePct": 5.612,
+      "MeanSocMssdPct2": 2.0e-06,
+      "MeanVoltageRmseMv": 4.53,
+      "BestVoltageRmseMv": 0.03,
+      "WorstVoltageRmseMv": 25.41,
+      "MeanVoltageMssdMv2": 0.1109
+    },
+    {
+      "Estimator": "EBiSPKF",
+      "MeanSocRmsePct": 1.744,
+      "BestSocRmsePct": 0.554,
+      "WorstSocRmsePct": 5.416,
+      "MeanSocMssdPct2": 2.0e-06,
+      "MeanVoltageRmseMv": 4.55,
+      "BestVoltageRmseMv": 0.03,
+      "WorstVoltageRmseMv": 25.45,
+      "MeanVoltageMssdMv2": 0.111
+    },
+    {
+      "Estimator": "Em7SPKF",
+      "MeanSocRmsePct": 1.476,
+      "BestSocRmsePct": 0.551,
+      "WorstSocRmsePct": 4.033,
+      "MeanSocMssdPct2": 2.0e-06,
+      "MeanVoltageRmseMv": 4.86,
+      "BestVoltageRmseMv": 0.02,
+      "WorstVoltageRmseMv": 23.23,
+      "MeanVoltageMssdMv2": 0.1736
+    }
+  ],
+  "notes": [
+    "Recovered from Command Window output, not from the original MATLAB sweepResults variable.",
+    "Warning seen during reporting: EaEKF was not found in the sweep results."
+  ]
+}

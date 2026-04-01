@@ -9,7 +9,7 @@ This summary reports the ATL desktop-evaluation injection study. The source data
 | Study layer | `Evaluation/Injection/` |
 | Saved run | `Evaluation/Injection/results/injection_20260324_154523.mat` |
 | Scenario name | `atl_bss_desktop` |
-| Source dataset | `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat` |
+| Source dataset | `data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat` |
 | ESC model | `models/ATLmodel.mat` |
 | ROM model | `models/ROM_ATL20_beta.mat` |
 | Injection cases reported here | `noise`, `perturbance` |

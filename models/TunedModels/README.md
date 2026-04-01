@@ -1,15 +1,19 @@
-# TunedModels
+# Tuned ROM Models
 
-Direct usage guide for the ROM retuning and ROM validation workflow in `models/TunedModels/`.
+This folder contains released tuned ROM model artifacts and ROM-specific validation helpers.
 
-## What this folder does
+Released model files remain in `models/` and are not moved into `data/`.
 
-This folder contains the scripts used to:
+## Purpose
+
+Use this folder when you want to:
+
 - build retuned ROM models from existing ESC models
-- validate those ROMs against the source ESC models
-- re-plot saved ROM validation results
+- validate ROM models against their source ESC models
+- re-plot saved ROM validation results later
 
 Current entry points:
+
 - [`retuningROM.m`](retuningROM.m)
 - [`build_rom_models.m`](build_rom_models.m)
 - [`retuningROMVal.m`](retuningROMVal.m)
@@ -17,7 +21,7 @@ Current entry points:
 - [`plotRomValidation.m`](plotRomValidation.m)
 - [`extract_rom_results.m`](extract_rom_results.m)
 
-## Quick start
+## Quick Start
 
 From the repository root in MATLAB:
 
@@ -26,25 +30,19 @@ addpath(genpath('.'));
 cd models/TunedModels
 ```
 
-## Build retuned ROM models
-
-Batch build the repo's current ROM variants:
+Batch build the repo's ROM variants:
 
 ```matlab
 build_rom_models
 ```
 
-What it creates:
-- [`models/ROM_OMT8_beta.mat`](../ROM_OMT8_beta.mat)
-- [`models/ROM_ATL20_beta.mat`](../ROM_ATL20_beta.mat)
+Batch validate the repo's ROM set:
 
-What it uses:
-- base ROM: [`models/ROM_NMC30_HRA.mat`](../ROM_NMC30_HRA.mat)
-- ESC source models:
-  - [`models/OMTLIFEmodel.mat`](../OMTLIFEmodel.mat)
-  - [`models/ATLmodel.mat`](../ATLmodel.mat)
+```matlab
+validate_rom_models
+```
 
-## Build one ROM manually
+## Build One ROM Manually
 
 Default single-ROM build:
 
@@ -63,28 +61,7 @@ cfg.tc = 25;
 ROM = retuningROM(fullfile('models', 'ROM_OMT8_beta.mat'), cfg);
 ```
 
-Defaults in [`retuningROM.m`](retuningROM.m):
-- output file: [`models/ROM_ATL20_beta.mat`](../ROM_ATL20_beta.mat)
-- base ROM: [`models/ROM_NMC30_HRA.mat`](../ROM_NMC30_HRA.mat)
-- ESC source model: [`models/ATLmodel.mat`](../ATLmodel.mat)
-- temperature: `25 degC`
-
-## Validate ROM models
-
-Batch validation for the repo's current ROM set:
-
-```matlab
-validate_rom_models
-```
-
-What it validates:
-- [`models/ROM_OMT8_beta.mat`](../ROM_OMT8_beta.mat) against [`models/OMTLIFEmodel.mat`](../OMTLIFEmodel.mat)
-- [`models/ROM_ATL20_beta.mat`](../ROM_ATL20_beta.mat) against [`models/ATLmodel.mat`](../ATLmodel.mat)
-
-Saved output:
-- [`models/TunedModels/ROM_validation_results.mat`](ROM_validation_results.mat)
-
-## Validate one ROM manually
+## Validate One ROM Manually
 
 ```matlab
 cfg = struct();
@@ -98,7 +75,10 @@ cfg.show_plots = true;
 validation = retuningROMVal(cfg);
 ```
 
+## Custom Settings
+
 Useful [`retuningROMVal.m`](retuningROMVal.m) options:
+
 - `rom_file`
 - `esc_model_file`
 - `tc`
@@ -107,12 +87,29 @@ Useful [`retuningROMVal.m`](retuningROMVal.m) options:
 - `show_plots`
 - `dyn_file`
 
-Important default behavior:
-- if `ts` is empty, the ROM native sample time is used
-- if `dyn_file` is not provided, the script tries to use a chemistry-matched DYN `script1` profile from `ESC_Id/DYN_Files/...`
-- if no matching DYN file is found, it falls back to the synthetic script-1 profile from [`utility/profiles/buildScript1NormalizedProfile.m`](../../utility/profiles/buildScript1NormalizedProfile.m)
+Where a ROM validation helper needs a DYN validation profile, it now resolves canonical modelling inputs under:
 
-## Plot results anytime
+- `data/modelling/processed/dynamic/...`
+
+Examples:
+
+- `data/modelling/processed/dynamic/atl20/ATL_DYN_40_P25.mat`
+- `data/modelling/processed/dynamic/nmc30/NMC30_DYN_P25.mat`
+
+To force a specific validation profile:
+
+```matlab
+cfg = struct();
+cfg.rom_file = fullfile('models', 'ROM_ATL20_beta.mat');
+cfg.esc_model_file = fullfile('models', 'ATLmodel.mat');
+cfg.dyn_file = fullfile('data', 'modelling', 'processed', 'dynamic', 'atl20', 'ATL_DYN_40_P25.mat');
+
+validation = retuningROMVal(cfg);
+```
+
+If `dyn_file` is not provided, `retuningROMVal.m` tries to use a chemistry-matched canonical DYN `script1` profile. If no matching canonical DYN file is found, it falls back to the synthetic script-1 profile from [`utility/profiles/buildScript1NormalizedProfile.m`](../../utility/profiles/buildScript1NormalizedProfile.m).
+
+## Plot Results Anytime
 
 Plot after a fresh validation:
 
@@ -128,35 +125,20 @@ plotRomValidation(result_omt);
 plotRomValidation(result_atl);
 ```
 
-The plotting function creates:
-- a current and SOC figure
-- a voltage and voltage-error figure
-
-Plot titles are normalized to the form:
-- `NMC30 Dyn | RMSE xx.xx mV`
-- `OMT8 BSS | RMSE xx.xx mV`
-
-## Extract text summaries
-
-```matlab
-extract_rom_results
-```
-
-This reads [`ROM_validation_results.mat`](ROM_validation_results.mat) and prints a compact text summary of the saved metrics.
-
-## Files and outputs
+## Files and Outputs
 
 Inputs expected by this folder:
+
 - ESC models in `models/`
 - base ROMs in `models/`
-- optional DYN validation profiles in `ESC_Id/DYN_Files/...`
+- optional DYN validation profiles in `data/modelling/processed/dynamic/...`
 
 Outputs produced by this folder:
+
 - retuned ROM `.mat` files in `models/`
-- [`ROM_validation_results.mat`](ROM_validation_results.mat) in `models/TunedModels/`
+- `ROM_validation_results.mat` in `models/TunedModels/`
 
-## Related docs
+## Notes
 
-- [`results/ROMvalidation.md`](../../results/ROMvalidation.md)
-- [`ESC_Id/README.md`](../../ESC_Id/README.md)
-- [`Evaluation/README.md`](../../Evaluation/README.md)
+- Legacy assumptions about `ESC_Id/DYN_Files/...` are intentionally unsupported after the data-layout refactor.
+- This folder does not define any parallel execution layer of its own.

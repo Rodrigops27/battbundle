@@ -31,9 +31,8 @@ numpoles = 2;                      % Two RC pairs
 do_hysteresis = true;              % Fit hysteresis
 save_plots = false;
 
-profile_file = fullfile(repo_root,'Evaluation','OMTLIFE8AHC-HP', ...
-    'Bus_CoreBatteryData_Data.mat');
-ocv_model_file = fullfile(esc_root,'OCV_Files','OMTLIFE8AHC-HP','OMTLIFEmodel-ocv-diag.mat');
+profile_file = fullfile(repo_root, 'data', 'evaluation', 'raw', 'omtlife8ahc_hp', 'Bus_CoreBatteryData_Data.mat');
+ocv_model_file = fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'omtlife8ahc_hp', 'OMTLIFEmodel-ocv-diag.mat');
 output_file = fullfile(models_output_dir,'OMTLIFEmodel.mat');
 
 cfg = struct();

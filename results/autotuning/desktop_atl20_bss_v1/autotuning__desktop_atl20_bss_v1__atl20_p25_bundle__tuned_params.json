@@ -1,0 +1,121 @@
+{
+  "artifact_class": "summary",
+  "kind": "autotuning_tuned_params",
+  "layer": "autotuning",
+  "created_on": "2026-03-30 15:06:47",
+  "suite_version": "desktop_atl20_bss_v1",
+  "scenario_id": "atl20_p25_bundle",
+  "tuned_params_json_file": "results/autotuning/desktop_atl20_bss_v1/autotuning__desktop_atl20_bss_v1__atl20_p25_bundle__tuned_params.json",
+  "heavy_results_file": "autotuning/results/atl20_p25_bundle_autotuning_results.mat",
+  "run_name": "atl20_p25_bundle_autotuning",
+  "scenarios": [
+    {
+      "name": "atl20_p25_bss_esc",
+      "suite_version": "desktop_atl20_bss_v1",
+      "dataset_file": "data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat",
+      "esc_model_file": "models/ATL20model_P25.mat",
+      "rom_model_file": "models/ROM_ATL20_beta.mat",
+      "estimators": [
+        {
+          "estimator_name": "ROM-EKF",
+          "objective_metric": "SocRmsePct",
+          "best_objective_value": 9.599975558080807,
+          "tuned_parameters": [
+            { "name": "sigma_w_ekf", "value": 99.2346425966025 },
+            { "name": "sigma_v_ekf", "value": 0.19946430537656634 }
+          ]
+        },
+        {
+          "estimator_name": "ESC-SPKF",
+          "objective_metric": "SocRmsePct",
+          "best_objective_value": 7.6615896272228019,
+          "tuned_parameters": [
+            { "name": "sigma_w_esc", "value": 99.57684176495242 },
+            { "name": "sigma_v_esc", "value": 0.19675126126057063 }
+          ]
+        },
+        {
+          "estimator_name": "ESC-EKF",
+          "objective_metric": "SocRmsePct",
+          "best_objective_value": 8.6155018069225537,
+          "tuned_parameters": [
+            { "name": "sigma_w_esc", "value": 0.001487752438862048 },
+            { "name": "sigma_v_esc", "value": 0.19998544396320528 }
+          ]
+        },
+        {
+          "estimator_name": "EaEKF",
+          "objective_metric": "SocRmsePct",
+          "best_objective_value": 9.8332058927855588,
+          "tuned_parameters": [
+            { "name": "sigma_w_esc", "value": 31.848592889369872 },
+            { "name": "sigma_v_esc", "value": 1.0158891104413202e-08 }
+          ]
+        },
+        {
+          "estimator_name": "EacrSPKF",
+          "objective_metric": "SocRmsePct",
+          "best_objective_value": 0.49629443579978333,
+          "tuned_parameters": [
+            { "name": "sigma_w_esc", "value": 0.28968350609231697 },
+            { "name": "sigma_v_esc", "value": 5.1353594869790589e-06 }
+          ]
+        },
+        {
+          "estimator_name": "EnacrSPKF",
+          "objective_metric": "SocRmsePct",
+          "best_objective_value": 13.425956999419483,
+          "tuned_parameters": [
+            { "name": "sigma_w_esc", "value": 99.940365441529138 },
+            { "name": "sigma_v_esc", "value": 0.19976874042935996 }
+          ]
+        },
+        {
+          "estimator_name": "EDUKF",
+          "objective_metric": "SocRmsePct",
+          "best_objective_value": 5.6464596908343889,
+          "tuned_parameters": [
+            { "name": "sigma_w_esc", "value": 15.185522701806976 },
+            { "name": "sigma_v_esc", "value": 1.0362094190923006e-07 }
+          ]
+        },
+        {
+          "estimator_name": "EsSPKF",
+          "objective_metric": "SocRmsePct",
+          "best_objective_value": 8.2613640433198459,
+          "tuned_parameters": [
+            { "name": "sigma_w_esc", "value": 30.535327820823539 },
+            { "name": "sigma_v_esc", "value": 0.043206650074841674 }
+          ]
+        },
+        {
+          "estimator_name": "EbSPKF",
+          "objective_metric": "SocRmsePct",
+          "best_objective_value": 8.4411301088340167,
+          "tuned_parameters": [
+            { "name": "sigma_w_esc", "value": 98.92293520406902 },
+            { "name": "sigma_v_esc", "value": 0.19937216066115243 }
+          ]
+        },
+        {
+          "estimator_name": "EBiSPKF",
+          "objective_metric": "SocRmsePct",
+          "best_objective_value": 7.8227360050271475,
+          "tuned_parameters": [
+            { "name": "sigma_w_esc", "value": 19.562597997926822 },
+            { "name": "sigma_v_esc", "value": 0.09645803474587436 }
+          ]
+        },
+        {
+          "estimator_name": "Em7SPKF",
+          "objective_metric": "SocRmsePct",
+          "best_objective_value": 7.5936451459985923,
+          "tuned_parameters": [
+            { "name": "sigma_w_esc", "value": 58.08047931189445 },
+            { "name": "sigma_v_esc", "value": 0.19963773002464155 }
+          ]
+        }
+      ]
+    }
+  ]
+}

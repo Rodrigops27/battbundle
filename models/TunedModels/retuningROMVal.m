@@ -322,10 +322,7 @@ end
 function dyn_file = resolveDynProfileFile(cfg, repo_root, esc_model_name)
 dyn_file = '';
 if ~isempty(cfg.dyn_file)
-    dyn_file = cfg.dyn_file;
-    if exist(dyn_file, 'file') ~= 2
-        dyn_file = fullfile(repo_root, dyn_file);
-    end
+    dyn_file = resolveModellingDatasetPath(cfg.dyn_file, repo_root, 'must_exist', true);
     if exist(dyn_file, 'file') ~= 2
         error('retuningROMVal:MissingDynFile', ...
             'DYN profile file not found: %s', cfg.dyn_file);
@@ -336,13 +333,13 @@ end
 label = shortChemistryLabel(esc_model_name);
 switch label
     case 'NMC30'
-        candidates = {fullfile(repo_root, 'ESC_Id', 'DYN_Files', 'NMC30_DYN', 'NMC30_DYN_P25.mat')};
+        candidates = {fullfile(repo_root, 'data', 'modelling', 'processed', 'dynamic', 'nmc30', 'NMC30_DYN_P25.mat')};
     case 'OMT8'
-        candidates = {fullfile(repo_root, 'ESC_Id', 'DYN_Files', 'OMT8_DYN', 'OMT8_DYN_P25.mat')};
+        candidates = {};
     case 'ATL'
         candidates = { ...
-            fullfile(repo_root, 'ESC_Id', 'DYN_Files', 'ATL_DYN', 'ATL_DYN_P25.mat'), ...
-            fullfile(repo_root, 'ESC_Id', 'DYN_Files', 'ATL_DYN', 'ATL_DYN_40_P25.mat')};
+            fullfile(repo_root, 'data', 'modelling', 'processed', 'dynamic', 'atl20', 'ATL_DYN_P25.mat'), ...
+            fullfile(repo_root, 'data', 'modelling', 'processed', 'dynamic', 'atl20', 'ATL_DYN_40_P25.mat')};
     otherwise
         candidates = {};
 end

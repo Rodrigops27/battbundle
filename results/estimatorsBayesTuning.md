@@ -6,7 +6,7 @@ This summary reports the results obtain through a Bayes optimization to tune the
 
 Scenario details:
 - chemistry / scenario: `ATL` / `atl_bss_esc`
-- dataset: `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`
+- dataset: `data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat`
 - ESC model: `models/ATLmodel.mat`
 - ROM model: `models/ROM_ATL20_beta.mat`
 - optimization objective: `SocRmsePct`

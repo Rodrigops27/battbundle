@@ -11,7 +11,7 @@ The scenario considered here is:
 | Item | Value |
 | --- | --- |
 | Bundle | ATL desktop evaluation |
-| Dataset | `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat` |
+| Dataset | `data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat` |
 | Dataset type | ESC-driven BSS synthetic dataset |
 | ESC model | `models/ATLmodel.mat` |
 | Main benchmark reference | `results/estimatorsBayesTuning.md` |

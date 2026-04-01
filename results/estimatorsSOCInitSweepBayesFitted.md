@@ -10,7 +10,7 @@ Scenario:
 | --- | --- |
 | Study script | `Evaluation/initSOCs/runInitSocStudy.m` / `Evaluation/initSOCs/sweepInitSocStudy.m` |
 | Saved results | `Evaluation/initSOCs/results/Init_Sweep_ATL_BSS_init_soc_sweep_results.mat` |
-| Dataset | `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat` |
+| Dataset | `data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat` |
 | Dataset type | ESC-driven BSS synthetic dataset |
 | ESC model | `models/ATLmodel.mat` |
 | Sweep | initial SOC from `0%` to `100%` in `10%` steps |

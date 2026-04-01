@@ -39,6 +39,7 @@
 %
 % TODO: use a masked/smoothed dU/dZ-based lag estimation instead of
 % relying on unmasked dZ/dU-like inverse-slope alignment over the full range.
+% adding pchip to the interpolation pursuing for monotonicity.
 
 function model=DiagProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots,diagType)
   if nargin < 6 || isempty(debugPlots)

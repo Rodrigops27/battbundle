@@ -131,6 +131,8 @@ So `EacrSPKF` is the main case where the full grid sweep should be trusted more 
 
 ## Bayes quality versus robustness
 
+This review should also be separated from transfer robustness under explicit sensor corruption. A Bayes result can be genuinely good against the full covariance grid and still transfer poorly to the injected `noise` case, because the optimizer was tuned on the nominal ATL `SocRmsePct` objective rather than on a corrupted-measurement benchmark. That distinction appears clearly in this repo: several SPKF-family estimators show excellent or good Bayes recovery against the grid in this review, yet the tuned-profile injection study shows that `ESC-SPKF`, `EDUKF`, `EsSPKF`, `EBiSPKF`, and `Em7SPKF` can degrade badly under random measurement corruption. A plausible reason is over-specialization of the tuned covariance point to the nominal desktop benchmark, especially where Bayes selected extremely small sensor-noise values, making the filter too confident in measurements that are later corrupted in the injection testbench. So a strong Bayes/grid match should be read as evidence of optimizer quality at the nominal objective, not as automatic evidence of robustness to injected measurement noise.
+
 This review also separates two questions that are easy to mix together:
 
 1. Did Bayes optimization find a near-best tuned point?

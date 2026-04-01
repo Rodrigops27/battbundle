@@ -85,6 +85,8 @@ end
 paths = struct();
 paths.injection_root = injection_root;
 paths.repo_root = repo_root;
+suite_versions = unique(arrayfun(@(s) char(s.suite_version), cfg.scenarios, 'UniformOutput', false), 'stable');
+paths.registry = ensureDataRegistryLayout(repo_root, 'suite_versions', suite_versions);
 paths.results_root_abs = resolveAbsolutePath(cfg.output.results_root, repo_root);
 paths.datasets_root_abs = resolveAbsolutePath(cfg.output.datasets_root, repo_root);
 if exist(paths.results_root_abs, 'dir') ~= 7, mkdir(paths.results_root_abs); end
@@ -102,14 +104,25 @@ plan = struct([]);
 plan_idx = 0;
 for scenario_idx = 1:numel(cfg.scenarios)
     scenario = cfg.scenarios(scenario_idx);
-    source_dataset = loadOrBuildSourceDataset(scenario, paths.repo_root);
+    [source_dataset, source_dataset_file] = loadOrBuildSourceDataset(scenario, paths.repo_root);
     for case_idx = 1:numel(scenario.injection_cases)
         case_cfg = scenario.injection_cases(case_idx);
+        case_id = fieldOr(case_cfg, 'case_id', sprintf('case_%03d', case_idx));
+        dataset_family = fieldOr(case_cfg, 'dataset_family', fieldOr(case_cfg, 'mode', 'derived'));
+        augmentation_type = fieldOr(case_cfg, 'augmentation_type', fieldOr(case_cfg, 'mode', 'derived'));
+        case_root = buildInjectedDatasetRoot(paths.repo_root, scenario.suite_version, dataset_family, case_id);
         plan_idx = plan_idx + 1;
         plan(plan_idx, 1).scenario_name = scenario.name; %#ok<AGROW>
+        plan(plan_idx, 1).suite_version = scenario.suite_version;
         plan(plan_idx, 1).case_cfg = case_cfg;
+        plan(plan_idx, 1).case_id = case_id;
+        plan(plan_idx, 1).dataset_family = dataset_family;
+        plan(plan_idx, 1).augmentation_type = augmentation_type;
         plan(plan_idx, 1).source_dataset = source_dataset;
-        plan(plan_idx, 1).dataset_file = buildInjectedDatasetPath(paths.datasets_root_abs, scenario.name, case_cfg.name);
+        plan(plan_idx, 1).source_dataset_file = source_dataset_file;
+        plan(plan_idx, 1).dataset_root = case_root;
+        plan(plan_idx, 1).dataset_file = fullfile(case_root, 'dataset.mat');
+        plan(plan_idx, 1).manifest_file = fullfile(case_root, 'manifest.json');
         plan(plan_idx, 1).benchmark_results_file = buildBenchmarkResultsPath(paths.results_root_abs, scenario.name, case_cfg.name);
         plan(plan_idx, 1).benchmark_dataset_template = scenario.benchmark_dataset_template;
         plan(plan_idx, 1).modelSpec = scenario.modelSpec;
@@ -121,6 +134,25 @@ end
 
 function run_output = executePlan(plan_item, validation_cfg)
 [dataset, metadata] = generateInjectedDataset(plan_item.source_dataset, plan_item.dataset_file, plan_item.case_cfg); %#ok<ASGLU>
+
+source_dataset_id = inferSourceDatasetId(plan_item.source_dataset, plan_item.source_dataset_file);
+dataset_id = sprintf('%s__%s__%s', plan_item.suite_version, plan_item.dataset_family, plan_item.case_id);
+manifest = struct( ...
+    'dataset_id', dataset_id, ...
+    'parent_dataset_id', source_dataset_id, ...
+    'suite_version', plan_item.suite_version, ...
+    'dataset_family', plan_item.dataset_family, ...
+    'augmentation_type', plan_item.augmentation_type, ...
+    'case_id', plan_item.case_id, ...
+    'source_dataset_path', normalizeStoredPath(plan_item.source_dataset_file), ...
+    'resolved_output_path', normalizeStoredPath(plan_item.dataset_file), ...
+    'random_seed', fieldOr(plan_item.case_cfg, 'random_seed', []), ...
+    'generated_by', 'runInjectionStudy', ...
+    'generated_at', datestr(now, 'yyyy-mm-dd HH:MM:SS'), ...
+    'benchmark_contract_version', 'benchmark_dataset_struct_v1', ...
+    'injection_config', plan_item.case_cfg, ...
+    'notes', fieldOr(plan_item.case_cfg, 'notes', ''));
+writeDerivedDatasetManifest(plan_item.dataset_root, manifest, 'write_mat_metadata', true);
 
 validation = struct();
 if validation_cfg.run_validation
@@ -144,6 +176,10 @@ run_output = struct();
 run_output.scenario_name = plan_item.scenario_name;
 run_output.case_name = plan_item.case_cfg.name;
 run_output.injection_mode = plan_item.case_cfg.mode;
+run_output.case_id = plan_item.case_id;
+run_output.dataset_id = dataset_id;
+run_output.parent_dataset_id = source_dataset_id;
+run_output.manifest_file = plan_item.manifest_file;
 run_output.injected_dataset_file = plan_item.dataset_file;
 run_output.benchmark_results_file = results.metadata.saved_results_file;
 run_output.validation = validation;
@@ -151,9 +187,9 @@ run_output.metrics_table = results.metadata.metrics_table;
 run_output.results = results;
 end
 
-function source_dataset = loadOrBuildSourceDataset(scenario, repo_root)
+function [source_dataset, dataset_file] = loadOrBuildSourceDataset(scenario, repo_root)
 spec = scenario.source_dataset;
-dataset_file = resolveReadPath(spec.dataset_file, repo_root);
+dataset_file = resolveEvaluationDatasetPath(spec.dataset_file, repo_root, 'access', 'benchmark', 'must_exist', false);
 if getCfg(spec, 'rebuild_dataset', false) || exist(dataset_file, 'file') ~= 2
     if ~isfield(spec, 'builder_fcn') || isempty(spec.builder_fcn)
         error('runInjectionStudy:MissingSourceDataset', ...
@@ -174,8 +210,9 @@ dataset_var = getCfg(spec, 'dataset_variable', 'dataset');
 source_dataset = loaded.(dataset_var);
 end
 
-function path_out = buildInjectedDatasetPath(datasets_root, scenario_name, case_name)
-path_out = fullfile(datasets_root, sanitizeToken(scenario_name), [sanitizeToken(case_name) '.mat']);
+function path_out = buildInjectedDatasetRoot(repo_root, suite_version, dataset_family, case_id)
+path_out = resolveEvaluationOutputRoot(repo_root, suite_version, dataset_family, ...
+    'kind', 'derived', 'case_id', case_id, 'create_dir', true);
 end
 
 function path_out = buildBenchmarkResultsPath(results_root, scenario_name, case_name)
@@ -227,16 +264,6 @@ if isa(raw_fcn, 'function_handle')
     fcn = raw_fcn;
 else
     fcn = str2func(char(raw_fcn));
-end
-end
-
-function path_out = resolveReadPath(path_in, repo_root)
-if exist(path_in, 'file') == 2 || exist(path_in, 'dir') == 7
-    path_out = path_in;
-elseif isAbsolutePath(path_in)
-    path_out = path_in;
-else
-    path_out = fullfile(repo_root, path_in);
 end
 end
 
@@ -328,4 +355,36 @@ token = regexprep(token, '^_|_$', '');
 if isempty(token)
     token = 'case';
 end
+end
+
+function dataset_id = inferSourceDatasetId(dataset, dataset_file)
+dataset_id = '';
+if isstruct(dataset)
+    dataset_id = fieldOr(dataset, 'dataset_id', '');
+end
+if isempty(dataset_id)
+    [~, base_name] = fileparts(dataset_file);
+    dataset_id = base_name;
+end
+end
+
+function path_out = normalizeStoredPath(path_in)
+path_out = relativizeRepoPath(path_in, resolveRepoRoot());
+end
+
+function path_out = relativizeRepoPath(path_in, repo_root)
+path_out = strrep(char(path_in), '\', '/');
+path_out = regexprep(path_out, '/+', '/');
+repo_root = strrep(char(repo_root), '\', '/');
+repo_root = regexprep(repo_root, '/+', '/');
+repo_prefix = [repo_root '/'];
+if strcmpi(path_out, repo_root)
+    path_out = '.';
+elseif strncmpi(path_out, repo_prefix, numel(repo_prefix))
+    path_out = path_out(numel(repo_prefix) + 1:end);
+end
+end
+
+function repo_root = resolveRepoRoot()
+repo_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 end

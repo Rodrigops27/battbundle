@@ -6,12 +6,12 @@ This summary collects the latest saved benchmark runs from the Evaluation layer.
 Included runs:
 - `ATL20`
   - ESC-driven Bus Core Battery synthetic dataset
-  - dataset: `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`
+  - dataset: `data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat`
   - ESC model: `models/ATLmodel.mat`
   - ROM model: `models/ROM_ATL20_beta.mat`
 - `NMC30`
   - ROM-driven benchmark dataset
-  - dataset: `Evaluation/ROMSimData/datasets/rom_bus_coreBattery_dataset.mat`
+  - dataset: `data/evaluation/processed/behavioral_nmc30_bss_v1/nominal/rom_bus_coreBattery_dataset.mat`
   - ESC model: `models/NMC30model.mat`
   - ROM model: `models/ROM_NMC30_HRA12.mat`
 

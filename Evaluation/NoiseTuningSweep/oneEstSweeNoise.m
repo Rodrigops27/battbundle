@@ -203,9 +203,9 @@ defaults.PlotVoltageMetricfigs = true;
 defaults.PlotInnovationMetricfigs = true;
 defaults.continue_on_failure = true;
 defaults.print_failure_table = true;
-defaults.esc_dataset_file = fullfile(repo_root, 'Evaluation', 'ESCSimData', 'datasets', 'esc_bus_coreBattery_dataset.mat');
-defaults.rom_dataset_file = fullfile(repo_root, 'Evaluation', 'ROMSimData', 'datasets', 'rom_bus_coreBattery_dataset.mat');
-defaults.raw_bus_file = fullfile(repo_root, 'Evaluation', 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat');
+defaults.esc_dataset_file = fullfile(repo_root, 'data', 'evaluation', 'processed', 'desktop_atl20_bss_v1', 'nominal', 'esc_bus_coreBattery_dataset.mat');
+defaults.rom_dataset_file = fullfile(repo_root, 'data', 'evaluation', 'processed', 'behavioral_nmc30_bss_v1', 'nominal', 'rom_bus_coreBattery_dataset.mat');
+defaults.raw_bus_file = fullfile(repo_root, 'data', 'evaluation', 'raw', 'omtlife8ahc_hp', 'Bus_CoreBatteryData_Data.mat');
 defaults.rom_file = firstExistingFile({ ...
     fullfile(repo_root, 'models', 'ROM_NMC30_HRA12.mat'), ...
     fullfile(repo_root, 'models', 'ROM_NMC30_HRA.mat')}, ...
@@ -219,6 +219,9 @@ defaults.esc_model_file = firstExistingFile({ ...
 defaults.tuning = defaultStudyTuning();
 
 cfg = mergeStructDefaults(cfg, defaults);
+cfg.esc_dataset_file = resolveEvaluationDatasetPath(cfg.esc_dataset_file, repo_root, 'access', 'benchmark', 'must_exist', false);
+cfg.rom_dataset_file = resolveEvaluationDatasetPath(cfg.rom_dataset_file, repo_root, 'access', 'benchmark', 'must_exist', false);
+cfg.raw_bus_file = resolveEvaluationDatasetPath(cfg.raw_bus_file, repo_root, 'access', 'builder', 'must_exist', false);
 cfg.tuning = mergeStructDefaults(cfg.tuning, defaultStudyTuning());
 cfg.sweep_mode = lower(cfg.sweep_mode);
 cfg.estimator_name = normalizeCharValue(cfg.estimator_name, 'oneEstSweeNoise:BadEstimatorName');

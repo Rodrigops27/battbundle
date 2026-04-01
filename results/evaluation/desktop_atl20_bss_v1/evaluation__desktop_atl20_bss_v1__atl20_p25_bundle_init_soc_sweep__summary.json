@@ -1,0 +1,254 @@
+{
+  "artifact_class": "summary",
+  "kind": "init_soc_summary",
+  "layer": "evaluation",
+  "suite_version": "desktop_atl20_bss_v1",
+  "scenario_id": "atl20_p25_bundle_init_soc_sweep",
+  "created_on": "2026-03-31T00:00:00+02:00",
+  "summary_json_file": "results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_init_soc_sweep__summary.json",
+  "summary_markdown_file": "results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_init_soc_sweep__summary.md",
+  "heavy_results_file": "Evaluation/initSOCs/results/atl20_p25_bundle_init_soc_sweep.mat",
+  "extracted_summary_file": "Evaluation/initSOCs/results/atl20_p25_bundle_init_soc_sweep_summary.mat",
+  "source_file": "Evaluation/initSOCs/results/atl20_p25_bundle_init_soc_sweep.mat",
+  "dataset_mode": "esc",
+  "estimator_names": [
+    "ROM-EKF",
+    "ESC-SPKF",
+    "ESC-EKF",
+    "EaEKF",
+    "EacrSPKF",
+    "EnacrSPKF",
+    "EDUKF",
+    "EsSPKF",
+    "EbSPKF",
+    "EBiSPKF",
+    "Em7SPKF"
+  ],
+  "soc0_sweep_percent": [
+    0,
+    5,
+    10,
+    15,
+    20,
+    25,
+    30,
+    35,
+    40,
+    45,
+    50,
+    55,
+    60,
+    65,
+    70,
+    75,
+    80,
+    85,
+    90,
+    95,
+    100
+  ],
+  "n_sweep_points": 21,
+  "aggregate_table": [
+    {
+      "Estimator": "ROM-EKF",
+      "MeanSocRmsePct": 11.551,
+      "BestSocRmsePct": 9.4009,
+      "WorstSocRmsePct": 13.833,
+      "MeanVoltageRmseMv": 51.54,
+      "BestVoltageRmseMv": 50.554,
+      "WorstVoltageRmseMv": 55.703
+    },
+    {
+      "Estimator": "ESC-SPKF",
+      "MeanSocRmsePct": 5.6744,
+      "BestSocRmsePct": 2.8339,
+      "WorstSocRmsePct": 10.481,
+      "MeanVoltageRmseMv": 26.173,
+      "BestVoltageRmseMv": 25.393,
+      "WorstVoltageRmseMv": 30.119
+    },
+    {
+      "Estimator": "ESC-EKF",
+      "MeanSocRmsePct": 6.6181,
+      "BestSocRmsePct": 0.52869,
+      "WorstSocRmsePct": 28.129,
+      "MeanVoltageRmseMv": 10.523,
+      "BestVoltageRmseMv": 2.0385,
+      "WorstVoltageRmseMv": 72.912
+    },
+    {
+      "Estimator": "EaEKF",
+      "MeanSocRmsePct": 0.67959,
+      "BestSocRmsePct": 0.63998,
+      "WorstSocRmsePct": 0.7572,
+      "MeanVoltageRmseMv": 0.068648,
+      "BestVoltageRmseMv": 0.0022467,
+      "WorstVoltageRmseMv": 0.54365
+    },
+    {
+      "Estimator": "EacrSPKF",
+      "MeanSocRmsePct": 12.171,
+      "BestSocRmsePct": 2.3452,
+      "WorstSocRmsePct": 28.766,
+      "MeanVoltageRmseMv": 1.0693,
+      "BestVoltageRmseMv": 0.51937,
+      "WorstVoltageRmseMv": 3.1256
+    },
+    {
+      "Estimator": "EnacrSPKF",
+      "MeanSocRmsePct": 13.391,
+      "BestSocRmsePct": 13.39,
+      "WorstSocRmsePct": 13.391,
+      "MeanVoltageRmseMv": 30.913,
+      "BestVoltageRmseMv": 30.885,
+      "WorstVoltageRmseMv": 31.084
+    },
+    {
+      "Estimator": "EDUKF",
+      "MeanSocRmsePct": 14.343,
+      "BestSocRmsePct": 3.1635,
+      "WorstSocRmsePct": 34.115,
+      "MeanVoltageRmseMv": 55.132,
+      "BestVoltageRmseMv": 11.97,
+      "WorstVoltageRmseMv": 305.89
+    },
+    {
+      "Estimator": "EsSPKF",
+      "MeanSocRmsePct": 4.5433,
+      "BestSocRmsePct": 2.0816,
+      "WorstSocRmsePct": 10.313,
+      "MeanVoltageRmseMv": 18.271,
+      "BestVoltageRmseMv": 17.42,
+      "WorstVoltageRmseMv": 24.309
+    },
+    {
+      "Estimator": "EbSPKF",
+      "MeanSocRmsePct": 5.816,
+      "BestSocRmsePct": 3.1896,
+      "WorstSocRmsePct": 10.232,
+      "MeanVoltageRmseMv": 26.068,
+      "BestVoltageRmseMv": 25.361,
+      "WorstVoltageRmseMv": 29.786
+    },
+    {
+      "Estimator": "EBiSPKF",
+      "MeanSocRmsePct": 4.8131,
+      "BestSocRmsePct": 1.8649,
+      "WorstSocRmsePct": 11.177,
+      "MeanVoltageRmseMv": 18.458,
+      "BestVoltageRmseMv": 17.544,
+      "WorstVoltageRmseMv": 23.571
+    },
+    {
+      "Estimator": "Em7SPKF",
+      "MeanSocRmsePct": 5.8083,
+      "BestSocRmsePct": 2.0043,
+      "WorstSocRmsePct": 12.629,
+      "MeanVoltageRmseMv": 23.137,
+      "BestVoltageRmseMv": 21.84,
+      "WorstVoltageRmseMv": 29.937
+    }
+  ],
+  "best_point_table": [
+    {
+      "Estimator": "ROM-EKF",
+      "BestInitialSocPct": 60,
+      "SocRmsePctAtBestPoint": 9.4009,
+      "VoltageRmseMvAtBestPoint": 50.738
+    },
+    {
+      "Estimator": "ESC-SPKF",
+      "BestInitialSocPct": 60,
+      "SocRmsePctAtBestPoint": 2.8339,
+      "VoltageRmseMvAtBestPoint": 25.409
+    },
+    {
+      "Estimator": "ESC-EKF",
+      "BestInitialSocPct": 60,
+      "SocRmsePctAtBestPoint": 0.52869,
+      "VoltageRmseMvAtBestPoint": 2.0385
+    },
+    {
+      "Estimator": "EaEKF",
+      "BestInitialSocPct": 60,
+      "SocRmsePctAtBestPoint": 0.63998,
+      "VoltageRmseMvAtBestPoint": 0.0023201
+    },
+    {
+      "Estimator": "EacrSPKF",
+      "BestInitialSocPct": 60,
+      "SocRmsePctAtBestPoint": 2.3452,
+      "VoltageRmseMvAtBestPoint": 0.67088
+    },
+    {
+      "Estimator": "EnacrSPKF",
+      "BestInitialSocPct": 20,
+      "SocRmsePctAtBestPoint": 13.39,
+      "VoltageRmseMvAtBestPoint": 31.083
+    },
+    {
+      "Estimator": "EDUKF",
+      "BestInitialSocPct": 55,
+      "SocRmsePctAtBestPoint": 3.1635,
+      "VoltageRmseMvAtBestPoint": 13.77
+    },
+    {
+      "Estimator": "EsSPKF",
+      "BestInitialSocPct": 70,
+      "SocRmsePctAtBestPoint": 2.0816,
+      "VoltageRmseMvAtBestPoint": 17.42
+    },
+    {
+      "Estimator": "EbSPKF",
+      "BestInitialSocPct": 65,
+      "SocRmsePctAtBestPoint": 3.1896,
+      "VoltageRmseMvAtBestPoint": 25.361
+    },
+    {
+      "Estimator": "EBiSPKF",
+      "BestInitialSocPct": 65,
+      "SocRmsePctAtBestPoint": 1.8649,
+      "VoltageRmseMvAtBestPoint": 17.544
+    },
+    {
+      "Estimator": "Em7SPKF",
+      "BestInitialSocPct": 65,
+      "SocRmsePctAtBestPoint": 2.0043,
+      "VoltageRmseMvAtBestPoint": 21.84
+    }
+  ],
+  "selected_points_table": [
+    {
+      "InitialSocPct": 0,
+      "BestSocRmseEstimator": "EaEKF",
+      "BestSocRmsePct": 0.72337,
+      "BestVoltageRmseEstimator": "EaEKF",
+      "BestVoltageRmseMv": 0.54365
+    },
+    {
+      "InitialSocPct": 50,
+      "BestSocRmseEstimator": "EaEKF",
+      "BestSocRmsePct": 0.64537,
+      "BestVoltageRmseEstimator": "EaEKF",
+      "BestVoltageRmseMv": 0.0022467
+    },
+    {
+      "InitialSocPct": 60,
+      "BestSocRmseEstimator": "ESC-EKF",
+      "BestSocRmsePct": 0.52869,
+      "BestVoltageRmseEstimator": "EaEKF",
+      "BestVoltageRmseMv": 0.0023201
+    },
+    {
+      "InitialSocPct": 100,
+      "BestSocRmseEstimator": "EaEKF",
+      "BestSocRmsePct": 0.75432,
+      "BestVoltageRmseEstimator": "EaEKF",
+      "BestVoltageRmseMv": 0.27725
+    }
+  ],
+  "notes": [
+    "Reconstructed from Command Window output.",
+    "The heavy sweep MAT and extracted summary MAT already exist; this promoted summary was filled in from the printed tables."
+  ]
+}

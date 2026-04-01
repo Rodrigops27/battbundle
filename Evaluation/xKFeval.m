@@ -30,6 +30,9 @@ function results = xKFeval(dataset, estimators, flags)
 %   flags.R0figs               Optional R0 summary figure. Default true if available.
 %   flags.Biasfigs             Optional bias summary figure. Default true if available.
 %   flags.default_temperature_c Optional scalar, default 25.
+%   flags.use_parallel         Optional logical. Parallelize across estimators.
+%   flags.auto_start_parallel_pool Optional logical, default true.
+%   flags.parallel_pool_size   Optional scalar worker count.
 
 dataset = normalizeDataset(dataset, flags);
 flags = normalizeFlags(flags);
@@ -37,52 +40,44 @@ estimators = normalizeEstimators(estimators, dataset);
 
 n_samples = numel(dataset.time_s);
 n_estimators = numel(estimators);
+[use_parallel, parallel_info] = resolveParallelMode(flags, n_estimators);
 
-for idx = 1:n_estimators
-    est = estimators(idx);
-    est_result = initializeEstimatorResult(est, dataset, n_samples);
-
-    for k = 2:n_samples
-        dt = dataset.delta_t_s(k-1);
-        step = est.stepFcn(dataset.voltage_v(k), dataset.current_a(k), ...
-            dataset.temperature_c(k), dt, est.kfData);
-        est.kfData = step.kfData;
-
-        est_result.soc(k) = clamp01(step.soc);
-        est_result.voltage(k) = step.voltage;
-        est_result.soc_bnd(k) = step.soc_bnd;
-        est_result.voltage_bnd(k) = step.voltage_bnd;
-        est_result.innovation_pre(k) = step.innovation_pre;
-        est_result.sk(k) = step.sk;
-
-        if est_result.has_r0
-            est_result.r0(k) = step.r0;
-            est_result.r0_bnd(k) = step.r0_bnd;
+estimator_results = cell(n_estimators, 1);
+if use_parallel
+    try
+        parfor idx = 1:n_estimators
+            estimator_results{idx} = runSingleEstimator(estimators(idx), dataset, n_samples);
         end
-        if est_result.has_bias
-            est_result.bias(k, :) = reshape(step.bias, 1, []);
-            est_result.bias_bnd(k, :) = reshape(step.bias_bnd, 1, []);
+    catch ME
+        warning('xKFeval:ParallelFallback', ...
+            ['Parallel estimator evaluation failed (%s). ', ...
+             'Falling back to serial execution. If this happened after editing xKFeval.m, ', ...
+             'restart the parallel pool and rerun.'], ME.message);
+        parallel_info.used = false;
+        parallel_info.message = sprintf('Parallel estimator evaluation failed and fell back to serial execution (%s).', ME.message);
+        parallel_info.failure_message = ME.message;
+        for idx = 1:n_estimators
+            estimator_results{idx} = runSingleEstimator(estimators(idx), dataset, n_samples);
         end
     end
-
-    est_result.error_soc = dataset.metric_soc - est_result.soc;
-    est_result.error_voltage = dataset.metric_voltage - est_result.voltage;
-    est_result.rmse_soc = sqrt(mean(est_result.error_soc(~isnan(est_result.error_soc)).^2));
-    est_result.rmse_voltage = sqrt(mean(est_result.error_voltage(~isnan(est_result.error_voltage)).^2));
-    est_result.me_soc = mean(est_result.error_soc(~isnan(est_result.error_soc)));
-    est_result.me_voltage = mean(est_result.error_voltage(~isnan(est_result.error_voltage)));
-    est_result.mssd_soc = computeMssd(est_result.soc);
-    est_result.mssd_voltage = computeMssd(est_result.voltage);
-    est_result.kfDataFinal = est.kfData;
-
-    estimators(idx) = est;
-    results.estimators(idx) = est_result; 
+else
+    for idx = 1:n_estimators
+        estimator_results{idx} = runSingleEstimator(estimators(idx), dataset, n_samples);
+    end
 end
+
+results.estimators = vertcat(estimator_results{:});
 
 results.dataset = dataset;
 results.flags = flags;
+results.parallel = parallel_info;
 
 if flags.Verbose
+    if parallel_info.used
+        fprintf('xKFeval parallel estimator evaluation enabled (%d workers).\n', parallel_info.pool_size);
+    elseif ~isempty(parallel_info.message)
+        fprintf('%s\n', parallel_info.message);
+    end
     printSummary(results);
     printDiagnostics(results);
 end
@@ -219,6 +214,14 @@ flags.R0figs = getFlag(flags, 'R0figs', true);
 flags.Biasfigs = getFlag(flags, 'Biasfigs', true);
 flags.default_temperature_c = getFlag(flags, 'default_temperature_c', 25);
 flags.Verbose = getFlag(flags, 'Verbose', true);
+
+parallel_cfg = struct();
+if isfield(flags, 'parallel') && isstruct(flags.parallel)
+    parallel_cfg = flags.parallel;
+end
+flags.use_parallel = getCfgFlag(flags, parallel_cfg, 'use_parallel', false);
+flags.auto_start_parallel_pool = getCfgFlag(flags, parallel_cfg, 'auto_start_parallel_pool', true);
+flags.parallel_pool_size = getCfgFlag(flags, parallel_cfg, 'parallel_pool_size', []);
 end
 
 function estimators = normalizeEstimators(estimators, dataset)
@@ -289,6 +292,43 @@ if est_result.has_bias
         est_result.bias_bnd(1, :) = reshape(estimator.bias_bnd_init, 1, []);
     end
 end
+end
+
+function est_result = runSingleEstimator(est, dataset, n_samples)
+est_result = initializeEstimatorResult(est, dataset, n_samples);
+
+for k = 2:n_samples
+    dt = dataset.delta_t_s(k-1);
+    step = est.stepFcn(dataset.voltage_v(k), dataset.current_a(k), ...
+        dataset.temperature_c(k), dt, est.kfData);
+    est.kfData = step.kfData;
+
+    est_result.soc(k) = clamp01(step.soc);
+    est_result.voltage(k) = step.voltage;
+    est_result.soc_bnd(k) = step.soc_bnd;
+    est_result.voltage_bnd(k) = step.voltage_bnd;
+    est_result.innovation_pre(k) = step.innovation_pre;
+    est_result.sk(k) = step.sk;
+
+    if est_result.has_r0
+        est_result.r0(k) = step.r0;
+        est_result.r0_bnd(k) = step.r0_bnd;
+    end
+    if est_result.has_bias
+        est_result.bias(k, :) = reshape(step.bias, 1, []);
+        est_result.bias_bnd(k, :) = reshape(step.bias_bnd, 1, []);
+    end
+end
+
+est_result.error_soc = dataset.metric_soc - est_result.soc;
+est_result.error_voltage = dataset.metric_voltage - est_result.voltage;
+est_result.rmse_soc = sqrt(mean(est_result.error_soc(~isnan(est_result.error_soc)).^2));
+est_result.rmse_voltage = sqrt(mean(est_result.error_voltage(~isnan(est_result.error_voltage)).^2));
+est_result.me_soc = mean(est_result.error_soc(~isnan(est_result.error_soc)));
+est_result.me_voltage = mean(est_result.error_voltage(~isnan(est_result.error_voltage)));
+est_result.mssd_soc = computeMssd(est_result.soc);
+est_result.mssd_voltage = computeMssd(est_result.voltage);
+est_result.kfDataFinal = est.kfData;
 end
 
 function printSummary(results)
@@ -529,6 +569,106 @@ if isfield(flags, fieldName) && ~isempty(flags.(fieldName))
     value = flags.(fieldName);
 else
     value = defaultValue;
+end
+end
+
+function value = getCfgFlag(flags, parallel_cfg, field_name, default_value)
+if isfield(flags, field_name) && ~isempty(flags.(field_name))
+    value = flags.(field_name);
+elseif isfield(parallel_cfg, field_name) && ~isempty(parallel_cfg.(field_name))
+    value = parallel_cfg.(field_name);
+else
+    value = default_value;
+end
+end
+
+function [use_parallel, info] = resolveParallelMode(flags, n_estimators)
+use_parallel = false;
+info = struct( ...
+    'requested', logical(getFlag(flags, 'use_parallel', false)), ...
+    'used', false, ...
+    'message', '', ...
+    'pool_size', 0, ...
+    'failure_message', '');
+
+if ~info.requested
+    return;
+end
+
+if n_estimators < 2
+    info.message = 'Parallel evaluation requested but fewer than two estimators are active. Using serial execution.';
+    return;
+end
+
+if isInsideParallelWorker()
+    info.message = 'Parallel estimator evaluation requested from within an active parallel worker. Nested parallel execution is disabled; using serial execution.';
+    return;
+end
+
+if exist('parfor', 'builtin') ~= 5 || exist('gcp', 'file') ~= 2 || exist('parpool', 'file') ~= 2
+    info.message = 'Parallel estimator evaluation requested but Parallel Computing Toolbox functions are unavailable. Falling back to serial execution.';
+    return;
+end
+
+if ~license('test', 'Distrib_Computing_Toolbox')
+    info.message = 'Parallel estimator evaluation requested but Parallel Computing Toolbox is not licensed. Falling back to serial execution.';
+    return;
+end
+
+pool = gcp('nocreate');
+if isempty(pool) && getFlag(flags, 'auto_start_parallel_pool', true)
+    try
+        pool_size = getFlag(flags, 'parallel_pool_size', []);
+        if isempty(pool_size)
+            pool = parpool('local');
+        else
+            pool = parpool('local', pool_size);
+        end
+    catch ME
+        info.message = sprintf('Parallel estimator evaluation requested but a pool could not be started (%s). Falling back to serial execution.', ME.message);
+        return;
+    end
+elseif isempty(pool)
+    info.message = 'Parallel estimator evaluation requested but no pool exists and auto_start_parallel_pool is false. Falling back to serial execution.';
+    return;
+end
+
+prepareParallelWorkers(pool);
+use_parallel = true;
+info.used = true;
+info.pool_size = pool.NumWorkers;
+end
+
+function prepareParallelWorkers(pool)
+if isempty(pool)
+    return;
+end
+
+source_file = which(mfilename);
+if isempty(source_file) || exist(source_file, 'file') ~= 2
+    return;
+end
+
+try
+    attached_files = string(pool.AttachedFiles);
+    if any(strcmpi(attached_files, string(source_file)))
+        return;
+    end
+    addAttachedFiles(pool, {source_file});
+catch
+    % Best-effort only. If attaching fails, the parfor path may still work.
+end
+end
+
+function tf = isInsideParallelWorker()
+tf = false;
+if exist('getCurrentTask', 'file') ~= 2
+    return;
+end
+try
+    tf = ~isempty(getCurrentTask());
+catch
+    tf = false;
 end
 end
 

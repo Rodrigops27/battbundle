@@ -1,6 +1,6 @@
 % script compareATL20OcvModels.m
-%   Compares the original ATLmodel-ocv.mat against ATL20model-ocv.mat by
-%   evaluating both OCV models on a common SOC grid.
+%   Compares the original ATLmodel-ocv.mat against the derived ATL20
+%   OCV model by evaluating both on a common SOC grid.
 
 clearvars
 close all
@@ -9,8 +9,8 @@ clc
 script_dir = fileparts(mfilename('fullpath'));
 esc_root = fileparts(script_dir);
 repo_root = fileparts(esc_root);
-original_file = fullfile(esc_root, 'OCV_models', 'ATLmodel-ocv.mat');
-candidate_file = fullfile(esc_root, 'OCV_models', 'ATL20model-ocv.mat');
+original_file = fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'atl', 'ATLmodel-ocv.mat');
+candidate_file = fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'atl20', 'ATL20model-ocv-vavgFT.mat');
 results_file = fullfile(script_dir, 'ATL20model-ocv-validation.mat');
 
 addpath(repo_root);

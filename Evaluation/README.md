@@ -1,74 +1,180 @@
 # Evaluation Layer
 
-This layer contains the estimator benchmarking harnesses, synthetic evaluation dataset builders, and robustness studies.
+This layer contains the benchmark runner, evaluation dataset builders, and robustness-study wrappers.
+
+## Purpose
 
 Use this layer when you want to:
+
 - benchmark several estimators on the same ESC or ROM-backed dataset
 - compare SOC and voltage metrics across estimators
-- run initialization, noise, or fault sensitivity studies
+- run initialization, noise, or injection sensitivity studies
+- build canonical evaluation datasets from raw application profiles
 
-The default study scenario in this layer is the ATL20 desktop evaluation:
+The default desktop scenario uses:
+
 - ESC model: [`models/ATLmodel.mat`](../models/ATLmodel.mat)
-- benchmark dataset: [`Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`](ESCSimData/datasets/esc_bus_coreBattery_dataset.mat)
+- benchmark dataset: [`data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat`](../data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat)
+
+## Canonical Evaluation Policy
+
+Benchmark/runtime evaluation dataset reads must resolve only under:
+
+- `data/evaluation/processed`
+- `data/evaluation/derived`
+
+Source-profile builders and conversion scripts may read from:
+
+- `data/evaluation/raw/...`
+
+Legacy `Evaluation/.../datasets/...` roots are intentionally unsupported.
+
+## Canonical Suites
+
+- ESC desktop nominal dataset:
+  `data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat`
+- ROM behavioral nominal dataset:
+  `data/evaluation/processed/behavioral_nmc30_bss_v1/nominal/rom_bus_coreBattery_dataset.mat`
+- Raw source profile for dataset builders:
+  `data/evaluation/raw/omtlife8ahc_hp/Bus_CoreBatteryData_Data.mat`
+- Synthetic ESC builder assets:
+  `data/evaluation/synthetic/ESCSimData/...`
+- Synthetic ROM builder assets:
+  `data/evaluation/synthetic/ROMSimData/...`
 
 ## Main Entry Points
 
 - [`runBenchmark.m`](runBenchmark.m)
-  - Reusable benchmark API for dataset, model, and estimator-set specs.
-  - No-input default now runs the ATL ESC-driven BSS benchmark and saves results unless disabled.
-- [`resolveEstimatorTuningBundle.m`](resolveEstimatorTuningBundle.m)
-  - Resolves direct tuning structs or autotuning profile MAT files into per-estimator tuning.
-- [`xKFeval.m`](xKFeval.m)
-  - Core evaluation runner.
+  Stable configurable benchmark interface.
 - [`mainEval.m`](mainEval.m)
-  - Example structured benchmark entry point.
-- [`initSOCs/sweepInitSocStudy.m`](initSOCs/sweepInitSocStudy.m)
-  - SOC-initialization sensitivity study.
-- [`NoiseTuningSweep/README.md`](NoiseTuningSweep/README.md)
-  - covariance-tuning study guide and entry points.
-- [`Injection/README.md`](Injection/README.md)
-  - Noise-injection and perturbance-injection study guide and entry points.
-- [`plotInnovationAcfPacf.m`](plotInnovationAcfPacf.m)
-  - Innovation plotting helper.
-- [`printEstimatorBiasMetrics.m`](printEstimatorBiasMetrics.m)
-  - Bias and innovation summary helper.
+  Fixed example scenario script built on top of `runBenchmark.m`.
+- [`data/evaluation/synthetic/ESCSimData/BSSsimESCdata.m`](../data/evaluation/synthetic/ESCSimData/BSSsimESCdata.m)
+  ESC-side dataset builder.
+- [`data/evaluation/synthetic/ROMSimData/createBusCoreBatterySyntheticDataset.m`](../data/evaluation/synthetic/ROMSimData/createBusCoreBatterySyntheticDataset.m)
+  ROM-side dataset builder.
+- [`initSOCs/runInitSocStudy.m`](initSOCs/runInitSocStudy.m)
+  Initial-SOC sensitivity study.
+- [`initSOCs/README.md`](initSOCs/README.md)
+  Initial-SOC sweep guide and entry points.
+- [`NoiseTuningSweep/sweepNoiseStudy.m`](NoiseTuningSweep/sweepNoiseStudy.m)
+  Noise/covariance sweep study.
+- [`Injection/runInjectionStudy.m`](Injection/runInjectionStudy.m)
+  Derived-case injection study.
 
-## Folder Conventions
+## Quick Start
 
-### Benchmark datasets
+From the repository root:
 
-Save benchmark-ready `.mat` files containing a `dataset` struct under one of:
-- `Evaluation/ROMSimData/datasets/`
-- `Evaluation/ESCSimData/datasets/`
-- `Evaluation/Injection/datasets/`
+```matlab
+addpath(genpath('.'));
 
-Use:
-- `ROMSimData/datasets/` for ROM-driven reference datasets
-- `ESCSimData/datasets/` for ESC-driven reference datasets
-- `Injection/datasets/` for the renamed user-facing injection-study datasets
+datasetSpec = struct( ...
+    'dataset_file', fullfile('data', 'evaluation', 'processed', 'desktop_atl20_bss_v1', 'nominal', 'esc_bus_coreBattery_dataset.mat'), ...
+    'dataset_variable', 'dataset');
 
-### Raw measured application profiles
+modelSpec = struct( ...
+    'esc_model_file', fullfile('models', 'ATLmodel.mat'), ...
+    'rom_model_file', fullfile('models', 'ROM_ATL20_beta.mat'), ...
+    'tc', 25, ...
+    'chemistry_label', 'ATL');
 
-Keep raw measured profiles near their application-specific subfolder if they are used as source material before conversion into a benchmark dataset.
+estimatorSetSpec = struct('registry_name', 'mainEval10');
+flags = struct('Summaryfigs', true, 'Verbose', true);
 
-Current repo example:
-- [`Evaluation/OMTLIFE8AHC-HP/Bus_CoreBatteryData_Data.mat`](OMTLIFE8AHC-HP/Bus_CoreBatteryData_Data.mat)
+results = runBenchmark(datasetSpec, modelSpec, estimatorSetSpec, flags);
+results.metadata.metrics_table
+```
 
-### Models
+For the fixed example scenario:
 
-Benchmarking expects models in the repository-level `models/` folder:
-- ESC models such as [`models/ATLmodel.mat`](../models/ATLmodel.mat)
-- ESC models such as [`models/NMC30model.mat`](../models/NMC30model.mat)
-- ROM models such as [`models/ROM_ATL20_beta.mat`](../models/ROM_ATL20_beta.mat)
-- ROM models such as [`models/ROM_NMC30_HRA12.mat`](../models/ROM_NMC30_HRA12.mat)
+```matlab
+addpath(genpath('.'));
+mainEval
+```
 
-## Benchmark Dataset Contract
+## Parallel Execution
 
-[`runBenchmark.m`](runBenchmark.m) expects a saved `dataset` struct with at least:
+`runBenchmark.m` forwards optional estimator-level parallel flags to `xKFeval.m`:
+
+- `flags.use_parallel`
+- `flags.auto_start_parallel_pool`
+- `flags.parallel_pool_size`
+
+Example:
+
+```matlab
+flags = struct( ...
+    'Summaryfigs', true, ...
+    'Verbose', true, ...
+    'use_parallel', true, ...
+    'auto_start_parallel_pool', true, ...
+    'parallel_pool_size', []);
+```
+
+This parallelism is across estimators, not across time steps. If `xKFeval.m` is called from inside an already active parallel worker, nested parallel execution is disabled automatically and the estimator loop falls back to serial execution for that call.
+
+## Custom Settings
+
+To benchmark the behavioral NMC30 suite:
+
+```matlab
+addpath(genpath('.'));
+
+datasetSpec = struct( ...
+    'dataset_file', fullfile('data', 'evaluation', 'processed', 'behavioral_nmc30_bss_v1', 'nominal', 'rom_bus_coreBattery_dataset.mat'), ...
+    'dataset_variable', 'dataset', ...
+    'dataset_soc_field', 'soc_true', ...
+    'metric_soc_field', 'soc_true', ...
+    'metric_voltage_field', 'voltage_v', ...
+    'reference_name', 'ROM reference', ...
+    'voltage_name', 'ROM voltage', ...
+    'title_prefix', 'NMC30 ROM');
+
+modelSpec = struct( ...
+    'esc_model_file', fullfile('models', 'NMC30model.mat'), ...
+    'rom_model_file', fullfile('models', 'ROM_NMC30_HRA12.mat'), ...
+    'tc', 25, ...
+    'chemistry_label', 'NMC30');
+
+estimatorSetSpec = struct('registry_name', 'mainEval10');
+results = runBenchmark(datasetSpec, modelSpec, estimatorSetSpec, struct('Verbose', true));
+```
+
+To use tuned estimator covariances from an autotuning MAT file:
+
+```matlab
+estimatorSetSpec.tuning = struct( ...
+    'kind', 'autotuning_profile', ...
+    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
+    'scenario_name', 'atl_bss_esc', ...
+    'selection_policy', 'best_objective', ...
+    'fallback_to_default', true);
+```
+
+Builder-side example:
+
+```matlab
+addpath(genpath('.'));
+
+cfg = struct( ...
+    'model_file', fullfile('models', 'ATLmodel.mat'), ...
+    'profile_file', fullfile('data', 'evaluation', 'raw', 'omtlife8ahc_hp', 'Bus_CoreBatteryData_Data.mat'), ...
+    'tc', 25);
+
+BSSsimESCdata( ...
+    fullfile('data', 'evaluation', 'processed', 'desktop_atl20_bss_v1', 'nominal', 'esc_bus_coreBattery_dataset.mat'), ...
+    cfg);
+```
+
+## Dataset Contract
+
+`runBenchmark.m` expects a saved `dataset` struct with at least:
+
 - `current_a`
 - `voltage_v`
 
 Common optional fields:
+
 - `time_s`
 - `temperature_c`
 - `reference_soc`
@@ -81,282 +187,41 @@ Common optional fields:
 - `voltage_name`
 - `title_prefix`
 
-See the top-level [`README.md`](../README.md) for the full benchmark dataset contract.
+## Derived Dataset Manifests
 
-## Recommended Process
+Derived evaluation cases save next to the dataset:
 
-1. Place or build a benchmark dataset under `Evaluation/.../datasets/`.
-2. Ensure the ESC model exists in `models/`.
-3. Add a ROM model in `models/` if `ROM-EKF` should run.
-4. Optionally point `estimatorSetSpec.tuning` or wrapper `cfg.tuning` at an autotuning param file.
-5. Run [`runBenchmark.m`](runBenchmark.m) or a study wrapper.
-5. Inspect the metric table and plots.
+- `dataset.mat`
+- `manifest.json`
+- optional `manifest.mat`
 
-## Tuned Estimator Profiles
+Use [`utility/dataRegistry/summarizeEvaluationSuiteManifests.m`](../utility/dataRegistry/summarizeEvaluationSuiteManifests.m) to scan a suite and summarize nominal and derived cases.
 
-[`runBenchmark.m`](runBenchmark.m) now accepts two tuning styles:
-- a plain shared tuning struct, as before
-- a resolved tuning profile spec pointing at an autotuning MAT file
+## Output Artifact Policy
 
-The tuning-profile entry point is:
+Evaluation outputs are split into:
 
-```matlab
-estimatorSetSpec.tuning = struct( ...
-    'kind', 'autotuning_profile', ...
-    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
-    'scenario_name', 'atl_bss_esc', ...
-    'selection_policy', 'best_objective', ...
-    'fallback_to_default', true);
-```
+- summary artifacts:
+  small, Git-trackable metrics tables, manifests, metadata, and selected published plots
+- heavy artifacts:
+  local-only MAT outputs containing full estimator time-series results, merged benchmark result bundles, and detailed study outputs from injection, init-SOC, and noise sweeps
 
-Supported profile fields:
-- `param_file`
-  - MAT file produced by the autotuning layer.
-- `scenario_name`
-  - Optional scenario filter inside the autotuning MAT file.
-- `selection_policy`
-  - One of `best_objective`, `last`, or `first`.
-- `fallback_to_default`
-  - If `true`, missing files or missing estimator entries fall back to default/shared tuning.
-- `warn_on_missing_param_file`
-  - Default `true`.
-- `warn_on_missing_estimator`
-  - Default `true`.
-- any regular tuning fields such as `SigmaX0_soc`
-  - Applied as shared overrides on top of the resolved tuned values.
+Trackable evaluation summaries should go under:
 
-Behavior:
-- If the param file is found and a matching estimator entry exists, [`runBenchmark.m`](runBenchmark.m) uses the tuned covariance values from that file.
-- If the param file is missing, [`runBenchmark.m`](runBenchmark.m) warns and falls back to default/shared tuning when `fallback_to_default = true`.
-- If a requested estimator is missing from the param file, [`runBenchmark.m`](runBenchmark.m) also warns and falls back for that estimator when `fallback_to_default = true`.
-- The resolved outcome is saved in `results.metadata.tuning_bundle`.
+- `results/evaluation/...`
+- `results/figures/...`
 
-## Default Benchmark Example
+Heavy evaluation artifacts should stay in local workflow locations such as:
 
-With no inputs, [`runBenchmark.m`](runBenchmark.m) now defaults to the ATL ESC-driven BSS case:
+- `data/evaluation/derived/...`
+- `Evaluation/results/...`
+- `Evaluation/Injection/results/...`
+- `Evaluation/initSOCs/results/...`
+- `Evaluation/NoiseTuningSweep/results/...`
 
-```matlab
-addpath(genpath('.'));
-results = runBenchmark();
-results.metadata.metrics_table
-```
+Do not commit heavy benchmark-result MAT files by default.
 
-Default configuration:
-- dataset: [`Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`](ESCSimData/datasets/esc_bus_coreBattery_dataset.mat)
-- ESC model: [`models/ATLmodel.mat`](../models/ATLmodel.mat)
-- ROM model: [`models/ROM_ATL20_beta.mat`](../models/ROM_ATL20_beta.mat)
-- estimator set: `all`
-- dataset builder fallback: [`Evaluation/ESCSimData/BSSsimESCdata.m`](ESCSimData/BSSsimESCdata.m)
-- automatic save: enabled
+## Notes
 
-## NMC30 Benchmark Example
-
-```matlab
-addpath(genpath('.'));
-
-datasetSpec = struct( ...
-    'dataset_file', fullfile('Evaluation', 'ROMSimData', 'datasets', 'rom_bus_coreBattery_dataset.mat'), ...
-    'dataset_variable', 'dataset');
-
-modelSpec = struct( ...
-    'esc_model_file', fullfile('models', 'NMC30model.mat'), ...
-    'rom_model_file', fullfile('models', 'ROM_NMC30_HRA12.mat'), ...
-    'tc', 25, ...
-    'chemistry_label', 'NMC30');
-
-estimatorSetSpec = struct('registry_name', 'mainEval10');
-flags = struct('Summaryfigs', true, 'Verbose', true);
-
-results = runBenchmark(datasetSpec, modelSpec, estimatorSetSpec, flags);
-results.metadata.metrics_table
-```
-
-## ATL ESC-Driven BSS Example
-
-Use this when you want to benchmark the ATL ESC model against the ESC-driven Bus Core Battery synthetic dataset:
-
-```matlab
-addpath(genpath('.'));
-
-datasetSpec = struct( ...
-    'dataset_file', fullfile('Evaluation', 'ESCSimData', 'datasets', 'esc_bus_coreBattery_dataset.mat'), ...
-    'dataset_variable', 'dataset', ...
-    'builder_fcn', 'BSSsimESCdata', ...
-    'builder_cfg', struct('model_file', fullfile('models', 'ATLmodel.mat'), 'tc', 25), ...
-    'dataset_soc_field', 'soc_true', ...
-    'metric_soc_field', 'soc_true', ...
-    'metric_voltage_field', 'voltage_v', ...
-    'reference_name', 'ESC reference', ...
-    'voltage_name', 'ESC voltage', ...
-    'title_prefix', 'ATL BSS');
-
-modelSpec = struct( ...
-    'esc_model_file', fullfile('models', 'ATLmodel.mat'), ...
-    'rom_model_file', fullfile('models', 'ROM_ATL20_beta.mat'), ...
-    'tc', 25, ...
-    'chemistry_label', 'ATL', ...
-    'require_rom_match', true);
-
-estimatorSetSpec = struct( ...
-    'registry_name', 'all', ...
-    'allow_rom_skip', true, ...
-    'tuning', struct( ...
-        'kind', 'autotuning_profile', ...
-        'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
-        'scenario_name', 'atl_bss_esc', ...
-        'selection_policy', 'best_objective', ...
-        'fallback_to_default', true));
-
-flags = struct( ...
-    'Summaryfigs', true, ...
-    'Verbose', true);
-
-results = runBenchmark(datasetSpec, modelSpec, estimatorSetSpec, flags);
-results.metadata.metrics_table
-```
-
-The dataset builder for this case is:
-- [`Evaluation/ESCSimData/BSSsimESCdata.m`](ESCSimData/BSSsimESCdata.m)
-
-The saved dataset path used by the benchmark is:
-- [`Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`](ESCSimData/datasets/esc_bus_coreBattery_dataset.mat)
-
-## Study Wrappers
-
-### Main benchmark
-
-```matlab
-cd Evaluation
-mainEval
-```
-
-### Initial SOC sensitivity
-
-```matlab
-cd Evaluation/initSOCs
-runInitSocStudy
-```
-
-With a tuning profile and parallel computing:
-
-```matlab
-cfg = struct();
-cfg.parallel.use_parallel = true;
-cfg.parallel.auto_start_pool = true;
-cfg.estimatorSetSpec.tuning = struct( ...
-    'kind', 'autotuning_profile', ...
-    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
-    'scenario_name', 'atl_bss_esc', ...
-    'selection_policy', 'best_objective', ...
-    'fallback_to_default', true);
-runInitSocStudy([0 100], 10, cfg);
-```
-
-Run the full 11-estimator desktop set with parallel computing:
-
-```matlab
-cfg = struct();
-cfg.parallel.use_parallel = true;
-cfg.parallel.auto_start_pool = true;
-cfg.estimatorSetSpec.estimator_names = { ...
-    'ROM-EKF', ...
-    'ESC-SPKF', 'ESC-EKF', 'EaEKF', ...
-    'EacrSPKF', 'EnacrSPKF', 'EDUKF', ...
-    'EsSPKF', 'EbSPKF', 'EBiSPKF', 'Em7SPKF'};
-cfg.estimatorSetSpec.tuning = struct( ...
-    'kind', 'autotuning_profile', ...
-    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
-    'scenario_name', 'atl_bss_esc', ...
-    'selection_policy', 'best_objective', ...
-    'fallback_to_default', true);
-runInitSocStudy([0 100], 10, cfg);
-```
-
-[`runInitSocStudy.m`](initSOCs/runInitSocStudy.m) now accepts the estimator-selection entry points:
-- `cfg.estimatorSetSpec.estimator_names`
-- `cfg.estimatorSetSpec.tuning`
-- compatibility shim: `cfg.scenarios(1).estimatorSetSpec.*`
-
-If `cfg.estimatorSetSpec.registry_name = 'all'`, the wrapper expands to the full desktop estimator set:
-- `ROM-EKF`
-- `ESC-SPKF`
-- `ESC-EKF`
-- `EaEKF`
-- `EacrSPKF`
-- `EnacrSPKF`
-- `EDUKF`
-- `EsSPKF`
-- `EbSPKF`
-- `EBiSPKF`
-- `Em7SPKF`
-
-### Noise and perturbance injection
-
-```matlab
-cd Evaluation/Injection
-runInjectionStudy
-```
-
-With a tuning profile:
-
-```matlab
-cfg = defaultInjectionConfig();
-cfg.scenarios(1).estimatorSetSpec.tuning = struct( ...
-    'kind', 'autotuning_profile', ...
-    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
-    'scenario_name', 'atl_bss_esc', ...
-    'selection_policy', 'best_objective', ...
-    'fallback_to_default', true);
-runInjectionStudy(cfg);
-```
-
-## Plotting And Outputs
-
-Plot generation is controlled mostly through the `flags` passed into [`xKFeval.m`](xKFeval.m) or [`runBenchmark.m`](runBenchmark.m).
-
-Common flags:
-- `SOCfigs`
-- `Vfigs`
-- `Biasfigs`
-- `R0figs`
-- `InnovationACFPACFfigs`
-- `Summaryfigs`
-
-Additional plotting helpers:
-- [`plotEvalResults.m`](plotEvalResults.m)
-- [`plotInnovationAcfPacf.m`](plotInnovationAcfPacf.m)
-- the figure output embedded in [`xKFeval.m`](xKFeval.m)
-
-Metrics are exposed in:
-- `results.metadata.metrics_table`
-- per-estimator fields in `results.estimators`
-
-[`runBenchmark.m`](runBenchmark.m) now saves results automatically by default. The default output path is:
-- `Evaluation/results/<title_prefix>_benchmark_results.mat`
-
-```matlab
-results = runBenchmark(datasetSpec, modelSpec, estimatorSetSpec, flags);
-results.metadata.saved_results_file
-```
-
-Re-plot at any time with:
-
-```matlab
-plotEvalResults(results.metadata.saved_results_file);
-```
-
-Disable autosave with:
-
-```matlab
-flags = struct('SaveResults', false, 'Summaryfigs', true, 'Verbose', true);
-results = runBenchmark(datasetSpec, modelSpec, estimatorSetSpec, flags);
-```
-
-## Notes And Gotchas
-
-- Repo convention is `+I = discharge`.
-- `ROM-EKF` is skipped by [`runBenchmark.m`](runBenchmark.m) when no compatible ROM is available unless that skip is disallowed explicitly.
-- Tuning-profile warnings come from [`runBenchmark.m`](runBenchmark.m) when a param file or estimator entry is missing and fallback tuning is used.
-- [`mainEval.m`](mainEval.m) is an example scenario, not the only supported benchmark path.
-- Benchmark datasets should be normalized before use; raw measured profiles belong in source/application folders until converted.
-- Estimator-specific assumptions and failure modes are documented in [`docs/Estimators Design.md`](../docs/Estimators%20Design.md).
+- `runBenchmark.m` and the study wrappers resolve canonical paths only.
+- Builder scripts may still consume `data/evaluation/raw/...`.

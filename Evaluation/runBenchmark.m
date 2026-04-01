@@ -4,14 +4,14 @@ function results = runBenchmark(datasetSpec, modelSpec, estimatorSetSpec, flags)
 % No-input default
 %   results = runBenchmark()
 %   Runs the repository's default ATL ESC-driven BSS benchmark using:
-%     Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat
+%     data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat
 %     models/ATLmodel.mat
 %     models/ROM_ATL20_beta.mat
 %     estimator registry all
 %
 % Example
 %   datasetSpec = struct( ...
-%       'dataset_file', fullfile('Evaluation', 'ROMSimData', 'datasets', 'rom_bus_coreBattery_dataset.mat'), ...
+%       'dataset_file', fullfile('data', 'evaluation', 'processed', 'behavioral_nmc30_bss_v1', 'nominal', 'rom_bus_coreBattery_dataset.mat'), ...
 %       'dataset_variable', 'dataset', ...
 %       'dataset_soc_field', 'soc_true', ...
 %       'metric_soc_field', 'soc_true', ...
@@ -62,6 +62,9 @@ function results = runBenchmark(datasetSpec, modelSpec, estimatorSetSpec, flags)
 %   flags                           Passed through to xKFeval.
 %   flags.SaveResults               Optional logical, default true.
 %   flags.results_file              Optional MAT-file path for saved results.
+%   flags.use_parallel              Optional logical. Parallelize across estimators.
+%   flags.auto_start_parallel_pool  Optional logical, default true.
+%   flags.parallel_pool_size        Optional scalar worker count.
 %
 % Output
 %   results                         xKFeval output with benchmark metadata and
@@ -99,6 +102,7 @@ end
 
 repo_root = fileparts(here);
 addpath(genpath(repo_root));
+ensureDataRegistryLayout(repo_root, 'suite_versions', {'desktop_atl20_bss_v1', 'behavioral_nmc30_bss_v1'});
 
 if use_builtin_default
     [datasetSpec, modelSpec, estimatorSetSpec, flags] = defaultBenchmarkConfig();
@@ -137,6 +141,7 @@ results.metadata.estimatorSetSpec = estimatorSetSpec;
 results.metadata.tuning_bundle = tuning_bundle;
 results.metadata.tuning_profile_used = tuning_bundle.profile_used;
 results.metadata.tuning_profile_file = tuning_bundle.profile_file;
+results.metadata.parallel = getFieldOr(results, 'parallel', struct());
 results.metadata.saved_results_file = '';
 
 results = saveResultsIfRequested(results, flags, here, repo_root);
@@ -172,7 +177,8 @@ end
 if ~isfield(datasetSpec, 'voltage_name'), datasetSpec.voltage_name = ''; end
 if ~isfield(datasetSpec, 'title_prefix'), datasetSpec.title_prefix = ''; end
 
-datasetSpec.dataset_file = resolvePathForReadOrWrite(datasetSpec.dataset_file, evaluation_root, repo_root);
+datasetSpec.dataset_file = resolveEvaluationDatasetPath( ...
+    datasetSpec.dataset_file, repo_root, 'access', 'benchmark', 'must_exist', false);
 end
 
 function modelSpec = normalizeModelSpec(modelSpec, repo_root)
@@ -232,6 +238,15 @@ if ~isfield(flags, 'SaveResults') || isempty(flags.SaveResults)
 end
 if ~isfield(flags, 'results_file')
     flags.results_file = '';
+end
+if ~isfield(flags, 'use_parallel') || isempty(flags.use_parallel)
+    flags.use_parallel = false;
+end
+if ~isfield(flags, 'auto_start_parallel_pool') || isempty(flags.auto_start_parallel_pool)
+    flags.auto_start_parallel_pool = true;
+end
+if ~isfield(flags, 'parallel_pool_size')
+    flags.parallel_pool_size = [];
 end
 end
 
@@ -945,31 +960,6 @@ end
 path_out = path_in;
 end
 
-function path_out = resolvePathForReadOrWrite(path_in, evaluation_root, repo_root)
-if exist(path_in, 'file') == 2
-    path_out = path_in;
-    return;
-end
-
-candidates = { ...
-    fullfile(evaluation_root, path_in), ...
-    fullfile(repo_root, path_in)};
-
-for idx = 1:numel(candidates)
-    candidate = candidates{idx};
-    if exist(candidate, 'file') == 2
-        path_out = candidate;
-        return;
-    end
-end
-
-if isAbsolutePath(path_in)
-    path_out = path_in;
-else
-    path_out = fullfile(repo_root, path_in);
-end
-end
-
 function tf = isAbsolutePath(path_in)
 path_in = char(path_in);
 tf = numel(path_in) >= 2 && path_in(2) == ':';
@@ -1055,11 +1045,12 @@ end
 
 function [datasetSpec, modelSpec, estimatorSetSpec, flags] = defaultBenchmarkConfig()
 datasetSpec = struct( ...
-    'dataset_file', fullfile('Evaluation', 'ESCSimData', 'datasets', 'esc_bus_coreBattery_dataset.mat'), ...
+    'dataset_file', fullfile('data', 'evaluation', 'processed', 'desktop_atl20_bss_v1', 'nominal', 'esc_bus_coreBattery_dataset.mat'), ...
     'dataset_variable', 'dataset', ...
     'builder_fcn', 'BSSsimESCdata', ...
     'builder_cfg', struct( ...
         'model_file', fullfile('models', 'ATLmodel.mat'), ...
+        'profile_file', fullfile('data', 'evaluation', 'raw', 'omtlife8ahc_hp', 'Bus_CoreBatteryData_Data.mat'), ...
         'tc', 25), ...
     'dataset_soc_field', 'soc_true', ...
     'metric_soc_field', 'soc_true', ...

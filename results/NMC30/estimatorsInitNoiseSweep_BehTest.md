@@ -11,7 +11,7 @@ Scenario:
 | Study layer | `Evaluation/NoiseTuningSweep/` |
 | Core script | `Evaluation/NoiseTuningSweep/sweepNoiseStudy.m` |
 | Dataset mode | ESC-driven BSS synthetic dataset |
-| Dataset | `Evaluation/ROMSimData/datasets/rom_bus_coreBattery_dataset.mat` |
+| Dataset | `data/evaluation/processed/behavioral_nmc30_bss_v1/nominal/rom_bus_coreBattery_dataset.mat` |
 | ESC model | `models/NMC30model.mat` |
 | Sweep mode | `grid` |
 | `sigma_w` range | `0.001, 0.005, 0.025, 0.125, 0.625, 3.12, 15.6, 78.1, 100` |

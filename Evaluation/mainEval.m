@@ -15,12 +15,15 @@ if ~isdeployed
     end
     cd(here);
 end
+repo_root = fileparts(here);
 addpath(genpath('..'));
 
 %% Settings
 tc = 25;
-dataset_file = fullfile(pwd, 'ESCSimData', 'datasets', 'esc_bus_coreBattery_dataset.mat');
-profile_file = fullfile(pwd, 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat');
+dataset_file = fullfile('..', 'data', 'evaluation', 'processed', 'desktop_atl20_bss_v1', 'nominal', 'esc_bus_coreBattery_dataset.mat');
+profile_file = fullfile('..', 'data', 'evaluation', 'raw', 'omtlife8ahc_hp', 'Bus_CoreBatteryData_Data.mat');
+dataset_file = resolveEvaluationDatasetPath(dataset_file, repo_root, 'access', 'benchmark', 'must_exist', false);
+profile_file = resolveEvaluationDatasetPath(profile_file, repo_root, 'access', 'builder', 'must_exist', false);
 esc_model_file = firstExistingFile({ ...
     fullfile('..', 'models', 'ATLmodel.mat'), ...
     fullfile('..', 'ESC_Id', 'FullESCmodels', 'LFP', 'ATLmodel.mat')}, ...

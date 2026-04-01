@@ -191,11 +191,11 @@ end
 
 function cases = normalizeValidationCases(data_input, model, repo_root)
 if nargin < 1 || isempty(data_input)
-    data_input = fullfile(repo_root, 'Evaluation', 'OMTLIFE8AHC-HP', 'Bus_CoreBatteryData_Data.mat');
+    data_input = fullfile(repo_root, 'data', 'evaluation', 'raw', 'omtlife8ahc_hp', 'Bus_CoreBatteryData_Data.mat');
 end
 
 if ischar(data_input) || (isstring(data_input) && isscalar(data_input))
-    data_file = resolveLocalPath(char(data_input), repo_root);
+    data_file = resolveCanonicalDataPath(char(data_input), repo_root);
     raw = load(data_file);
     if isfield(raw, 'dataset') && isstruct(raw.dataset)
         cases = normalizeValidationCases(raw.dataset, model, repo_root);
@@ -543,7 +543,7 @@ if nargin < 1 || isempty(model_input)
         'No default ATL-family ESC model file was found.');
     raw = load(model_file);
 elseif ischar(model_input) || (isstring(model_input) && isscalar(model_input))
-    model_file = resolveLocalPath(char(model_input), repo_root);
+    model_file = resolveModelPath(char(model_input), repo_root);
     raw = load(model_file);
 elseif isstruct(model_input)
     raw = model_input;
@@ -605,27 +605,46 @@ end
 end
 
 function path_out = resolveLocalPath(input_path, repo_root)
+path_out = resolveCanonicalDataPath(input_path, repo_root);
+end
+
+function path_out = resolveModelPath(input_path, repo_root)
 if exist(input_path, 'file') == 2
     path_out = input_path;
     return;
 end
 
-script_dir = fullfile(repo_root, 'ESC_Id');
-candidates = { ...
-    fullfile(script_dir, input_path), ...
-    fullfile(repo_root, input_path), ...
-    fullfile(repo_root, 'Evaluation', input_path), ...
-    fullfile(repo_root, 'utility', input_path)};
-
-path_out = input_path;
-for idx = 1:numel(candidates)
-    if exist(candidates{idx}, 'file') == 2
-        path_out = candidates{idx};
-        return;
-    end
+if isAbsolutePath(input_path)
+    error('ESCvalidation:MissingModelFile', ...
+        'ESC model file not found: %s', input_path);
 end
 
-error('ESCvalidation:MissingFile', 'File not found: %s', input_path);
+repo_candidate = fullfile(repo_root, input_path);
+if exist(repo_candidate, 'file') == 2
+    path_out = repo_candidate;
+    return;
+end
+
+error('ESCvalidation:MissingModelFile', ...
+    'ESC model file not found: %s', input_path);
+end
+
+function path_out = resolveCanonicalDataPath(input_path, repo_root)
+try
+    path_out = resolveEvaluationDatasetPath(input_path, repo_root, 'access', 'builder', 'must_exist', true);
+    return;
+catch evalME
+end
+
+try
+    path_out = resolveModellingDatasetPath(input_path, repo_root, 'must_exist', true);
+    return;
+catch modelME
+end
+
+error('ESCvalidation:MissingFile', ...
+    'Validation data path is not a supported canonical data location: %s\n%s\n%s', ...
+    input_path, evalME.message, modelME.message);
 end
 
 function file_path = firstExistingFile(candidates, error_id, error_msg)
@@ -640,6 +659,11 @@ if isempty(file_path)
     searched = sprintf('\n  - %s', candidates{:});
     error(error_id, '%s Searched:%s', error_msg, searched);
 end
+end
+
+function tf = isAbsolutePath(path_in)
+path_in = char(path_in);
+tf = numel(path_in) >= 2 && path_in(2) == ':';
 end
 
 function value = fieldOr(s, field_name, default_value)

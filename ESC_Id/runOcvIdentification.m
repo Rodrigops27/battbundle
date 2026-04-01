@@ -4,7 +4,7 @@ function identification_results = runOcvIdentification(cfg)
 % This function is the API-style wrapper around the OCV engines in ESC_Id.
 % It loads OCV test data, chooses one engine, optionally restricts the
 % output to one selected temperature, computes OCV-fit metrics, and saves
-% the intermediate OCV model in ESC_Id/OCV_models.
+% the intermediate OCV model under data/modelling/derived/ocv_models.
 %
 % Supported engines:
 %   - voltageAverage   -> VavgProcessOCV (default)
@@ -14,13 +14,13 @@ function identification_results = runOcvIdentification(cfg)
 % Example:
 %   cfg = struct();
 %   cfg.run_name = 'ATL20 OCV identification';
-%   cfg.ocv_data_input = fullfile('data', 'Modelling', 'OCV_Files', 'ATL20', 'ATL_OCV');
+%   cfg.ocv_data_input = fullfile('data', 'modelling', 'processed', 'ocv', 'atl20');
 %   cfg.data_prefix = 'ATL';
 %   cfg.cell_id = 'ATL20';
 %   cfg.engine = 'voltageAverage';
 %   cfg.temperature_scope = 'single';
 %   cfg.desired_temperature = 25;
-%   cfg.output.model_output_file = fullfile('ESC_Id', 'OCV_models', 'ATL20model-ocv.mat');
+%   cfg.output.model_output_file = fullfile('data', 'modelling', 'derived', 'ocv_models', 'atl20', 'ATL20model-ocv-vavgFT.mat');
 %   results = runOcvIdentification(cfg);
 
 if nargin < 1 || isempty(cfg)
@@ -76,12 +76,12 @@ identification_results = struct();
 identification_results.kind = 'ocv_identification_results';
 identification_results.created_on = datestr(now, 'yyyy-mm-dd HH:MM:SS');
 identification_results.name = cfg.run_name;
-identification_results.repo_root = repo_root;
-identification_results.config = cfg;
+identification_results.repo_root = normalizeStoredPath(repo_root, repo_root);
+identification_results.config = sanitizeConfigForStorage(cfg, repo_root);
 identification_results.available_temperatures_degC = available_temps;
 identification_results.requested_temperatures_degC = requested_temps;
 identification_results.build_temperatures_degC = build_temps;
-identification_results.ocv_data_input = cfg.ocv_data_input;
+identification_results.ocv_data_input = normalizeStoredInput(cfg.ocv_data_input, repo_root);
 identification_results.model_output_file = '';
 identification_results.results_file = '';
 identification_results.model = [];
@@ -94,11 +94,11 @@ end
 
 if cfg.output.save_model
     save(paths.model_output_file_abs, 'model', 'ocv_validation');
-    identification_results.model_output_file = paths.model_output_file_abs;
+    identification_results.model_output_file = normalizeStoredPath(paths.model_output_file_abs, repo_root);
 end
 
 if cfg.output.save_results
-    identification_results.results_file = paths.results_file_abs;
+    identification_results.results_file = normalizeStoredPath(paths.results_file_abs, repo_root);
     save(paths.results_file_abs, 'identification_results');
 end
 
@@ -127,8 +127,8 @@ defaults.output = struct( ...
     'save_model', true, ...
     'save_results', false, ...
     'include_model_struct', false, ...
-    'model_output_file', fullfile('ESC_Id', 'OCV_models', 'OCVmodel-ocv.mat'), ...
-    'results_file', fullfile('ESC_Id', 'results', 'OCV_identification_results.mat'));
+    'model_output_file', fullfile('data', 'modelling', 'derived', 'ocv_models', 'misc', 'OCVmodel-ocv.mat'), ...
+    'results_file', fullfile('data', 'modelling', 'derived', 'identification_results', 'misc', 'OCV_identification_results.mat'));
 end
 
 function [cfg, paths] = normalizeConfig(cfg, esc_root, repo_root)
@@ -145,14 +145,16 @@ if isempty(cfg.ocv_data_input)
 end
 
 if ischar(cfg.ocv_data_input) || (isstring(cfg.ocv_data_input) && isscalar(cfg.ocv_data_input))
-    cfg.ocv_data_input = resolveAbsolutePath(char(cfg.ocv_data_input), repo_root);
+    cfg.ocv_data_input = resolveModellingDatasetPath(char(cfg.ocv_data_input), repo_root, 'must_exist', true);
 end
 
 paths = struct();
 paths.esc_root = esc_root;
 paths.repo_root = repo_root;
-paths.model_output_file_abs = resolveOutputPath(cfg.output.model_output_file, repo_root);
-paths.results_file_abs = resolveOutputPath(cfg.output.results_file, repo_root);
+paths.model_output_file_abs = resolveModellingDatasetPath( ...
+    resolveOutputPath(cfg.output.model_output_file, repo_root), repo_root, 'must_exist', false);
+paths.results_file_abs = resolveModellingDatasetPath( ...
+    resolveOutputPath(cfg.output.results_file, repo_root), repo_root, 'must_exist', false);
 
 cfg.output.model_output_file = paths.model_output_file_abs;
 cfg.output.results_file = paths.results_file_abs;
@@ -378,6 +380,42 @@ if isfield(s, field_name) && ~isempty(s.(field_name))
     value = s.(field_name);
 else
     value = default_value;
+end
+end
+
+function cfg_out = sanitizeConfigForStorage(cfg_in, repo_root)
+cfg_out = cfg_in;
+cfg_out.ocv_data_input = normalizeStoredInput(fieldOr(cfg_in, 'ocv_data_input', ''), repo_root);
+if isfield(cfg_in, 'output')
+    cfg_out.output = cfg_in.output;
+    cfg_out.output.model_output_file = normalizeStoredPath(fieldOr(cfg_in.output, 'model_output_file', ''), repo_root);
+    cfg_out.output.results_file = normalizeStoredPath(fieldOr(cfg_in.output, 'results_file', ''), repo_root);
+end
+end
+
+function value_out = normalizeStoredInput(value_in, repo_root)
+if ischar(value_in) || (isstring(value_in) && isscalar(value_in))
+    value_out = normalizeStoredPath(char(value_in), repo_root);
+else
+    value_out = value_in;
+end
+end
+
+function path_out = normalizeStoredPath(path_in, repo_root)
+if isempty(path_in)
+    path_out = '';
+    return;
+end
+
+path_out = strrep(char(path_in), '\', '/');
+path_out = regexprep(path_out, '/+', '/');
+repo_root = strrep(char(repo_root), '\', '/');
+repo_root = regexprep(repo_root, '/+', '/');
+repo_prefix = [repo_root '/'];
+if strcmpi(path_out, repo_root)
+    path_out = '.';
+elseif strncmpi(path_out, repo_prefix, numel(repo_prefix))
+    path_out = path_out(numel(repo_prefix) + 1:end);
 end
 end
 

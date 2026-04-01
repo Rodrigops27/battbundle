@@ -4,7 +4,7 @@
 
 This note defines a practical criterion to decide which ESC-based Kalman filter is the best overall choice for the ATL desktop-evaluation bundle:
 - chemistry: `ATL`
-- dataset: `Evaluation/ESCSimData/datasets/esc_bus_coreBattery_dataset.mat`
+- dataset: `data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat`
 - dataset type: ESC-driven BSS synthetic dataset
 
 The intent is to balance:

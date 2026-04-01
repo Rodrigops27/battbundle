@@ -1,7 +1,7 @@
 % script buildATLmodelOcv.m
-%   Loads ATL OCV test files from data/Modelling/OCV_Files/ATL20/ATL_OCV,
+%   Loads ATL OCV test files from data/modelling/processed/ocv/atl20,
 %   runs the legacy ESC_Id/processOCV, and saves ATLmodel-ocv.mat to
-%   ESC_Id/OCV_models.
+%   data/modelling/derived/ocv_models/atl.
 
 clearvars
 close all
@@ -10,8 +10,8 @@ clc
 script_dir = fileparts(mfilename('fullpath'));
 esc_root = fileparts(script_dir);
 repo_root = fileparts(esc_root);
-ocv_data_dir = fullfile(repo_root, 'data', 'Modelling', 'OCV_Files', 'ATL20', 'ATL_OCV');
-output_dir = fullfile(esc_root, 'OCV_models');
+ocv_data_dir = fullfile(repo_root, 'data', 'modelling', 'processed', 'ocv', 'atl20');
+output_dir = fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'atl');
 output_file = fullfile(output_dir, 'ATLmodel-ocv.mat');
 
 addpath(repo_root);

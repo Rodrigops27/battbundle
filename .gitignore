@@ -8,3 +8,69 @@
 *.fig
 *_benchmark_results.mat
 runNoiseCovStudy_*.mat
+best_benchmark_results.mat
+autotuning_checkpoint.mat
+bayesopt_checkpoint.mat
+*_checkpoint.mat
+
+# Heavy evaluation and autotuning workflow outputs
+Evaluation/results/*.mat
+Evaluation/Injection/results/**/*.mat
+Evaluation/initSOCs/results/**/*.mat
+Evaluation/NoiseTuningSweep/results/**/*.mat
+autotuning/results/**/*.mat
+results/evaluation/**/*.mat
+results/autotuning/**/*.mat
+
+# Data registry artifacts kept local by default
+
+# Modelling raw data
+data/modelling/raw/**
+!data/modelling/raw/.gitkeep
+
+# Modelling interim datasets; keep helper scripts and placeholders trackable
+data/modelling/interim/**
+!data/modelling/interim/**/
+!data/modelling/interim/**/*.m
+!data/modelling/interim/**/.gitkeep
+
+# Modelling synthetic datasets
+data/modelling/synthetic/**
+!data/modelling/synthetic/**/
+!data/modelling/synthetic/**/.gitkeep
+
+# Modelling derived artifacts
+data/modelling/derived/**
+!data/modelling/derived/**/
+!data/modelling/derived/**/.gitkeep
+
+# Evaluation raw data; keep only the canonical original source profile
+data/evaluation/raw/**
+!data/evaluation/raw/**/
+!data/evaluation/raw/**/.gitkeep
+!data/evaluation/raw/omtlife8ahc_hp/Bus_CoreBatteryData_Data.mat
+
+# Evaluation interim datasets
+data/evaluation/interim/**
+!data/evaluation/interim/**/
+!data/evaluation/interim/**/.gitkeep
+
+# Evaluation synthetic builder assets; keep helper scripts and placeholders trackable
+data/evaluation/synthetic/**
+!data/evaluation/synthetic/**/
+!data/evaluation/synthetic/**/*.m
+!data/evaluation/synthetic/**/.gitkeep
+
+# Evaluation processed datasets; keep only the canonical tracked original
+data/evaluation/processed/**
+!data/evaluation/processed/**/
+!data/evaluation/processed/**/.gitkeep
+!data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat
+
+# Evaluation derived datasets are reproducible/local-only; keep only lightweight metadata
+data/evaluation/derived/**
+!data/evaluation/derived/**/
+!data/evaluation/derived/**/.gitkeep
+!data/evaluation/derived/**/manifest.json
+data/evaluation/derived/**/dataset.mat
+data/evaluation/derived/**/manifest.mat

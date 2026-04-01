@@ -10,7 +10,7 @@ esc_root = fileparts(script_dir);
 repo_root = fileparts(esc_root);
 
 if ~exist('ocv_data_dir', 'var') || isempty(ocv_data_dir)
-    ocv_data_dir = fullfile(repo_root, 'data', 'Modelling', 'OCV_Files', 'ATL20', 'ATL_OCV');
+    ocv_data_dir = fullfile(repo_root, 'data', 'modelling', 'processed', 'ocv', 'atl20');
 end
 if ~exist('engine', 'var') || isempty(engine)
     engine = 'voltageAverage';
@@ -49,10 +49,10 @@ if ~exist('debug_plots', 'var') || isempty(debug_plots)
     debug_plots = false;
 end
 if ~exist('output_file', 'var') || isempty(output_file)
-    output_file = fullfile(esc_root, 'OCV_models', 'ATL20model-ocv.mat');
+    output_file = fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'atl20', 'ATL20model-ocv-vavgFT.mat');
 end
 if ~exist('results_file', 'var') || isempty(results_file)
-    results_file = fullfile(esc_root, 'results', 'ATL20_ocv_identification_results.mat');
+    results_file = fullfile(repo_root, 'data', 'modelling', 'derived', 'identification_results', 'atl20', 'ATL20_ocv_identification_results.mat');
 end
 
 cfg = struct();

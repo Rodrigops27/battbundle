@@ -8,8 +8,8 @@ repo_root = fileparts(esc_root);
 
 if nargin < 1 || isempty(model_inputs)
     model_inputs = { ...
-        fullfile(esc_root, 'OCV_models', 'ATLmodel-ocv.mat'), ...
-        fullfile(esc_root, 'OCV_models', 'ATL20model-ocv.mat')};
+        fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'atl', 'ATLmodel-ocv.mat'), ...
+        fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'atl20', 'ATL20model-ocv-vavgFT.mat')};
 end
 if nargin < 2 || isempty(cfg)
     cfg = struct();
@@ -34,7 +34,7 @@ if ~isfield(cfg, 'ocv_method') || isempty(cfg.ocv_method)
     cfg.ocv_method = 'diagAverage';
 end
 if ~isfield(cfg, 'data_dir') || isempty(cfg.data_dir)
-    cfg.data_dir = fullfile(repo_root, 'data', 'Modelling', 'OCV_Files', 'ATL20', 'ATL_OCV');
+    cfg.data_dir = fullfile(repo_root, 'data', 'modelling', 'processed', 'ocv', 'atl20');
 end
 
 validation = computeOcvModelMetrics(model_inputs, cfg.data_dir, cfg);

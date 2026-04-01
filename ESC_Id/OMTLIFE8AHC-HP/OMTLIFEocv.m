@@ -10,17 +10,16 @@ clc
 script_dir = fileparts(mfilename('fullpath'));
 omtlife_parent = fileparts(script_dir);  % ESC_Id/OMTLIFE8AHC-HP/ -> ESC_Id/
 repo_root = fileparts(omtlife_parent);    % ESC_Id/ -> bnchmrk/
-ocv_output_dir = fullfile(omtlife_parent,'OCV_Files','OMTLIFE8AHC-HP');
+ocv_output_dir = fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'omtlife8ahc_hp');
 
 addpath(repo_root);
 addpath(genpath(fullfile(repo_root,'utility')));
 addpath(genpath(fullfile(repo_root,'ESC_Id')));
 
-% Look for OCV data in ESC_Id/OCV_Files/OMTLIFE8AHC-HP/ (correct location)
-dataset_file = fullfile(omtlife_parent,'OCV_Files','OMTLIFE8AHC-HP','LFP_OCV_interp.mat');
+dataset_file = fullfile(repo_root, 'data', 'modelling', 'interim', 'ocv', 'omtlife8ahc_hp', 'LFP_OCV_interp.mat');
 if ~exist(dataset_file,'file')
     error('OMTLIFEocv:MissingData', ...
-        'OCV interpolation data not found: %s\nExpected file in ESC_Id/OCV_Files/OMTLIFE8AHC-HP/', ...
+        'OCV interpolation data not found: %s\nExpected file in data/modelling/interim/ocv/omtlife8ahc_hp/', ...
         dataset_file);
 end
 

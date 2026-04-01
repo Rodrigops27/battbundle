@@ -34,6 +34,7 @@ dataset = loadDatasetInput(datasetInput, cfg.dataset_variable);
 [time_data, time_label] = getTimeAxis(dataset);
 soc_data = selectSocSignal(dataset);
 valid_corr = isfinite(dataset.current_a(:)) & isfinite(dataset.voltage_v(:)) & isfinite(soc_data(:));
+[current_c_rate, has_capacity] = computeCurrentCRate(dataset);
 
 fig_handles = struct();
 
@@ -42,9 +43,22 @@ fig_handles.signals = figure( ...
     'NumberTitle', 'off');
 
 ax(1) = subplot(3, 1, 1); %#ok<AGROW>
-plot(time_data, dataset.current_a(:), 'LineWidth', 1.2);
+if has_capacity
+    signal_color = [0 0.4470 0.7410];
+    yyaxis left;
+    plot(time_data, current_c_rate, 'LineWidth', 1.2, 'Color', signal_color);
+    ylabel('C-rate [1/h]');
+    ax(1).YAxis(1).Color = signal_color;
+
+    yyaxis right;
+    plot(time_data, dataset.current_a(:), 'LineWidth', 1.2, 'Color', signal_color);
+    ylabel('Current [A]');
+    ax(1).YAxis(2).Color = signal_color;
+else
+    plot(time_data, dataset.current_a(:), 'LineWidth', 1.2);
+    ylabel('Current [A]');
+end
 grid on;
-ylabel('Current [A]');
 title(buildAxisTitle(dataset, cfg));
 
 ax(2) = subplot(3, 1, 2); %#ok<AGROW>
@@ -268,6 +282,35 @@ end
 
 error('plotDatasetSignals:MissingSoc', ...
     'Dataset does not contain a recognized SOC field.');
+end
+
+function [current_c_rate, has_capacity] = computeCurrentCRate(dataset)
+current_a = dataset.current_a(:);
+capacity_ah = resolveCapacityAh(dataset);
+
+has_capacity = isfinite(capacity_ah) && capacity_ah > 0;
+if has_capacity
+    current_c_rate = current_a / capacity_ah;
+else
+    current_c_rate = current_a;
+end
+end
+
+function capacity_ah = resolveCapacityAh(dataset)
+capacity_ah = NaN;
+candidate_fields = {'capacity_ah', 'target_capacity_ah', 'source_capacity_ah', ...
+    'capacity', 'qparam', 'nominalcapacityah', 'ratedcapacityah'};
+
+for idx = 1:numel(candidate_fields)
+    field_name = candidate_fields{idx};
+    if isfield(dataset, field_name) && ~isempty(dataset.(field_name))
+        value = dataset.(field_name);
+        if isnumeric(value) && isscalar(value) && isfinite(value) && value > 0
+            capacity_ah = double(value);
+            return;
+        end
+    end
+end
 end
 
 function fig_name = buildFigureName(dataset, cfg)

@@ -11,10 +11,10 @@ esc_root = fileparts(script_dir);
 repo_root = fileparts(esc_root);
 
 if ~exist('ocv_file', 'var') || isempty(ocv_file)
-    ocv_file = fullfile(esc_root, 'OCV_models', 'ATLmodel-ocv.mat');
+    ocv_file = fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'atl', 'ATLmodel-ocv.mat');
 end
 if ~exist('dyn_data_dir', 'var') || isempty(dyn_data_dir)
-    dyn_data_dir = fullfile(repo_root, 'data', 'Modelling', 'DYN_Files', 'ATL_DYN');
+    dyn_data_dir = fullfile(repo_root, 'data', 'modelling', 'processed', 'dynamic', 'atl20');
 end
 if ~exist('desired_temperature', 'var')
     desired_temperature = [];
@@ -32,13 +32,13 @@ if ~exist('model_output_file', 'var') || isempty(model_output_file)
     model_output_file = fullfile(repo_root, 'models', 'ATLmodel.mat');
 end
 if ~exist('results_file', 'var') || isempty(results_file)
-    results_file = fullfile(esc_root, 'results', 'ATLmodel_identification_results.mat');
+    results_file = fullfile(repo_root, 'data', 'modelling', 'derived', 'identification_results', 'atl', 'ATLmodel_identification_results.mat');
 end
 
 cfg = struct();
 cfg.run_name = 'ATL ESC identification results';
 cfg.ocv_model_input = ocv_file;
-cfg.ocv_validation_input = fullfile(repo_root, 'data', 'Modelling', 'OCV_Files', 'ATL20', 'ATL_OCV');
+cfg.ocv_validation_input = fullfile(repo_root, 'data', 'modelling', 'processed', 'ocv', 'atl20');
 cfg.ocv_validation_cfg = struct( ...
     'cell_id', 'ATL', ...
     'data_prefix', 'ATL', ...
