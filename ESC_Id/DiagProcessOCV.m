@@ -25,21 +25,8 @@
 %   This file is distributed under the Creative Commons Attribution-ShareAlike
 %   4.0 International License (CC BY-SA 4.0).
 % -------------------------------------------------------------------------
-% Known failure mode: flat-plateau / low-slope regions can make the
-% derivative-based lag estimation unstable or non-representative.
-% If the estimated diagonal shifts leave only a narrow mid-SOC overlap
-% between the shifted charge and discharge curves, rawocv can become
-% dominated by tail extrapolation and stretch unrealistically near
-% 0% and 100% SOC.
+% TODO: Extrapolation and fitting would need visual inspection (config.debug)
 %
-% A more robust approach is to construct rawocv only on the valid overlap
-% interval of the shifted branches, then fill the tails from measured
-% charge/discharge data (or leave them unsupported) instead of
-% extrapolating the diagonal estimate.
-%
-% TODO: use a masked/smoothed dU/dZ-based lag estimation instead of
-% relying on unmasked dZ/dU-like inverse-slope alignment over the full range.
-% adding pchip to the interpolation pursuing for monotonicity.
 
 function model=DiagProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots,diagType)
   if nargin < 6 || isempty(debugPlots)
@@ -329,7 +316,7 @@ function [Z, U, info] = OCV_diagonalAverage(data, config)
     text(0.02, 0.98, sprintf([ ...
       'Peak lag from xcorr = %.3f V\n' ...
       'Used separation magnitude = %.3f V\n' ...
-      'Applied branch shifts = ±%.3f V'], ...
+      'Applied branch shifts = +/-%.3f V'], ...
       selectedVoltagePeakLag(1), lagU, lagU/2), ...
       'Units', 'normalized', ...
       'VerticalAlignment', 'top', ...
@@ -341,12 +328,12 @@ function [Z, U, info] = OCV_diagonalAverage(data, config)
     dzdv1 = roughdiff(disZ,stdV);
     dzdv3 = roughdiff(chgZ,stdV);
     figure;
-    plot(stdV,abs(dzdv1),stdV,abs(dzdv3));
+    plot(stdV,dzdv1,stdV,dzdv3);
     set(gca,'colororderindex',1); hold on
-    plot(stdV+lagU/2,abs(dzdv1),'--',...
-      stdV-lagU/2,abs(dzdv3),'--');
+    plot(stdV-lagU/2,dzdv1,'--',...
+      stdV+lagU/2,dzdv3,'--');
     xlabel('Voltage'); 
-    ylabel('Absolute dZ/dU'); 
+    ylabel('dZ/dU'); 
     legend('Discharge','Charge','Shift dis','Shift chg'); 
     title( ...
         sprintf('%s Cell @ %.2f\\circC', ...
@@ -399,7 +386,7 @@ function [Z, U, info] = OCV_diagonalAverage(data, config)
     text(0.02, 0.98, sprintf([ ...
       'Peak lag from xcorr = %.3f SOC\n' ...
       'Used separation magnitude = %.3f SOC\n' ...
-      'Applied branch shifts = ±%.3f SOC'], ...
+      'Applied branch shifts = +/-%.3f SOC'], ...
       selectedSocPeakLag(1), lagZ, lagZ/2), ...
       'Units', 'normalized', ...
       'VerticalAlignment', 'top', ...
@@ -411,12 +398,12 @@ function [Z, U, info] = OCV_diagonalAverage(data, config)
     dzdv1 = roughdiff(stdZ,disV);
     dzdv3 = roughdiff(stdZ,chgV);
     figure;
-    plot(stdZ,abs(dzdv1),stdZ,abs(dzdv3));
+    plot(stdZ,dzdv1,stdZ,dzdv3);
     set(gca,'colororderindex',1); hold on
-    plot(stdZ+lagZ/2,abs(dzdv1),'--',...
-      stdZ-lagZ/2,abs(dzdv3),'--');
-    xlabel('Relative composition'); 
-    ylabel('Absolute dZ/dU'); 
+    plot(stdZ-lagZ/2,dzdv1,'--',...
+      stdZ+lagZ/2,dzdv3,'--');
+    xlabel('SOC'); 
+    ylabel('dZ/dU'); 
     legend('Discharge','Charge','Shift dis','Shift chg'); 
     title( ...
         sprintf('%s Cell @ %.2f\\circC', ...
@@ -425,30 +412,27 @@ function [Z, U, info] = OCV_diagonalAverage(data, config)
     drawnow;
   end
 
-  % Interpolate shifted charge/discharge curves and keep only the region
-  % where both branches have valid support. The tails are filled later from
-  % measured branches to avoid diagonal extrapolation blow-up.
-  uuD = data.orig.disV + lagU/2;
-  zzD = data.orig.disZ + lagZ/2;
-  U4D = interp1(zzD,uuD,stdZ,'linear',NaN);
-  uuC = data.orig.chgV - lagU/2;
-  zzC = data.orig.chgZ - lagZ/2;
-  U4C = interp1(zzC,uuC,stdZ,'linear',NaN);
-  overlapMask = isfinite(U4D) & isfinite(U4C);
-  U4 = NaN(size(stdZ));
+  % Interpolate shifted charge/discharge curves over the full SOC grid
+  % using shape-preserving cubic interpolation/extrapolation.
+  uuD = data.orig.disV + abs(lagU)/2; % up
+  zzD = data.orig.disZ - abs(lagZ)/2; % left
+  U4D = interp1(zzD,uuD,stdZ,'pchip','extrap');
+  uuC = data.orig.chgV - abs(lagU)/2; % down
+  zzC = data.orig.chgZ + abs(lagZ)/2; % right
+  U4C = interp1(zzC,uuC,stdZ,'pchip','extrap');
   switch config.datype
     case 'useDis' % base off of discharge data
-      U4(overlapMask) = U4D(overlapMask);
+      U4 = U4D;
     case 'useChg' % base off of charge data
-      U4(overlapMask) = U4C(overlapMask);
+      U4 = U4C;
     otherwise  % 'useAvg' average the basis
-      U4(overlapMask) = (U4C(overlapMask) + U4D(overlapMask))/2;
+      U4 = (U4C + U4D)/2;
   end
 
   Z = stdZ;
   U = U4;
   info = struct();
-  info.overlapMask = overlapMask;
+  info.overlapMask = true(size(U4));
   info.U4D = U4D;
   info.U4C = U4C;
   info.lagU = lagU;
@@ -457,41 +441,8 @@ end
 
 function rawocv = buildOverlapLimitedRawOcv(diagData, diagZ, diagU, diagInfo)
   stdZ = diagZ(:);
-  lowTail = diagData.interp.chgV(:);
-  highTail = diagData.interp.disV(:);
-  rawStd = NaN(size(stdZ));
-
-  overlapIdx = find(diagInfo.overlapMask(:));
-  if isempty(overlapIdx)
-    warning('DiagProcessOCV:NoDiagonalOverlap', ...
-      ['No valid diagonal overlap remained after shifting; falling back ' ...
-       'to simple voltage averaging on the standard SOC grid.']);
-    rawStd = (lowTail + highTail)/2;
-  else
-    firstIdx = overlapIdx(1);
-    lastIdx = overlapIdx(end);
-
-    rawStd(overlapIdx) = diagU(overlapIdx);
-
-    lowOffset = rawStd(firstIdx) - lowTail(firstIdx);
-    highOffset = rawStd(lastIdx) - highTail(lastIdx);
-
-    if firstIdx > 1
-      rawStd(1:firstIdx-1) = lowTail(1:firstIdx-1) + lowOffset;
-    end
-    if lastIdx < numel(stdZ)
-      rawStd(lastIdx+1:end) = highTail(lastIdx+1:end) + highOffset;
-    end
-
-    missingIdx = find(~isfinite(rawStd));
-    if ~isempty(missingIdx)
-      validIdx = find(isfinite(rawStd));
-      rawStd(missingIdx) = interp1(stdZ(validIdx), rawStd(validIdx), ...
-        stdZ(missingIdx), 'linear', 'extrap');
-    end
-  end
-
-  rawocv = interp1(stdZ, rawStd, 0:0.005:1, 'linear');
+  diagU = diagU(:);
+  rawocv = interp1(stdZ, diagU, 0:0.005:1, 'pchip', 'extrap');
 end
 
 function dZ = roughdiff(Z,U)
