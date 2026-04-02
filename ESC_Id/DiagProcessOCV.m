@@ -189,13 +189,16 @@ function filedatum = buildDiagFiledata(testdata, cellID, Q25, config)
   indD  = find(testdata.script1.step == 2);
   indC  = find(testdata.script3.step == 2);
 
-  disZ = 1 - testdata.script1.disAh(indD)/Q25;
-  disZ = disZ + (1 - disZ(1));
-  chgZ = testdata.script3.chgAh(indC)/Q25;
-  chgZ = chgZ - chgZ(1);
+  rawDisZ = 1 - testdata.script1.disAh(indD)/Q25;
+  rawDisZ = rawDisZ + (1 - rawDisZ(1));
+  rawChgZ = testdata.script3.chgAh(indC)/Q25;
+  rawChgZ = rawChgZ - rawChgZ(1);
 
-  disV = testdata.script1.voltage(indD);
-  chgV = testdata.script3.voltage(indC);
+  rawDisV = testdata.script1.voltage(indD);
+  rawChgV = testdata.script3.voltage(indC);
+
+  [disZ,disV] = preprocessOcvBranch(rawDisZ, rawDisV, config.du);
+  [chgZ,chgV] = preprocessOcvBranch(rawChgZ, rawChgV, config.du);
 
   diagData = struct();
   diagData.name = cellID;
@@ -213,10 +216,10 @@ function filedatum = buildDiagFiledata(testdata, cellID, Q25, config)
   end
 
   filedatum.temp = testdata.temp;
-  filedatum.disZ = disZ(:);
-  filedatum.disV = disV(:);
-  filedatum.chgZ = chgZ(:);
-  filedatum.chgV = chgV(:);
+  filedatum.disZ = rawDisZ(:);
+  filedatum.disV = rawDisV(:);
+  filedatum.chgZ = rawChgZ(:);
+  filedatum.chgV = rawChgV(:);
   filedatum.rawocv = buildOverlapLimitedRawOcv(diagData, diagZ, diagU, diagInfo);
 end
 
@@ -231,6 +234,20 @@ function interpData = makeDiagInterpData(orig, config)
   interpData.stdZ = stdZ;
   interpData.disV = linearinterp(orig.disZ,orig.disV,stdZ);
   interpData.chgV = linearinterp(orig.chgZ,orig.chgV,stdZ);
+end
+
+function [zout,vout] = preprocessOcvBranch(zin, vin, dv)
+  zin = zin(:);
+  vin = vin(:);
+
+  [zout,vout] = smoothdiff(zin, vin, dv);
+
+  % Keep the smoothed branch in voltage-ascending order for downstream
+  % voltage-domain interpolation and cross-correlation.
+  if vout(1) > vout(end)
+    zout = flip(zout);
+    vout = flip(vout);
+  end
 end
 
 function config = defaultDiagConfig(vmin,vmax,debugPlots,diagType)
@@ -273,15 +290,53 @@ function [Z, U, info] = OCV_diagonalAverage(data, config)
   intervals = config.daxcorrfiltv(stdV);
   if ~iscell(intervals), intervals = {intervals}; end
   lagU = zeros(size(intervals));
+  voltageShiftAxes = cell(size(intervals));
+  voltageCorrAxes = cell(size(intervals));
+  voltagePeakAxes = cell(size(intervals));
+  selectedVoltagePeakLag = zeros(size(intervals));
   for k = 1:length(intervals)
     ind = intervals{k};
     dzdv1 = roughdiff(disZ(ind),stdV(ind));
     dzdv3 = roughdiff(chgZ(ind),stdV(ind));
     [c,lag] = xcorr(dzdv1,dzdv3);
+    voltageShiftAxes{k} = lag * du;
+    voltageCorrAxes{k} = normalizeCorrelation(c);
+    voltagePeakAxes{k} = lag(c==max(c)) * du;
+    selectedVoltagePeakLag(k) = voltagePeakAxes{k}(1);
     lagU(k) = abs(lag(c==max(c))*du);
     lagU(k) = lagU(k,1);
   end
   lagU = mean(lagU);
+  if config.debug
+    figure;
+    hold on
+    for k = 1:length(intervals)
+      plot(voltageShiftAxes{k}, voltageCorrAxes{k}, 'LineWidth', 1.2, ...
+        'DisplayName', sprintf('Interval %d', k));
+      peakShift = voltagePeakAxes{k};
+      peakCorr = interp1(voltageShiftAxes{k}, voltageCorrAxes{k}, peakShift, 'nearest', 'extrap');
+      plot(peakShift, peakCorr, 'o', 'MarkerSize', 7, 'LineWidth', 1.2, ...
+        'DisplayName', sprintf('Peak %d', k));
+    end
+    xline(lagU, 'r--', 'LineWidth', 1.2, ...
+      'DisplayName', sprintf('Used magnitude = %.5g V', lagU));
+    xlabel('Voltage shift');
+    ylabel('Normalized cross-correlation');
+    title('Determine voltage shift via correlation');
+    ylim([0 1.05]);
+    grid on
+    legend('Location', 'best');
+    text(0.02, 0.98, sprintf([ ...
+      'Peak lag from xcorr = %.3f V\n' ...
+      'Used separation magnitude = %.3f V\n' ...
+      'Applied branch shifts = ±%.3f V'], ...
+      selectedVoltagePeakLag(1), lagU, lagU/2), ...
+      'Units', 'normalized', ...
+      'VerticalAlignment', 'top', ...
+      'BackgroundColor', 'w', ...
+      'Margin', 4);
+    drawnow;
+  end
   if config.debug
     dzdv1 = roughdiff(disZ,stdV);
     dzdv3 = roughdiff(chgZ,stdV);
@@ -305,15 +360,53 @@ function [Z, U, info] = OCV_diagonalAverage(data, config)
   intervals = config.daxcorrfiltz(stdZ);
   if ~iscell(intervals), intervals = {intervals}; end
   lagZ = zeros(size(intervals));
+  socShiftAxes = cell(size(intervals));
+  socCorrAxes = cell(size(intervals));
+  socPeakAxes = cell(size(intervals));
+  selectedSocPeakLag = zeros(size(intervals));
   for k = 1:length(intervals)
     ind = intervals{k};
     dzdv1 = roughdiff(stdZ(ind),disV(ind));
     dzdv3 = roughdiff(stdZ(ind),chgV(ind));
     [c,lag] = xcorr(dzdv1,dzdv3);
+    socShiftAxes{k} = lag * dz;
+    socCorrAxes{k} = normalizeCorrelation(c);
+    socPeakAxes{k} = lag(c==max(c)) * dz;
+    selectedSocPeakLag(k) = socPeakAxes{k}(1);
     lagZ(k) = abs(lag(c==max(c))*dz);
     lagZ(k) = lagZ(k,1);
   end
   lagZ = mean(lagZ);
+  if config.debug
+    figure;
+    hold on
+    for k = 1:length(intervals)
+      plot(socShiftAxes{k}, socCorrAxes{k}, 'LineWidth', 1.2, ...
+        'DisplayName', sprintf('Interval %d', k));
+      peakShift = socPeakAxes{k};
+      peakCorr = interp1(socShiftAxes{k}, socCorrAxes{k}, peakShift, 'nearest', 'extrap');
+      plot(peakShift, peakCorr, 'o', 'MarkerSize', 7, 'LineWidth', 1.2, ...
+        'DisplayName', sprintf('Peak %d', k));
+    end
+    xline(lagZ, 'r--', 'LineWidth', 1.2, ...
+      'DisplayName', sprintf('Used magnitude = %.5g SOC', lagZ));
+    xlabel('SOC shift');
+    ylabel('Normalized cross-correlation');
+    title('Determine SOC shift via correlation');
+    ylim([0 1.05]);
+    grid on
+    legend('Location', 'best');
+    text(0.02, 0.98, sprintf([ ...
+      'Peak lag from xcorr = %.3f SOC\n' ...
+      'Used separation magnitude = %.3f SOC\n' ...
+      'Applied branch shifts = ±%.3f SOC'], ...
+      selectedSocPeakLag(1), lagZ, lagZ/2), ...
+      'Units', 'normalized', ...
+      'VerticalAlignment', 'top', ...
+      'BackgroundColor', 'w', ...
+      'Margin', 4);
+    drawnow;
+  end
   if config.debug
     dzdv1 = roughdiff(stdZ,disV);
     dzdv3 = roughdiff(stdZ,chgV);
@@ -430,4 +523,17 @@ function dZ = roughdiff(Z,U)
   dZc = ([dZc(1);dZc]+[dZc;dZc(end)])/2; % Avg of fwd/bkwd diffs
 
   dZ = dZc(run_id);
+end
+
+function cnorm = normalizeCorrelation(c)
+  c = double(c(:));
+  cmin = min(c);
+  cmax = max(c);
+  if ~isfinite(cmin) || ~isfinite(cmax)
+    cnorm = zeros(size(c));
+  elseif abs(cmax - cmin) <= eps(max(abs([cmin; cmax; 1])))
+    cnorm = ones(size(c));
+  else
+    cnorm = (c - cmin) ./ (cmax - cmin);
+  end
 end
