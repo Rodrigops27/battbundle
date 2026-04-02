@@ -47,10 +47,10 @@ classdef BundleEvalHelpers
 
             current_dir = char(start_dir);
             while ~isempty(current_dir)
-                if exist(fullfile(current_dir, 'buildATL20bundleP25.m'), 'file') == 2 && ...
-                        exist(fullfile(current_dir, 'data'), 'dir') == 7 && ...
+                if exist(fullfile(current_dir, 'data'), 'dir') == 7 && ...
                         exist(fullfile(current_dir, 'models'), 'dir') == 7 && ...
-                        exist(fullfile(current_dir, 'Evaluation'), 'dir') == 7
+                        exist(fullfile(current_dir, 'Evaluation'), 'dir') == 7 && ...
+                        exist(fullfile(current_dir, 'utility'), 'dir') == 7
                     repo_root = current_dir;
                     return;
                 end
@@ -70,6 +70,24 @@ classdef BundleEvalHelpers
             if exist(dir_path, 'dir') ~= 7
                 mkdir(dir_path);
             end
+        end
+
+        function path_out = resolveRepoPath(path_in, repo_root)
+            path_in = char(path_in);
+            if isempty(path_in)
+                path_out = path_in;
+                return;
+            end
+            if BundleEvalHelpers.isAbsolutePath(path_in)
+                path_out = path_in;
+            else
+                path_out = fullfile(repo_root, path_in);
+            end
+        end
+
+        function tf = isAbsolutePath(path_in)
+            path_in = char(path_in);
+            tf = ~isempty(regexp(path_in, '^[A-Za-z]:[\\/]|^\\\\', 'once'));
         end
 
         function upsertAtl20P25ModelValidationMarkdown(markdown_file, validation_results, model_file, dataset_file, results_file)
@@ -509,7 +527,7 @@ classdef BundleEvalHelpers
             cfg.use_parallel = true;
             cfg.auto_start_pool = true;
             cfg.SaveResults = true;
-            cfg.results_file = fullfile(repo_root, results_file);
+            cfg.results_file = BundleEvalHelpers.resolveRepoPath(results_file, repo_root);
             cfg.NoiseSummaryfigs = false;
             cfg.PlotSocRmsefigs = true;
             cfg.PlotVoltageRmsefigs = true;

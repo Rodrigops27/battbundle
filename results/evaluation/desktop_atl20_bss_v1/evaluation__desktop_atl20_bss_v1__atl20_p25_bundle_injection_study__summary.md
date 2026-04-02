@@ -42,3 +42,29 @@
 | atl20_p25_injection | perturbance | perturbance | EbSPKF | 6.12931 | 4.93947 | 2.21726e-06 | 19.2307 | -3.35967 | 0.130962 | 0.302283 | 3.98796 |
 | atl20_p25_injection | perturbance | perturbance | EBiSPKF | 8.02514 | 6.46651 | 1.908e-06 | 11.7153 | -1.0825 | 0.131731 | 0.302283 | 3.98796 |
 | atl20_p25_injection | perturbance | perturbance | Em7SPKF | 7.55485 | 6.32086 | 1.93201e-06 | 15.7608 | -1.20926 | 0.273956 | 0.302283 | 3.98796 |
+
+### Practical ranking for this study
+
+This ranking combines both injected cases and prioritizes estimators that remain usable under the harsher stochastic-sensor corruption without collapsing on the perturbance case:
+
+1. `EbSPKF`
+2. `ESC-SPKF`
+3. `Em7SPKF`
+4. `EsSPKF`
+5. `EBiSPKF`
+6. `ESC-EKF`
+7. `ROM-EKF`
+8. `EnacrSPKF`
+9. `EacrSPKF`
+10. `EaEKF`
+11. `EDUKF`
+
+## Observations
+
+- This study is the main transfer-robustness check for the tuned bundle because it evaluates the estimators on explicitly corrupted datasets rather than only on the nominal scenario.
+- `EbSPKF`, `ESC-SPKF`, `Em7SPKF`, `EsSPKF`, and `EBiSPKF` form the strongest practical group here. None of them wins every metric, but all remain usable under both injected cases.
+- The stochastic-sensor case is the harsher test. It is what separates the practically robust estimators from those that only look strong on the nominal benchmark.
+- `EacrSPKF` is the clearest example of nominal strength not transferring cleanly to corrupted data. It dominates the nominal benchmark but degrades badly under noise injection.
+- `EaEKF` and `EDUKF` also fail the transfer test in practical terms because their noise-injection behavior becomes severe despite their strengths in other studies.
+- `ROM-EKF` is not competitive on the nominal benchmark, but it avoids the catastrophic breakdown seen in some tuned filters under injection, which makes it less fragile than its nominal ranking alone suggests.
+- `EnacrSPKF` remains poor, but it is still preferable to the clearly unstable injected behavior of `EaEKF`, `EacrSPKF`, and `EDUKF` in this study.

@@ -40,6 +40,7 @@ Primary harness:
 - ATL and NMC30 both show negative mean voltage error, which indicates systematic overestimation of terminal voltage on these runs.
 - OMT8 was fitted with a BSS profile 55% to 90% SOC profile. It has the smallest bias and the lowest max error in the current summary.
 - This file is a result summary only. Detailed harness behavior, accepted dataset shapes, and metric definitions belong in `ESC_Id/README.md`.
+- ATL20model is an improved 25 degC version of the original ATLmodel since it used a voltage averaged OCV characterization.
 
 ## How to regenerate them
 

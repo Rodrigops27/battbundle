@@ -31,6 +31,8 @@ Canonical modelling reads and writes must resolve under:
 - `runOcvIdentification.m`
 - `runDynamicIdentification.m`
 - `ESCvalidation.m`
+- `compareEscModels.m`
+- `compareOcvModels.m`
 - `runESCvalidation.m`
 - `validate_models.m`
 - `ATL20/buildATL20modelOcv.m`
@@ -108,6 +110,62 @@ results = ESCvalidation( ...
     fullfile('models', 'ATL20model_P25.mat'), ...
     fullfile('data', 'modelling', 'processed', 'dynamic', 'atl20', 'ATL_DYN_40_P25.mat'), ...
     true);
+```
+
+`legacy_window_rmse_mv` is a secondary ESC validation metric computed only on
+the legacy 95%-to-5%-SOC voltage window used by older dynamic-validation
+scripts. It is not the full-trace RMSE, and it appears in the validation
+summary as `Legacy window RMSE`.
+
+## Example Two-Model Comparison
+
+`compareEscModels.m` compares two ESC models on the same dataset, returns both
+validation result structs plus aggregate comparison tables, and can generate a
+comparison figure.
+
+To test `models/ATL20model_P25.mat` against `models/ATLmodel.mat` on
+`data/modelling/processed/dynamic/atl20/ATL_DYN_50_P45.mat`:
+
+```matlab
+addpath(genpath('.'));
+
+cfg = struct();
+cfg.enabled_plot = true;
+
+comparison = compareEscModels( ...
+    fullfile('models', 'ATL20model_P25.mat'), ...
+    fullfile('models', 'ATLmodel.mat'), ...
+    fullfile('data', 'modelling', 'processed', 'dynamic', 'atl20', 'ATL_DYN_50_P45.mat'), ...
+    cfg);
+
+disp(comparison.case_summary_table);
+disp(comparison.model_summary_table);
+```
+
+## Example OCV Comparison
+
+`compareOcvModels.m` is the direct visual OCV comparator for two model files
+against raw OCV test data at one temperature. It plots the raw discharge and
+charge traces and both model OCV curves. It does not construct or rely on a
+"true" OCV reference, so this comparison is visual rather than a fit-metric
+validation.
+
+To compare `models/ATL20model_P25.mat` against `models/ATLmodel.mat` at
+25 degC using `data/modelling/processed/ocv/atl20/ATL_OCV_P25.mat`:
+
+```matlab
+addpath(genpath('.'));
+
+cfg = struct();
+cfg.enabled_plot = true;
+cfg.data_prefix = 'ATL';
+
+comparison = compareOcvModels( ...
+    fullfile('models', 'ATL20model_P25.mat'), ...
+    fullfile('models', 'ATLmodel.mat'), ...
+    fullfile('data', 'modelling', 'processed', 'ocv', 'atl20', 'ATL_OCV_P25.mat'), ...
+    25, ...
+    cfg);
 ```
 
 ## `ESC_Id/results` Classification

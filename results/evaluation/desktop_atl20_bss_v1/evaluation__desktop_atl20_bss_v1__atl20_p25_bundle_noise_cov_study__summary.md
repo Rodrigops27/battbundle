@@ -55,6 +55,29 @@
 
 - Combined from the split group1 and group2 promoted summaries.
 - Both groups cover the same 9x9 sigma_w/sigma_v grid; estimator sets were split for hardware/runtime reasons.
-- Recovered from Command Window output, not from the original MATLAB `sweepResults` variable.
-- Group 1 reporting emitted a MATLAB warning about sprintf escaping: `Escaped character '\s' is not valid.`
-- Group 2 reporting emitted a warning that `EaEKF was not found in the sweep results.`
+
+### Practical ranking for this study
+
+This ranking uses the full-grid robustness evidence, prioritizing low mean SOC RMSE and low worst-case SOC RMSE over the entire covariance sweep:
+
+1. `EaEKF`
+2. `ESC-EKF`
+3. `EacrSPKF`
+4. `EsSPKF`
+5. `Em7SPKF`
+6. `ESC-SPKF`
+7. `EBiSPKF`
+8. `EbSPKF`
+9. `EDUKF`
+10. `ROM-EKF`
+11. `EnacrSPKF`
+
+## Observations
+
+- This is the strongest artifact for covariance-robustness analysis because it explores the full 9x9 process-noise and sensor-noise grid.
+- `EaEKF` is the standout robust estimator in this study. Its mean, best, and worst SOC-RMSE values are all tightly grouped, which indicates an unusually flat and forgiving tuning surface.
+- `ESC-EKF` also looks strong here. It combines a very low best point with a much better mean and worst-case profile than the nominal benchmark alone would suggest.
+- `EacrSPKF` has the best single covariance point in the full grid, but its average robustness is still weaker than `EaEKF` and `ESC-EKF`.
+- `EsSPKF` and `Em7SPKF` are the most attractive SPKF-family compromise filters in this sweep because they pair good best-point performance with relatively good mean and worst-case behavior.
+- `EDUKF` is not robust in this study. Its best point is competitive, but its mean and worst-case metrics show severe sensitivity to covariance mismatch.
+- `ROM-EKF` and `EnacrSPKF` are dominated across the grid and are not practical choices from this robustness view.

@@ -29,3 +29,28 @@
 | EbSPKF | 8.441130 | 8.441130 | 20.361539 |
 | EBiSPKF | 7.822736 | 7.822736 | 12.724083 |
 | Em7SPKF | 7.593645 | 7.593645 | 16.137189 |
+
+### Practical ranking for this study
+
+This is the nominal Bayes-optimum ranking by the tuned objective value only:
+
+1. `EacrSPKF`
+2. `EDUKF`
+3. `Em7SPKF`
+4. `ESC-SPKF`
+5. `EBiSPKF`
+6. `EsSPKF`
+7. `EbSPKF`
+8. `ESC-EKF`
+9. `ROM-EKF`
+10. `EaEKF`
+11. `EnacrSPKF`
+
+## Observations
+
+- This study is a nominal-objective tuning result, not a robustness result. It shows where Bayes optimization landed on the desktop ATL20 benchmark objective.
+- `EacrSPKF` is the clear nominal winner in this artifact, with a large gap to the next estimator on the tuned `SocRmsePct` objective.
+- `EDUKF` is the second-best nominal Bayes point, but still far behind `EacrSPKF`.
+- The mid-pack SPKF family is tightly clustered: `Em7SPKF`, `ESC-SPKF`, `EBiSPKF`, `EsSPKF`, and `EbSPKF` all land in a narrow `7.6%` to `8.4%` SOC-RMSE band.
+- `EaEKF` shows extremely small voltage RMSE but poor SOC objective value here, so voltage fit and SOC accuracy are not moving together for this tuned point.
+- `ROM-EKF` and `EnacrSPKF` remain noncompetitive even after tuning, so Bayes optimization does not rescue them on the nominal benchmark.

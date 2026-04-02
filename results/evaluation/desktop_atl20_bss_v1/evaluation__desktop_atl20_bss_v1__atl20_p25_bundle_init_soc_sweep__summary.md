@@ -53,3 +53,29 @@
 | 50 | EaEKF | 0.64537 | EaEKF | 0.0022467 |
 | 60 | ESC-EKF | 0.52869 | EaEKF | 0.0023201 |
 | 100 | EaEKF | 0.75432 | EaEKF | 0.27725 |
+
+### Practical ranking for this study
+
+This ranking prioritizes low mean SOC RMSE and low worst-case sensitivity over the full initial-SOC sweep:
+
+1. `EaEKF`
+2. `EsSPKF`
+3. `EBiSPKF`
+4. `ESC-SPKF`
+5. `Em7SPKF`
+6. `EbSPKF`
+7. `ESC-EKF`
+8. `ROM-EKF`
+9. `EacrSPKF`
+10. `EnacrSPKF`
+11. `EDUKF`
+
+## Observations
+
+- This study is the main robustness check for estimator sensitivity to wrong initial SOC, so mean and worst-case behavior matter more than the single best point.
+- `EaEKF` is the clear winner here. It is nearly flat across the whole 0% to 100% initialization sweep, which makes it by far the least initialization-sensitive estimator in the bundle.
+- `ESC-EKF` has the best single point at `60%`, but it is not initialization-robust overall because its worst-case error is far larger than the leading robust estimators.
+- `EsSPKF` and `EBiSPKF` are the strongest practical SPKF-family choices in this study because they keep both mean and worst-case SOC error under control.
+- Most of the practically useful estimators achieve their best point around `55%` to `70%` initial SOC, which is a useful operating clue if an initialization prior is available.
+- `EnacrSPKF` is flat, but only because it stays poor everywhere. That is not robustness in the practical sense.
+- `EDUKF` and `EacrSPKF` are fragile to initialization mismatch in this study despite being competitive in other artifacts.

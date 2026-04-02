@@ -1,4 +1,33 @@
-addpath(genpath('.'));
+repo_root = '';
+repo_root_candidates = {pwd, fileparts(mfilename('fullpath'))};
+for repo_root_idx = 1:numel(repo_root_candidates)
+    repo_root_candidate = char(repo_root_candidates{repo_root_idx});
+    while ~isempty(repo_root_candidate)
+        if exist(fullfile(repo_root_candidate, 'data'), 'dir') == 7 && ...
+                exist(fullfile(repo_root_candidate, 'models'), 'dir') == 7 && ...
+                exist(fullfile(repo_root_candidate, 'Evaluation'), 'dir') == 7 && ...
+                exist(fullfile(repo_root_candidate, 'utility'), 'dir') == 7
+            repo_root = repo_root_candidate;
+            break;
+        end
+        parent_dir = fileparts(repo_root_candidate);
+        if isempty(parent_dir) || strcmp(parent_dir, repo_root_candidate)
+            break;
+        end
+        repo_root_candidate = parent_dir;
+    end
+    if ~isempty(repo_root)
+        break;
+    end
+end
+
+if isempty(repo_root)
+    error('run_atl20_p25_bundle:RepoRootNotFound', ...
+        'Could not locate the repository root. Run the example from inside the repository.');
+end
+
+addpath(genpath(repo_root));
+cd(repo_root);
 
 % If you edited Evaluation/xKFeval.m or Evaluation/runBenchmark.m and want
 % to run only the benchmark/noise-study sections separately, uncomment the
@@ -71,7 +100,7 @@ cfg_ocv.output = struct( ...
     'model_output_file', fullfile('data', 'modelling', 'derived', 'ocv_models', 'atl20', 'ATL20model-ocv-vavgFT.mat'), ...
     'results_file', fullfile('data', 'modelling', 'derived', 'identification_results', 'atl20', 'ATL20_ocv_identification_results.mat'));
 
-ocv_results = runOcvIdentification(cfg_ocv); %#ok<NASGU>
+ocv_results = runOcvIdentification(cfg_ocv); 
 
 %% 2) Dynamic identification: full ESC model at 25 degC
 close all;

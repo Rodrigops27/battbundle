@@ -28,7 +28,7 @@ This repository is organized as layered workflows:
 5. Add or maintain estimator implementations and initializers in `estimators/`.
 6. Tune estimator covariance parameters with Bayes optimization in `autotuning/` when needed.
    - Run a grid search to sweep the Kalman Filter Covariances for an specifc dataset..
-7. Benchmark estimators with [`Evaluation/runBenchmark.m`](Evaluation/runBenchmark.m); use [`Evaluation/mainEval.m`](Evaluation/mainEval.m) as a fixed example scenario.
+7. Benchmark estimators with [`Evaluation/runBenchmark.m`](Evaluation/runBenchmark.m).
 8. Run robustness studies such as initialization, covariance, and injection studies in  [`Evaluation`](Evaluation) .
 9. Store concise result summaries in `results/`.
 10. Select the validated estimator-model bundle according to an explicit ranking criterion, for example [`results/EstimatorSelection.md`](results/EstimatorSelection.md).

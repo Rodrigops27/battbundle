@@ -26,3 +26,29 @@
 | EbSPKF | 8.44072 | 7.64159 | 1.96719e-06 | 20.3615 | -0.867619 | 0.110431 |
 | EBiSPKF | 7.82221 | 7.38039 | 1.66787e-06 | 12.7241 | -1.4476 | 0.110828 |
 | Em7SPKF | 7.59313 | 7.12477 | 1.62622e-06 | 16.1372 | -1.48818 | 0.302911 |
+
+### Practical ranking for this study
+
+This is the tuned nominal benchmark ranking by observed SOC RMSE on the final bundle run:
+
+1. `EacrSPKF`
+2. `EDUKF`
+3. `Em7SPKF`
+4. `ESC-SPKF`
+5. `EBiSPKF`
+6. `EsSPKF`
+7. `EbSPKF`
+8. `ESC-EKF`
+9. `ROM-EKF`
+10. `EaEKF`
+11. `EnacrSPKF`
+
+## Observations
+
+- This artifact is the direct nominal benchmark result for the tuned bundle, so it is the cleanest statement of best-case estimator performance on the desktop ATL20 scenario.
+- `EacrSPKF` is decisively best on SOC RMSE in this nominal run, and it is the only estimator below `1%`.
+- `EDUKF` is second on SOC RMSE, but still well behind `EacrSPKF`.
+- The practical mid-tier cluster is again the SPKF family: `Em7SPKF`, `ESC-SPKF`, `EBiSPKF`, `EsSPKF`, and `EbSPKF`.
+- `ESC-EKF` is not a top nominal performer in this run despite its strong covariance-sweep best point, so its best-case tuning and its final tuned operating point should not be treated as the same thing.
+- `EaEKF` achieves nearly zero voltage RMSE but remains poor on SOC RMSE here, which makes it unattractive if SOC accuracy is the primary objective.
+- `EnacrSPKF` remains the weakest estimator in the final tuned benchmark.
