@@ -42,6 +42,32 @@ Canonical modelling reads and writes must resolve under:
 - `OMTLIFE8AHC-HP/OMTLIFEocv.m`
 - `OMTLIFE8AHC-HP/OMTdynId.m`
 
+## OCV Preprocessing
+
+All OCV engines in `ESC_Id` now start from the same preprocessing step:
+
+- extract the slow discharge and slow charge branches from `script1` and `script3`
+- normalize them to SOC using the 25 degC reference capacity
+- apply `smoothdiff.m` to both branches before any OCV estimator is run
+
+This shared preprocessing is implemented in `prepareOcvBranches.m` and is
+used by:
+
+- `processOCV.m`
+- `VavgProcessOCV.m`
+- `SOCavgOCV.m`
+- `DiagProcessOCV.m`
+
+The same smoothed-branch convention is also used when building OCV-reference
+curves inside `computeOcvModelMetrics.m`.
+
+TODO:
+The current ESC OCV temperature regression still uses the legacy linear form
+`OCV(SOC,T) = OCV0(SOC) + T*OCVrel(SOC)`. This may require a better
+expression, preferably using Kelvin to avoid sign handling and to make the
+reference temperature explicit, for example:
+`OCV(SOC,T) = OCV(SOC) + (T - 298.15)*dOCV/dT(SOC)`.
+
 ## Canonical Inputs And Outputs
 
 Examples:
@@ -64,6 +90,24 @@ Examples:
 
 ## Example OCV Identification
 
+`runOcvIdentification.m` supports these OCV engines:
+
+- `voltageAverage`
+- `socAverage`
+- `middleCurve`
+- `diagAverage`
+- `resistanceBlend`
+
+Regardless of engine choice, `smoothdiff.m` preprocessing is applied first to
+the input OCV branches.
+
+By default, `runOcvIdentification.m` evaluates the fitted model against a
+common OCV reference built with `middleCurve` on each dataset temperature.
+That reference is reconstructed directly from each temperature dataset and
+does not use the candidate model's `OCV0/OCVrel` regression. Override this
+with `cfg.reference_ocv_method` only when you explicitly want a different
+reference builder.
+
 ```matlab
 addpath(genpath('.'));
 
@@ -75,9 +119,38 @@ cfg.cell_id = 'ATL20';
 cfg.engine = 'voltageAverage';
 cfg.temperature_scope = 'single';
 cfg.desired_temperature = 25;
+cfg.reference_ocv_method = 'middleCurve';
 cfg.output.model_output_file = fullfile('data', 'modelling', 'derived', 'ocv_models', 'atl20', 'ATL20model-ocv-vavgFT.mat');
 results = runOcvIdentification(cfg);
 ```
+
+For the standard study flow, run `ESC_Id/stdy/runOcvModellingInspection.m`.
+By default it evaluates the processed ATL20 OCV folder
+`data/modelling/processed/ocv/atl20`, uses `middleCurve` as the common
+metrics reference, computes all methods including the three
+`DiagProcessOCV` variants, and opens one figure per temperature through
+`ESC_Id/stdy/inspectOcvModelling.m`.
+
+Those figures overlay the raw discharge/charge branches, the shared metrics
+reference OCV, and the enabled model curves. By default the three diagonal
+methods are still computed so their metrics remain available, but their
+curves are hidden from the plots unless `cfg.plot_diag_methods = true`.
+
+## Modelling Workflow
+
+Use this workflow when building ESC models in `ESC_Id`:
+
+1. Prepare or select the processed OCV laboratory dataset under `data/modelling/processed/ocv/...`.
+2. Run `ESC_Id/stdy/runOcvModellingInspection.m` to batch-identify the OCV methods and launch `ESC_Id/stdy/inspectOcvModelling.m` for visual comparison across the available temperatures.
+3. Choose the OCV estimator you want to carry forward: `resistanceBlend`, `voltageAverage`, `socAverage`, `middleCurve`, or `diagAverage` with one of `useDis`, `useChg`, or `useAvg`.
+4. Build the OCV model with `runOcvIdentification.m` using the selected engine and temperature scope.
+5. Review the identified OCV model visually and check the OCV-fit metrics before freezing that model for dynamic identification.
+   By default those metrics are measured against the per-temperature `middleCurve` reconstruction, used as a common reference across OCV engines.
+6. Prepare or select the processed dynamic-identification datasets under `data/modelling/processed/dynamic/...`.
+7. Run `runDynamicIdentification.m` with the selected OCV model, the desired dynamic datasets, the pole count, and hysteresis setting to execute the `processDynamic` stage.
+8. Review the resulting ESC model and the dynamic-fit metrics produced by `runDynamicIdentification.m`.
+9. Validate the ESC model with `ESCvalidation.m`, `runESCvalidation.m`, or `compareEscModels.m` on the intended validation scenarios.
+10. If multiple ESC candidates remain, compare them on common dynamic datasets and retain the model that best matches the intended operating conditions.
 
 ## Example Dynamic Identification
 
