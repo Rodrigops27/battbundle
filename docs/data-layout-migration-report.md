@@ -94,10 +94,6 @@ Each current entry was classified before migration.
 | `ESC_Id/results/ATL20_ocv_identification_results.mat` | reusable modelling artifact | migrated copy | `data/modelling/derived/identification_results/atl20/ATL20_ocv_identification_results.mat` because it is a structured OCV identification output |
 | `ESC_Id/results/ATL20model_P25_identification_results.mat` | reusable modelling artifact | migrated copy | `data/modelling/derived/identification_results/atl20/ATL20model_P25_identification_results.mat` because it is a structured dynamic identification output |
 | `ESC_Id/results/ESC_validation_results.mat` | reusable modelling artifact | migrated copy | `data/modelling/derived/validation_results/esc/ESC_validation_results.mat` because it is a structured validation output that can be consumed programmatically |
-| `ESC_Id/results/OCV/compareATL20OcvModels.m` | reporting support script | left outside `data/` | user-facing comparison helper, not a canonical dataset |
-| `ESC_Id/results/OCV/computeAtl20OcvValidationMetrics.m` | reporting support script | left outside `data/` | reporting helper, updated to read canonical modelling inputs |
-| `ESC_Id/results/OCV/plotAtl20OcvValidation.m` | reporting support script | left outside `data/` | plotting helper, not a reusable dataset |
-| `ESC_Id/results/OCV/OCV25degCcomparison.fig` | reporting artifact | left outside `data/` | figure output intended for user-facing reporting |
 | `ESC_Id/results/.gitignore` | repository control file | left outside `data/` | not a data artifact |
 
 ## Nominal Manifest Scaffolding
