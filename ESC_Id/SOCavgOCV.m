@@ -1,4 +1,4 @@
-% function model=VavgProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots)
+% function model=SOCavgOCV(data,cellID,minV,maxV,savePlots,debugPlots)
 %
 % Inputs:
 %   data = cell-test data passed in from runProcessOCV
@@ -11,20 +11,10 @@
 %   model = data structure with information for recreating OCV
 %
 % This function follows the same test-processing structure as processOCV.m
-% but reconstructs the OCV curve via voltage averaging of charge and
-% discharge traces, analogous to the reference OCP_voltageAverage method.
-%
-% Reference implementation adapted from "estimateOCV.m", developed by:
-% Prof. Gregory L. Plett and Prof. M. Scott Trimboli University of Colorado
-% Colorado Springs (UCCS) as part of the Physics-Based Reduced-Order Model
-% framework for lithium-ion batteries (see: Battery Management Systems,
-% Volume III: Physics-Based Methods, Artech House, 2024).
-% (Functions mirrored: setupIndsLocs, setupBlend, simStep, shortWarn)
-% License:
-%   This file is distributed under the Creative Commons Attribution-ShareAlike
-%   4.0 International License (CC BY-SA 4.0).
+% but reconstructs the OCV curve via SOC averaging of charge and
+% discharge traces, analogous to the reference OCP_socAverage method.
 
-function model=VavgProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots)
+function model=SOCavgOCV(data,cellID,minV,maxV,savePlots,debugPlots)
   if nargin < 6 || isempty(debugPlots)
     debugPlots = false;
   end
@@ -48,7 +38,7 @@ function model=VavgProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots)
     'rawocv', []), numtemps, 1);
   eta = zeros(size(filetemps));
   Q   = zeros(size(filetemps));
-  config = defaultVavgConfig(minV,maxV,debugPlots);
+  config = defaultSOCavgConfig(minV,maxV,debugPlots);
 
   k = ind25;
   totDisAh = data(k).script1.disAh(end) + ...
@@ -68,7 +58,7 @@ function model=VavgProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots)
   Q25 = data(k).script1.disAh(end) + data(k).script2.disAh(end) - ...
         data(k).script1.chgAh(end) - data(k).script2.chgAh(end);
   Q(k) = Q25;
-  filedata(k) = buildVavgFiledata(data(k), cellID, Q25, config);
+  filedata(k) = buildSOCavgFiledata(data(k), cellID, Q25, config);
 
   for k = not25'
     data(k).script2.chgAh = data(k).script2.chgAh*eta25;
@@ -86,7 +76,7 @@ function model=VavgProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots)
 
     Q(k) = data(k).script1.disAh(end) + data(k).script2.disAh(end) ...
            - data(k).script1.chgAh(end) - data(k).script2.chgAh(end);
-    filedata(k) = buildVavgFiledata(data(k), cellID, Q25, config);
+    filedata(k) = buildSOCavgFiledata(data(k), cellID, Q25, config);
   end
 
   Vraw = []; temps = [];
@@ -139,7 +129,7 @@ function model=VavgProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots)
     plot(100*SOC,OCVfromSOCtemp(SOC,filedata(k).temp,model), ...
          100*SOC,filedata(k).rawocv); hold on
     xlabel('SOC (%)'); ylabel('OCV (V)'); ylim([minV-0.1 maxV+0.1]);
-    title(sprintf('%s OCV relationship at temp = %d (Voltage Average)', ...
+    title(sprintf('%s OCV relationship at temp = %d (SOC Average)', ...
       cellID,filedata(k).temp)); xlim([0 100]);
     err = filedata(k).rawocv - ...
           OCVfromSOCtemp(SOC,filedata(k).temp,model);
@@ -154,10 +144,10 @@ function model=VavgProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots)
     if savePlots
       if ~exist('OCV_FIGURES','dir'), mkdir('OCV_FIGURES'); end
       if filetemps(k) < 0
-        filename = sprintf('OCV_FIGURES/%s_Vavg_N%02d.png', ...
+        filename = sprintf('OCV_FIGURES/%s_SOCavg_N%02d.png', ...
           cellID,abs(filetemps(k)));
       else
-        filename = sprintf('OCV_FIGURES/%s_Vavg_P%02d.png', ...
+        filename = sprintf('OCV_FIGURES/%s_SOCavg_P%02d.png', ...
           cellID,filetemps(k));
       end
       print(filename,'-dpng')
@@ -165,8 +155,8 @@ function model=VavgProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots)
   end
 end
 
-function filedatum = buildVavgFiledata(testdata, cellID, Q25, config)
-  branches = prepareOcvBranches(testdata, Q25, config.dz);
+function filedatum = buildSOCavgFiledata(testdata, cellID, Q25, config)
+  branches = prepareOcvBranches(testdata, Q25, config.dv);
 
   avgData = struct();
   avgData.name = cellID;
@@ -175,9 +165,9 @@ function filedatum = buildVavgFiledata(testdata, cellID, Q25, config)
   avgData.orig.disV = branches.smoothed.disV;
   avgData.orig.chgZ = branches.smoothed.chgZ;
   avgData.orig.chgV = branches.smoothed.chgV;
-  avgData.interp = makeVavgInterpData(avgData.orig, config);
+  avgData.interp = makeSOCavgInterpData(avgData.orig, config);
 
-  [avgZ, avgU] = OCV_voltageAverage(avgData, config);
+  [avgZ, avgU] = OCV_socAverage(avgData, config);
 
   filedatum.temp = testdata.temp;
   filedatum.disZ = branches.raw.disZ;
@@ -188,29 +178,34 @@ function filedatum = buildVavgFiledata(testdata, cellID, Q25, config)
 
   if config.debug
     figure;
-    plot(100*avgData.interp.stdZ,avgData.interp.disV, ...
-         100*avgData.interp.stdZ,avgData.interp.chgV, ...
-         100*avgZ,avgU,'LineWidth',1.2);
-    xlabel('SOC (%)');
+    yyaxis left
+    plot(avgData.interp.stdV, avgData.interp.disZ, ...
+         avgData.interp.stdV, avgData.interp.chgZ, 'LineWidth', 1.2);
+    ylabel('SOC');
+    yyaxis right
+    plot(avgZ, avgU, 'LineWidth', 1.4);
     ylabel('Voltage (V)');
-    title(sprintf('%s Cell @ %.2f\\circC Voltage Average', ...
+    xlabel('Voltage (V)');
+    title(sprintf('%s Cell @ %.2f\\circC SOC Average', ...
       cellID,testdata.temp));
-    legend('Discharge','Charge','Average','location','southeast');
-    xlim([0 100]);
-    ylim([config.vmin config.vmax]);
+    legend('Discharge SOC(V)','Charge SOC(V)','Average OCV','location','best');
+    xlim([config.vmin config.vmax]);
     grid on;
     drawnow;
   end
 end
 
-function interpData = makeVavgInterpData(orig, config)
+function interpData = makeSOCavgInterpData(orig, config)
+  stdV = (config.vmin:config.dv:config.vmax).';
   stdZ = (0:config.dz:1).';
+  interpData = struct();
+  interpData.stdV = stdV;
   interpData.stdZ = stdZ;
-  interpData.disV = linearinterp(orig.disZ,orig.disV,stdZ);
-  interpData.chgV = linearinterp(orig.chgZ,orig.chgV,stdZ);
+  interpData.disZ = linearinterp(orig.disV,orig.disZ,stdV);
+  interpData.chgZ = linearinterp(orig.chgV,orig.chgZ,stdV);
 end
 
-function config = defaultVavgConfig(vmin,vmax,debugPlots)
+function config = defaultSOCavgConfig(vmin,vmax,debugPlots)
   if nargin < 3 || isempty(debugPlots)
     debugPlots = false;
   end
@@ -218,11 +213,17 @@ function config = defaultVavgConfig(vmin,vmax,debugPlots)
   config = struct();
   config.vmin = vmin;
   config.vmax = vmax;
+  config.dv = 0.002;
   config.dz = 0.002;
   config.debug = logical(debugPlots);
 end
 
-function [Z, U] = OCV_voltageAverage(data, ~)
-  Z = data.interp.stdZ;
-  U = (data.interp.chgV + data.interp.disV)/2;
+function [Z, U] = OCV_socAverage(data, ~)
+  stdZ = data.interp.stdZ;
+  stdV = data.interp.stdV;
+  z3 = (data.interp.chgZ + data.interp.disZ)/2;
+  [z3uniq, uniqIdx] = unique(z3(:), 'stable');
+  vuniq = stdV(uniqIdx);
+  Z = stdZ;
+  U = interp1(z3uniq, vuniq, stdZ, 'linear', 'extrap');
 end

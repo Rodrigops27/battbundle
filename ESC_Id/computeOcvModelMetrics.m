@@ -20,10 +20,17 @@ function validation = computeOcvModelMetrics(model_inputs, data_input, cfg)
 %                   .min_v
 %                   .max_v
 %                   .ocv_method   'diagAverage', 'resistanceBlend', or
-%                                 'voltageAverage'
+%                                 'voltageAverage', 'socAverage', or
+%                                 'middleCurve'
 %
 % Output:
 %   validation    Struct with per-model OCV metrics and raw-fit references.
+%
+% Notes:
+%   When cfg.ocv_method = 'middleCurve', the reference.rawocv curve is
+%   rebuilt independently at each dataset temperature from the middle-curve
+%   algorithm. It does not use the candidate model's OCV0/OCVrel
+%   temperature regression.
 
 script_dir = fileparts(mfilename('fullpath'));
 repo_root = fileparts(script_dir);
@@ -234,6 +241,10 @@ switch cfg.ocv_method
         [filedata, eta, Q] = buildLegacyReference(data, cfg.min_v, cfg.max_v);
     case 'voltageaverage'
         [filedata, eta, Q] = buildVavgReference(data);
+    case 'socaverage'
+        [filedata, eta, Q] = buildSocavgReference(data, cfg.min_v, cfg.max_v);
+    case 'middlecurve'
+        [filedata, eta, Q] = buildMiddleReference(data, cfg.cell_id, cfg.min_v, cfg.max_v);
     otherwise
         error('computeOcvModelMetrics:UnsupportedMethod', ...
             'Unsupported ocv_method "%s".', cfg.ocv_method);
@@ -369,6 +380,89 @@ for k = not25
 end
 end
 
+function [filedata, eta, Q] = buildSocavgReference(data, min_v, max_v)
+filetemps = [data.temp];
+numtemps = numel(filetemps);
+ind25 = find(filetemps == 25, 1, 'first');
+if isempty(ind25)
+    error('computeOcvModelMetrics:Missing25C', 'Must have a test at 25degC');
+end
+not25 = find(filetemps ~= 25);
+
+filedata = repmat(struct('temp', [], 'disZ', [], 'disV', [], 'chgZ', [], 'chgV', [], 'rawocv', []), numtemps, 1);
+eta = zeros(size(filetemps));
+Q = zeros(size(filetemps));
+
+k = ind25;
+totDisAh = data(k).script1.disAh(end) + data(k).script2.disAh(end) + data(k).script3.disAh(end) + data(k).script4.disAh(end);
+totChgAh = data(k).script1.chgAh(end) + data(k).script2.chgAh(end) + data(k).script3.chgAh(end) + data(k).script4.chgAh(end);
+eta25 = totDisAh / totChgAh;
+eta(k) = eta25;
+data(k).script1.chgAh = data(k).script1.chgAh * eta25;
+data(k).script2.chgAh = data(k).script2.chgAh * eta25;
+data(k).script3.chgAh = data(k).script3.chgAh * eta25;
+data(k).script4.chgAh = data(k).script4.chgAh * eta25;
+
+Q25 = data(k).script1.disAh(end) + data(k).script2.disAh(end) - data(k).script1.chgAh(end) - data(k).script2.chgAh(end);
+Q(k) = Q25;
+filedata(k) = buildSocavgFiledata(data(k), Q25, min_v, max_v);
+
+for k = not25
+    data(k).script2.chgAh = data(k).script2.chgAh * eta25;
+    data(k).script4.chgAh = data(k).script4.chgAh * eta25;
+    eta(k) = (data(k).script1.disAh(end) + data(k).script2.disAh(end) + ...
+        data(k).script3.disAh(end) + data(k).script4.disAh(end) - ...
+        data(k).script2.chgAh(end) - data(k).script4.chgAh(end)) / ...
+        (data(k).script1.chgAh(end) + data(k).script3.chgAh(end));
+    data(k).script1.chgAh = eta(k) * data(k).script1.chgAh;
+    data(k).script3.chgAh = eta(k) * data(k).script3.chgAh;
+    Q(k) = data(k).script1.disAh(end) + data(k).script2.disAh(end) - data(k).script1.chgAh(end) - data(k).script2.chgAh(end);
+    filedata(k) = buildSocavgFiledata(data(k), Q25, min_v, max_v);
+end
+end
+
+function [filedata, eta, Q] = buildMiddleReference(data, cell_id, min_v, max_v)
+filetemps = [data.temp];
+numtemps = numel(filetemps);
+ind25 = find(filetemps == 25, 1, 'first');
+if isempty(ind25)
+    error('computeOcvModelMetrics:Missing25C', 'Must have a test at 25degC');
+end
+not25 = find(filetemps ~= 25);
+
+config = defaultMiddleConfig(min_v, max_v);
+filedata = repmat(struct('temp', [], 'disZ', [], 'disV', [], 'chgZ', [], 'chgV', [], 'rawocv', []), numtemps, 1);
+eta = zeros(size(filetemps));
+Q = zeros(size(filetemps));
+
+k = ind25;
+totDisAh = data(k).script1.disAh(end) + data(k).script2.disAh(end) + data(k).script3.disAh(end) + data(k).script4.disAh(end);
+totChgAh = data(k).script1.chgAh(end) + data(k).script2.chgAh(end) + data(k).script3.chgAh(end) + data(k).script4.chgAh(end);
+eta25 = totDisAh / totChgAh;
+eta(k) = eta25;
+data(k).script1.chgAh = data(k).script1.chgAh * eta25;
+data(k).script2.chgAh = data(k).script2.chgAh * eta25;
+data(k).script3.chgAh = data(k).script3.chgAh * eta25;
+data(k).script4.chgAh = data(k).script4.chgAh * eta25;
+
+Q25 = data(k).script1.disAh(end) + data(k).script2.disAh(end) - data(k).script1.chgAh(end) - data(k).script2.chgAh(end);
+Q(k) = Q25;
+filedata(k) = buildMiddleFiledata(data(k), cell_id, Q25, config);
+
+for k = not25
+    data(k).script2.chgAh = data(k).script2.chgAh * eta25;
+    data(k).script4.chgAh = data(k).script4.chgAh * eta25;
+    eta(k) = (data(k).script1.disAh(end) + data(k).script2.disAh(end) + ...
+        data(k).script3.disAh(end) + data(k).script4.disAh(end) - ...
+        data(k).script2.chgAh(end) - data(k).script4.chgAh(end)) / ...
+        (data(k).script1.chgAh(end) + data(k).script3.chgAh(end));
+    data(k).script1.chgAh = eta(k) * data(k).script1.chgAh;
+    data(k).script3.chgAh = eta(k) * data(k).script3.chgAh;
+    Q(k) = data(k).script1.disAh(end) + data(k).script2.disAh(end) - data(k).script1.chgAh(end) - data(k).script2.chgAh(end);
+    filedata(k) = buildMiddleFiledata(data(k), cell_id, Q25, config);
+end
+end
+
 function filedatum = buildLegacyFiledata(testdata, Q25, SOC)
 indD = find(testdata.script1.step == 2);
 IR1Da = testdata.script1.voltage(indD(1)-1) - testdata.script1.voltage(indD(1));
@@ -392,6 +486,11 @@ IRblend = IR1C + (IR2C - IR1C) * blend(:);
 chgV = testdata.script3.voltage(indC) - IRblend;
 chgZ = testdata.script3.chgAh(indC) / Q25;
 chgZ = chgZ - chgZ(1);
+branches = prepareOcvBranches(testdata, Q25, 0.002, disV, chgV);
+disZ = branches.smoothed.disZ;
+disV = branches.smoothed.disV;
+chgZ = branches.smoothed.chgZ;
+chgV = branches.smoothed.chgV;
 
 deltaV50 = interp1(chgZ, chgV, 0.5) - interp1(disZ, disV, 0.5);
 ind = find(chgZ < 0.5);
@@ -402,24 +501,19 @@ vDis = flipud(disV(ind) + (1 - disZ(ind)) * deltaV50);
 zDis = flipud(disZ(ind));
 
 filedatum.temp = testdata.temp;
-filedatum.disZ = disZ(:);
-filedatum.disV = testdata.script1.voltage(indD);
-filedatum.chgZ = chgZ(:);
-filedatum.chgV = testdata.script3.voltage(indC);
+filedatum.disZ = branches.raw.disZ;
+filedatum.disV = branches.raw.disV;
+filedatum.chgZ = branches.raw.chgZ;
+filedatum.chgV = branches.raw.chgV;
 filedatum.rawocv = interp1([zChg; zDis], [vChg; vDis], SOC, 'linear', 'extrap').';
 end
 
 function filedatum = buildVavgFiledata(testdata, Q25)
-indD = find(testdata.script1.step == 2);
-indC = find(testdata.script3.step == 2);
-
-disZ = 1 - testdata.script1.disAh(indD) / Q25;
-disZ = disZ + (1 - disZ(1));
-chgZ = testdata.script3.chgAh(indC) / Q25;
-chgZ = chgZ - chgZ(1);
-
-disV = testdata.script1.voltage(indD);
-chgV = testdata.script3.voltage(indC);
+branches = prepareOcvBranches(testdata, Q25, 0.002);
+disZ = branches.smoothed.disZ;
+chgZ = branches.smoothed.chgZ;
+disV = branches.smoothed.disV;
+chgV = branches.smoothed.chgV;
 
 stdZ = (0:0.002:1).';
 avgDisV = linearinterp(disZ, disV, stdZ);
@@ -427,42 +521,78 @@ avgChgV = linearinterp(chgZ, chgV, stdZ);
 avgU = (avgChgV + avgDisV) / 2;
 
 filedatum.temp = testdata.temp;
-filedatum.disZ = disZ(:);
-filedatum.disV = disV(:);
-filedatum.chgZ = chgZ(:);
-filedatum.chgV = chgV(:);
+filedatum.disZ = branches.raw.disZ;
+filedatum.disV = branches.raw.disV;
+filedatum.chgZ = branches.raw.chgZ;
+filedatum.chgV = branches.raw.chgV;
 filedatum.rawocv = interp1(stdZ, avgU, 0:0.005:1, 'linear', 'extrap').';
 end
 
+function filedatum = buildSocavgFiledata(testdata, Q25, min_v, max_v)
+branches = prepareOcvBranches(testdata, Q25, 0.002);
+disZ = branches.smoothed.disZ;
+chgZ = branches.smoothed.chgZ;
+disV = branches.smoothed.disV;
+chgV = branches.smoothed.chgV;
+
+stdV = (min_v:0.002:max_v).';
+avgDisZ = linearinterp(disV, disZ, stdV);
+avgChgZ = linearinterp(chgV, chgZ, stdV);
+avgZ = (avgChgZ + avgDisZ) / 2;
+[avgZuniq, uniqIdx] = unique(avgZ(:), 'stable');
+avgU = interp1(avgZuniq, stdV(uniqIdx), 0:0.002:1, 'linear', 'extrap');
+
+filedatum.temp = testdata.temp;
+filedatum.disZ = branches.raw.disZ;
+filedatum.disV = branches.raw.disV;
+filedatum.chgZ = branches.raw.chgZ;
+filedatum.chgV = branches.raw.chgV;
+filedatum.rawocv = interp1((0:0.002:1).', avgU(:), 0:0.005:1, 'linear', 'extrap').';
+end
+
 function filedatum = buildDiagFiledata(testdata, cell_id, Q25, config)
-indD = find(testdata.script1.step == 2);
-indC = find(testdata.script3.step == 2);
-
-disZ = 1 - testdata.script1.disAh(indD) / Q25;
-disZ = disZ + (1 - disZ(1));
-chgZ = testdata.script3.chgAh(indC) / Q25;
-chgZ = chgZ - chgZ(1);
-
-disV = testdata.script1.voltage(indD);
-chgV = testdata.script3.voltage(indC);
+branches = prepareOcvBranches(testdata, Q25, config.du);
 
 diag_data = struct();
 diag_data.name = cell_id;
 diag_data.TdegC = testdata.temp;
-diag_data.orig.disZ = disZ(:);
-diag_data.orig.disV = disV(:);
-diag_data.orig.chgZ = chgZ(:);
-diag_data.orig.chgV = chgV(:);
+diag_data.orig.disZ = branches.smoothed.disZ;
+diag_data.orig.disV = branches.smoothed.disV;
+diag_data.orig.chgZ = branches.smoothed.chgZ;
+diag_data.orig.chgV = branches.smoothed.chgV;
 diag_data.interp = makeDiagInterpData(diag_data.orig, config);
 
 [diagZ, diagU, diagInfo] = ocvDiagonalAverage(diag_data, config);
 
 filedatum.temp = testdata.temp;
-filedatum.disZ = disZ(:);
-filedatum.disV = disV(:);
-filedatum.chgZ = chgZ(:);
-filedatum.chgV = chgV(:);
+filedatum.disZ = branches.raw.disZ;
+filedatum.disV = branches.raw.disV;
+filedatum.chgZ = branches.raw.chgZ;
+filedatum.chgV = branches.raw.chgV;
 filedatum.rawocv = buildOverlapLimitedRawOcv(diag_data, diagZ, diagU, diagInfo);
+end
+
+function filedatum = buildMiddleFiledata(testdata, cell_id, Q25, config)
+branches = prepareOcvBranches(testdata, Q25, config.dv);
+
+P = [branches.smoothed.disZ, branches.smoothed.disV];
+Q = [branches.smoothed.chgZ, branches.smoothed.chgV];
+opts = struct( ...
+    'nResample', config.n_resample, ...
+    'bandFrac', config.band_frac, ...
+    'interpMethod', config.interp_method, ...
+    'flipSecond', true, ...
+    'preSmooth', false, ...
+    'finalResample', true);
+[midCurve, ~, ~, ~] = middleCurvePolylineDtw(P, Q, opts);
+[midZ, midU] = normalizeMiddleCurve(midCurve, config.soc_resolution);
+
+filedatum.temp = testdata.temp;
+filedatum.disZ = branches.raw.disZ;
+filedatum.disV = branches.raw.disV;
+filedatum.chgZ = branches.raw.chgZ;
+filedatum.chgV = branches.raw.chgV;
+filedatum.rawocv = interp1(midZ, midU, 0:0.005:1, 'linear', 'extrap').';
 end
 
 function interp_data = makeDiagInterpData(orig, config)
@@ -488,6 +618,37 @@ config.debug = false;
 config.retain_voltage_grid_output = false;
 config.daxcorrfiltv = @(stdV) find(stdV >= vmin & stdV <= vmax);
 config.daxcorrfiltz = @(stdZ) find(stdZ >= 0 & stdZ <= 1);
+end
+
+function config = defaultMiddleConfig(vmin, vmax)
+config = struct();
+config.vmin = vmin;
+config.vmax = vmax;
+config.dv = 0.002;
+config.soc_resolution = 0.002;
+config.n_resample = 300;
+config.band_frac = 0.15;
+config.interp_method = 'pchip';
+end
+
+function [midZ, midU] = normalizeMiddleCurve(midCurve, soc_resolution)
+midCurve = sortrows(midCurve, 1, 'ascend');
+[midZ, uniqIdx] = unique(midCurve(:,1), 'stable');
+midU = midCurve(uniqIdx,2);
+
+midZ = max(0, min(1, midZ(:)));
+keep = isfinite(midZ) & isfinite(midU);
+midZ = midZ(keep);
+midU = midU(keep);
+
+if numel(midZ) < 2
+    error('computeOcvModelMetrics:BadMiddleCurve', ...
+        'Middle curve did not retain enough unique SOC points.');
+end
+
+soc_grid = (0:soc_resolution:1).';
+midU = interp1(midZ, midU, soc_grid, 'linear', 'extrap');
+midZ = soc_grid;
 end
 
 function [Z, U, info] = ocvDiagonalAverage(data, config)

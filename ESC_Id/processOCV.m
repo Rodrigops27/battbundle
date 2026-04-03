@@ -117,16 +117,21 @@ function model=processOCV(data,cellID,minV,maxV,savePlots)
   disV = data(k).script1.voltage(indD) + IRblend; % approx dischg V and
   disZ = 1 - data(k).script1.disAh(indD)/Q25;  % soc at each point
   disZ = disZ + (1 - disZ(1));
-  filedata(k).disZ = disZ; 
-  filedata(k).disV = data(k).script1.voltage(indD);
   
   blend = (0:length(indC)-1)/(length(indC)-1); % linear blending 0..1
   IRblend = IR1C + (IR2C-IR1C)*blend(:);       % blend resistances
   chgV = data(k).script3.voltage(indC) - IRblend; % approx chg V and 
   chgZ = data(k).script3.chgAh(indC)/Q25;      % soc at each point
   chgZ = chgZ - chgZ(1);
-  filedata(k).chgZ = chgZ; 
-  filedata(k).chgV = data(k).script3.voltage(indC);
+  branches = prepareOcvBranches(data(k), Q25, 0.002, disV, chgV);
+  disZ = branches.smoothed.disZ;
+  disV = branches.smoothed.disV;
+  chgZ = branches.smoothed.chgZ;
+  chgV = branches.smoothed.chgV;
+  filedata(k).disZ = branches.raw.disZ; 
+  filedata(k).disV = branches.raw.disV;
+  filedata(k).chgZ = branches.raw.chgZ; 
+  filedata(k).chgV = branches.raw.chgV;
 
   % compute voltage difference b/w charge and dischg @ 50% soc
   % force i*R compensated curve to pass half-way between each charge
@@ -183,16 +188,21 @@ function model=processOCV(data,cellID,minV,maxV,savePlots)
     disV = data(k).script1.voltage(indD) + IRblend;
     disZ = 1 - data(k).script1.disAh(indD)/Q25;
     disZ = disZ + (1 - disZ(1));
-    filedata(k).disZ = disZ; 
-    filedata(k).disV = data(k).script1.voltage(indD);
     
     blend = (0:length(indC)-1)/(length(indC)-1);
     IRblend = IR1C + (IR2C-IR1C)*blend(:);
     chgV = data(k).script3.voltage(indC) - IRblend;
     chgZ = data(k).script3.chgAh(indC)/Q25;
     chgZ = chgZ - chgZ(1);
-    filedata(k).chgZ = chgZ; 
-    filedata(k).chgV = data(k).script3.voltage(indC);
+    branches = prepareOcvBranches(data(k), Q25, 0.002, disV, chgV);
+    disZ = branches.smoothed.disZ;
+    disV = branches.smoothed.disV;
+    chgZ = branches.smoothed.chgZ;
+    chgV = branches.smoothed.chgV;
+    filedata(k).disZ = branches.raw.disZ; 
+    filedata(k).disV = branches.raw.disV;
+    filedata(k).chgZ = branches.raw.chgZ; 
+    filedata(k).chgV = branches.raw.chgV;
 
     deltaV50 = interp1(chgZ,chgV,0.5) - interp1(disZ,disV,0.5);
     ind = find(chgZ < 0.5);

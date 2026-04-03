@@ -5,9 +5,20 @@ function identification_results = runOcvIdentification(cfg)
 % It loads OCV test data, chooses one engine, optionally restricts the
 % output to one selected temperature, computes OCV-fit metrics, and saves
 % the intermediate OCV model under data/modelling/derived/ocv_models.
+% All OCV engines use the shared smoothdiff-based branch preprocessing in
+% prepareOcvBranches.m before estimator-specific processing.
+%
+% TODO:
+%   The current ESC OCV temperature model is still the legacy linear form
+%   OCV(SOC,T) = OCV0(SOC) + T*OCVrel(SOC). This may require a better
+%   expression, preferably using Kelvin to avoid sign handling and to make
+%   the temperature offset explicit, for example:
+%     OCV(SOC,T) = OCV(SOC) + (T - 298.15)*dOCV/dT(SOC)
 %
 % Supported engines:
 %   - voltageAverage   -> VavgProcessOCV (default)
+%   - socAverage       -> SOCavgOCV
+%   - middleCurve      -> middleOCV
 %   - diagAverage      -> DiagProcessOCV
 %   - resistanceBlend  -> processOCV
 %
@@ -20,6 +31,7 @@ function identification_results = runOcvIdentification(cfg)
 %   cfg.engine = 'voltageAverage';
 %   cfg.temperature_scope = 'single';
 %   cfg.desired_temperature = 25;
+%   cfg.reference_ocv_method = 'middleCurve';
 %   cfg.output.model_output_file = fullfile('data', 'modelling', 'derived', 'ocv_models', 'atl20', 'ATL20model-ocv-vavgFT.mat');
 %   results = runOcvIdentification(cfg);
 
@@ -67,7 +79,10 @@ metric_cfg = struct( ...
     'temps_degC', requested_temps, ...
     'min_v', cfg.min_v, ...
     'max_v', cfg.max_v, ...
-    'ocv_method', cfg.metric_method);
+    'ocv_method', cfg.reference_ocv_method);
+% Metrics use a common reconstructed OCV reference. By default this is the
+% per-temperature middle-curve reconstruction, not the candidate engine's
+% own OCV0/OCVrel regression output.
 ocv_validation = computeOcvModelMetrics(model, selectOcvDataByTemperature(all_data, requested_temps), metric_cfg);
 model.metrics.ocv = ocv_validation.models(1).metrics;
 model.metrics.ocv_summary_table = ocv_validation.models(1).summary_table;
@@ -117,6 +132,7 @@ defaults.data_prefix = 'ATL';
 defaults.cell_id = 'ATL';
 defaults.engine = 'voltageAverage';
 defaults.diag_type = 'useAvg';
+defaults.reference_ocv_method = 'middleCurve';
 defaults.temperature_scope = 'all';
 defaults.desired_temperature = [];
 defaults.min_v = 2.0;
@@ -136,7 +152,8 @@ defaults = defaultOcvIdentificationConfig();
 cfg = mergeStructDefaults(cfg, defaults);
 cfg.output = mergeStructDefaults(fieldOr(cfg, 'output', struct()), defaults.output);
 cfg.engine = normalizeEngineName(cfg.engine);
-cfg.metric_method = mapEngineToMetricMethod(cfg.engine);
+cfg.reference_ocv_method = normalizeReferenceOcvMethod( ...
+    fieldOr(cfg, 'reference_ocv_method', fieldOr(cfg, 'metric_method', defaults.reference_ocv_method)));
 cfg.temperature_scope = lower(char(fieldOr(cfg, 'temperature_scope', 'all')));
 
 if isempty(cfg.ocv_data_input)
@@ -168,6 +185,10 @@ key = regexprep(lower(char(engine_input)), '[^a-z0-9]', '');
 switch key
     case {'voltageaverage', 'vavg', 'vavgprocessocv'}
         engine = 'voltageAverage';
+    case {'socaverage', 'socavg', 'socavgcov', 'socavgocv'}
+        engine = 'socAverage';
+    case {'middlecurve', 'middle', 'middleocv', 'middledtw'}
+        engine = 'middleCurve';
     case {'diagaverage', 'diagonalaverage', 'diag', 'diagprocessocv'}
         engine = 'diagAverage';
     case {'resistanceblend', 'legacy', 'processocv'}
@@ -178,17 +199,22 @@ switch key
 end
 end
 
-function method = mapEngineToMetricMethod(engine)
-switch engine
-    case 'voltageAverage'
+function method = normalizeReferenceOcvMethod(method_input)
+key = regexprep(lower(char(method_input)), '[^a-z0-9]', '');
+switch key
+    case {'voltageaverage', 'vavg', 'vavgprocessocv'}
         method = 'voltageAverage';
-    case 'diagAverage'
+    case {'socaverage', 'socavg', 'socavgcov', 'socavgocv'}
+        method = 'socAverage';
+    case {'middlecurve', 'middle', 'middleocv', 'middledtw'}
+        method = 'middleCurve';
+    case {'diagaverage', 'diagonalaverage', 'diag', 'diagprocessocv'}
         method = 'diagAverage';
-    case 'resistanceBlend'
+    case {'resistanceblend', 'legacy', 'processocv'}
         method = 'resistanceBlend';
     otherwise
-        error('runOcvIdentification:UnsupportedEngine', ...
-            'Unsupported OCV engine "%s".', engine);
+        error('runOcvIdentification:UnsupportedReferenceMethod', ...
+            'Unsupported OCV reference method "%s".', char(method_input));
 end
 end
 
@@ -309,6 +335,10 @@ function model = runOcvEngine(data, cfg)
 switch cfg.engine
     case 'voltageAverage'
         model = VavgProcessOCV(data, cfg.cell_id, cfg.min_v, cfg.max_v, cfg.save_plots, cfg.debug_plots);
+    case 'socAverage'
+        model = SOCavgOCV(data, cfg.cell_id, cfg.min_v, cfg.max_v, cfg.save_plots, cfg.debug_plots);
+    case 'middleCurve'
+        model = middleOCV(data, cfg.cell_id, cfg.min_v, cfg.max_v, cfg.save_plots, cfg.debug_plots);
     case 'diagAverage'
         model = DiagProcessOCV(data, cfg.cell_id, cfg.min_v, cfg.max_v, cfg.save_plots, cfg.debug_plots, cfg.diag_type);
     case 'resistanceBlend'
