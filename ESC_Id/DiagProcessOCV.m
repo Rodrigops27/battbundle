@@ -173,27 +173,15 @@ function model=DiagProcessOCV(data,cellID,minV,maxV,savePlots,debugPlots,diagTyp
 end
 
 function filedatum = buildDiagFiledata(testdata, cellID, Q25, config)
-  indD  = find(testdata.script1.step == 2);
-  indC  = find(testdata.script3.step == 2);
-
-  rawDisZ = 1 - testdata.script1.disAh(indD)/Q25;
-  rawDisZ = rawDisZ + (1 - rawDisZ(1));
-  rawChgZ = testdata.script3.chgAh(indC)/Q25;
-  rawChgZ = rawChgZ - rawChgZ(1);
-
-  rawDisV = testdata.script1.voltage(indD);
-  rawChgV = testdata.script3.voltage(indC);
-
-  [disZ,disV] = preprocessOcvBranch(rawDisZ, rawDisV, config.du);
-  [chgZ,chgV] = preprocessOcvBranch(rawChgZ, rawChgV, config.du);
+  branches = prepareOcvBranches(testdata, Q25, config.du);
 
   diagData = struct();
   diagData.name = cellID;
   diagData.TdegC = testdata.temp;
-  diagData.orig.disZ = disZ(:);
-  diagData.orig.disV = disV(:);
-  diagData.orig.chgZ = chgZ(:);
-  diagData.orig.chgV = chgV(:);
+  diagData.orig.disZ = branches.smoothed.disZ;
+  diagData.orig.disV = branches.smoothed.disV;
+  diagData.orig.chgZ = branches.smoothed.chgZ;
+  diagData.orig.chgV = branches.smoothed.chgV;
   diagData.interp = makeDiagInterpData(diagData.orig, config);
 
   [diagZ, diagU, diagInfo] = OCV_diagonalAverage(diagData, config);
@@ -203,10 +191,10 @@ function filedatum = buildDiagFiledata(testdata, cellID, Q25, config)
   end
 
   filedatum.temp = testdata.temp;
-  filedatum.disZ = rawDisZ(:);
-  filedatum.disV = rawDisV(:);
-  filedatum.chgZ = rawChgZ(:);
-  filedatum.chgV = rawChgV(:);
+  filedatum.disZ = branches.raw.disZ;
+  filedatum.disV = branches.raw.disV;
+  filedatum.chgZ = branches.raw.chgZ;
+  filedatum.chgV = branches.raw.chgV;
   filedatum.rawocv = buildOverlapLimitedRawOcv(diagData, diagZ, diagU, diagInfo);
 end
 
@@ -221,20 +209,6 @@ function interpData = makeDiagInterpData(orig, config)
   interpData.stdZ = stdZ;
   interpData.disV = linearinterp(orig.disZ,orig.disV,stdZ);
   interpData.chgV = linearinterp(orig.chgZ,orig.chgV,stdZ);
-end
-
-function [zout,vout] = preprocessOcvBranch(zin, vin, dv)
-  zin = zin(:);
-  vin = vin(:);
-
-  [zout,vout] = smoothdiff(zin, vin, dv);
-
-  % Keep the smoothed branch in voltage-ascending order for downstream
-  % voltage-domain interpolation and cross-correlation.
-  if vout(1) > vout(end)
-    zout = flip(zout);
-    vout = flip(vout);
-  end
 end
 
 function config = defaultDiagConfig(vmin,vmax,debugPlots,diagType)
@@ -290,7 +264,7 @@ function [Z, U, info] = OCV_diagonalAverage(data, config)
     voltageCorrAxes{k} = normalizeCorrelation(c);
     voltagePeakAxes{k} = lag(c==max(c)) * du;
     selectedVoltagePeakLag(k) = voltagePeakAxes{k}(1);
-    lagU(k) = abs(lag(c==max(c))*du);
+    lagU(k) = lag(c==max(c))*du;
     lagU(k) = lagU(k,1);
   end
   lagU = mean(lagU);
@@ -360,7 +334,7 @@ function [Z, U, info] = OCV_diagonalAverage(data, config)
     socCorrAxes{k} = normalizeCorrelation(c);
     socPeakAxes{k} = lag(c==max(c)) * dz;
     selectedSocPeakLag(k) = socPeakAxes{k}(1);
-    lagZ(k) = abs(lag(c==max(c))*dz);
+    lagZ(k) = lag(c==max(c))*dz;
     lagZ(k) = lagZ(k,1);
   end
   lagZ = mean(lagZ);
@@ -415,11 +389,11 @@ function [Z, U, info] = OCV_diagonalAverage(data, config)
   % Interpolate shifted charge/discharge curves over the full SOC grid
   % using shape-preserving cubic interpolation/extrapolation.
   uuD = data.orig.disV + abs(lagU)/2; % up
-  zzD = data.orig.disZ - abs(lagZ)/2; % left
-  U4D = interp1(zzD,uuD,stdZ,'pchip','extrap');
+  zzD = data.orig.disZ - abs(lagZ)/4; % left, should be abs(lagZ)/2
+  U4D = interp1(zzD,uuD,stdZ,'spline','extrap');
   uuC = data.orig.chgV - abs(lagU)/2; % down
-  zzC = data.orig.chgZ + abs(lagZ)/2; % right
-  U4C = interp1(zzC,uuC,stdZ,'pchip','extrap');
+  zzC = data.orig.chgZ + abs(lagZ)/4; % right, should be abs(lagZ)/2
+  U4C = interp1(zzC,uuC,stdZ,'spline','extrap');
   switch config.datype
     case 'useDis' % base off of discharge data
       U4 = U4D;
