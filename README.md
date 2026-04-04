@@ -21,17 +21,18 @@ For the current repo state, the intended output is consistent with [`results/Est
 
 This repository is organized as layered workflows:
 
-1. Build an Enhanced Self-Correcting (ESC) model, based on [1], in `ESC_Id/`.
-2. Validate that model with [`ESC_Id/ESCvalidation.m`](ESC_Id/ESCvalidation.m).
-3. Store released ESC or Reduced Order Model (ROM) artifacts as `.mat` model files in `models/`.
-4. Evaluate the battery cell model accuracy with application specific datasets (stored or to be stored) at [`data/evaluation/processed`](data/evaluation/processed).
-5. Add or maintain estimator implementations and initializers in `estimators/`.
-6. Tune estimator covariance parameters with Bayes optimization in `autotuning/` when needed.
+1. Build reusable OCV models in `ocv_id/`.
+2. Build an Enhanced Self-Correcting (ESC) model, based on [1], in `ESC_Id/`.
+3. Validate that model with [`ESC_Id/ESCvalidation.m`](ESC_Id/ESCvalidation.m).
+4. Store released ESC or Reduced Order Model (ROM) artifacts as `.mat` model files in `models/`.
+5. Evaluate the battery cell model accuracy with application specific datasets (stored or to be stored) at [`data/evaluation/processed`](data/evaluation/processed).
+6. Add or maintain estimator implementations and initializers in `estimators/`.
+7. Tune estimator covariance parameters with Bayes optimization in `autotuning/` when needed.
    - Run a grid search to sweep the Kalman Filter Covariances for an specifc dataset..
-7. Benchmark estimators with [`Evaluation/runBenchmark.m`](Evaluation/runBenchmark.m).
-8. Run robustness studies such as initialization, covariance, and injection studies in  [`Evaluation`](Evaluation) .
-9. Store concise result summaries in `results/`.
-10. Select the validated estimator-model bundle according to an explicit ranking criterion, for example [`results/EstimatorSelection.md`](results/EstimatorSelection.md).
+8. Benchmark estimators with [`Evaluation/runBenchmark.m`](Evaluation/runBenchmark.m).
+9. Run robustness studies such as initialization, covariance, and injection studies in  [`Evaluation`](Evaluation) .
+10. Store concise result summaries in `results/`.
+11. Select the validated estimator-model bundle according to an explicit ranking criterion, for example [`results/EstimatorSelection.md`](results/EstimatorSelection.md).
 
 Shared simulation, plotting, profile, data registries and utility helpers live in `utility/`.
 
@@ -106,13 +107,15 @@ High-level policy:
 - benchmark-ready evaluation datasets belong in `data/evaluation/processed/...`
 - generated evaluation cases belong in `data/evaluation/derived/...`
 - promoted summaries belong in `results/...`
+- OCV inspection decision records belong in `results/ocv/...`
 - heavy generated outputs such as full time-series results, checkpoints, and large MAT artifacts are local-only by default
 
 See [`docs/architecture.md`](docs/architecture.md) for the full registry and artifact policy.
 
 ## Main Entry Points
 
-- `ESC_Id/runOcvIdentification.m`
+- `ocv_id/runOcvIdentification.m`
+- `ocv_id/stdy/runOcvModellingInspection.m`
 - `ESC_Id/runDynamicIdentification.m`
 - `ESC_Id/ESCvalidation.m`
 - `Evaluation/runBenchmark.m`
@@ -126,8 +129,10 @@ See [`docs/architecture.md`](docs/architecture.md) for the full registry and art
 
 - [`README.md`](README.md)
   - project orientation and entry points
+- [`ocv_id/README.md`](ocv_id/README.md)
+  - reusable OCV modeling, OCV study flow, and OCV artifacts
 - [`ESC_Id/README.md`](ESC_Id/README.md)
-  - ESC modeling and ESC validation
+  - ESC dynamic identification and ESC validation
 - [`Evaluation/README.md`](Evaluation/README.md)
   - estimator benchmarking, injected tests, and study runners
 - [`Evaluation/NoiseTuningSweep/README.md`](Evaluation/NoiseTuningSweep/README.md)
@@ -142,6 +147,8 @@ See [`docs/architecture.md`](docs/architecture.md) for the full registry and art
   - algorithm-design guide summarizing estimator's features, assumptions, tuning knobs, expected best-use cases, and likely failure modes to support estimator analysis and selection.
 - [`docs/architecture.md`](docs/architecture.md)
   - repository purpose, workflow, data registry, and artifact policy
+- [`docs/ocv-id-migration-note.md`](docs/ocv-id-migration-note.md)
+  - concise migration note for the new `ocv_id` layer
 - [`docs/data-layout-migration-report.md`](docs/data-layout-migration-report.md) migration record
 
 ## Repository Notes

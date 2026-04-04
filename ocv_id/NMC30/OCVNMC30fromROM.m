@@ -8,18 +8,18 @@
 clear; clc; close all;
 
 script_dir = fileparts(mfilename('fullpath'));
-nmc30_parent = fileparts(script_dir);  % NMC30/ -> ESC_Id/
-repo_root = fileparts(nmc30_parent);    % ESC_Id/ -> bnchmrk/
+nmc30_parent = fileparts(script_dir);  % NMC30/ -> ocv_id/
+repo_root = fileparts(nmc30_parent);    % ocv_id/ -> bnchmrk/
 ocv_output_dir = fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'nmc30');
 
 % Use bnchmrk path setup (root + selected folders and subfolders).
 addpath(repo_root);
 addpath(genpath(fullfile(repo_root, 'utility')));
-addpath(genpath(fullfile(repo_root, 'ESC_Id')));
+addpath(genpath(fullfile(repo_root, 'ocv_id')));
 
 fprintf('\n');
 fprintf('================================================================\n');
-fprintf('  Create NMC30 ESC Model from ROM OCV\n');
+fprintf('  Create NMC30 OCV Model from ROM OCV\n');
 fprintf('================================================================\n\n');
 
 %% SETTINGS
@@ -65,8 +65,8 @@ nmc30_ocv_rom = U_p - U_n;
 
 fprintf('  ✓ NMC30 OCV range: [%.3f V, %.3f V]\n', min(nmc30_ocv_rom), max(nmc30_ocv_rom));
 
-%% STEP 2: Create NMC30 model in ESC format
-fprintf('\nStep 2: Create NMC30 ESC model\n');
+%% STEP 2: Create NMC30 model in ESC-compatible OCV format
+fprintf('\nStep 2: Create NMC30 OCV model\n');
 
 nmc30_model = struct();
 nmc30_model.temps = tc_ref;

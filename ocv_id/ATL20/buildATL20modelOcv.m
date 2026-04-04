@@ -1,19 +1,23 @@
 % script buildATL20modelOcv.m
 %   Builds the ATL20 OCV model from ATL OCV test data. This is a
-%   chemistry-specific wrapper around ESC_Id/runOcvIdentification.m.
+%   chemistry-specific wrapper around ocv_id/runOcvIdentification.m.
 
 close all
 clc
 
 script_dir = fileparts(mfilename('fullpath'));
-esc_root = fileparts(script_dir);
-repo_root = fileparts(esc_root);
+ocv_root = fileparts(script_dir);
+repo_root = fileparts(ocv_root);
+
+addpath(repo_root);
+addpath(genpath(fullfile(repo_root, 'utility')));
+addpath(genpath(ocv_root));
 
 if ~exist('ocv_data_dir', 'var') || isempty(ocv_data_dir)
     ocv_data_dir = fullfile(repo_root, 'data', 'modelling', 'processed', 'ocv', 'atl20');
 end
 if ~exist('engine', 'var') || isempty(engine)
-    engine = 'voltageAverage';
+    engine = 'middleCurve';
 end
 if ~exist('diag_type', 'var') || isempty(diag_type)
     diag_type = 'useAvg';
@@ -49,7 +53,7 @@ if ~exist('debug_plots', 'var') || isempty(debug_plots)
     debug_plots = false;
 end
 if ~exist('output_file', 'var') || isempty(output_file)
-    output_file = fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'atl20', 'ATL20model-ocv-vavgFT.mat');
+    output_file = fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'atl20', 'ATL20model-ocv-middleCurve.mat');
 end
 if ~exist('results_file', 'var') || isempty(results_file)
     results_file = fullfile(repo_root, 'data', 'modelling', 'derived', 'identification_results', 'atl20', 'ATL20_ocv_identification_results.mat');

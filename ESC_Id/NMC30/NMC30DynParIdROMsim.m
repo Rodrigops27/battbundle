@@ -56,7 +56,7 @@ fprintf('Step 1: Load NMC30 OCV model\n');
 ocv_file = fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'nmc30', 'NMC30model-ocv.mat');
 if ~exist(ocv_file, 'file')
     error('NMC30DynParIdROMsim:MissingOCV', ...
-        'NMC30 OCV model not found: %s\nRun OCVNMC30fromROM.m first.', ocv_file);
+        'NMC30 OCV model not found: %s\nRun ocv_id/NMC30/OCVNMC30fromROM.m first.', ocv_file);
 end
 ocv_data = load(ocv_file);
 model_ocv = ocv_data.nmc30_model;

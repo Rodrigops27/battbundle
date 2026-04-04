@@ -8,13 +8,13 @@ close all
 clc
 
 script_dir = fileparts(mfilename('fullpath'));
-omtlife_parent = fileparts(script_dir);  % ESC_Id/OMTLIFE8AHC-HP/ -> ESC_Id/
-repo_root = fileparts(omtlife_parent);    % ESC_Id/ -> bnchmrk/
+omtlife_parent = fileparts(script_dir);  % ocv_id/OMTLIFE8AHC-HP/ -> ocv_id/
+repo_root = fileparts(omtlife_parent);    % ocv_id/ -> bnchmrk/
 ocv_output_dir = fullfile(repo_root, 'data', 'modelling', 'derived', 'ocv_models', 'omtlife8ahc_hp');
 
 addpath(repo_root);
 addpath(genpath(fullfile(repo_root,'utility')));
-addpath(genpath(fullfile(repo_root,'ESC_Id')));
+addpath(genpath(fullfile(repo_root,'ocv_id')));
 
 dataset_file = fullfile(repo_root, 'data', 'modelling', 'interim', 'ocv', 'omtlife8ahc_hp', 'LFP_OCV_interp.mat');
 if ~exist(dataset_file,'file')

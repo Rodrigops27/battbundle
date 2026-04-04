@@ -21,6 +21,9 @@ Evaluation/NoiseTuningSweep/results/**/*.mat
 autotuning/results/**/*.mat
 results/evaluation/**/*.mat
 results/autotuning/**/*.mat
+results/figures/ocv/**/*.png
+results/figures/ocv/**/*.pdf
+results/figures/ocv/**/*.fig
 
 # Data registry artifacts kept local by default
 

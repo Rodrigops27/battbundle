@@ -65,17 +65,17 @@ Automatically migrated clearly classifiable modelling assets:
 
 Updated modelling entry points:
 
-- `ESC_Id/runOcvIdentification.m`
+- `ocv_id/runOcvIdentification.m`
 - `ESC_Id/runDynamicIdentification.m`
 - `ESC_Id/ESCvalidation.m`
 - `ESC_Id/validate_models.m`
-- `ESC_Id/ATL20/buildATL20modelOcv.m`
+- `ocv_id/ATL20/buildATL20modelOcv.m`
 - `ESC_Id/ATL20/buildATLmodel.m`
-- `ESC_Id/ATL20/buildATLmodelOcv.m`
-- `ESC_Id/NMC30/OCVNMC30fromROM.m`
+- `ocv_id/ATL20/buildATLmodelOcv.m`
+- `ocv_id/NMC30/OCVNMC30fromROM.m`
 - `ESC_Id/NMC30/NMC30DynParIdROMsim.m`
 - `ESC_Id/NMC30/ROMsimDynData.m`
-- `ESC_Id/OMTLIFE8AHC-HP/OMTLIFEocv.m`
+- `ocv_id/OMTLIFE8AHC-HP/OMTLIFEocv.m`
 - `ESC_Id/OMTLIFE8AHC-HP/OMTdynId.m`
 - `models/TunedModels/retuningROMVal.m`
 

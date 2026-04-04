@@ -22,6 +22,7 @@ inspection.created_on = datestr(now, 'yyyy-mm-dd HH:MM:SS');
 inspection.config = cfg;
 inspection.temps_degC = selected_temps(:).';
 inspection.data = raw_data;
+inspection.selected_method = resolveSelectedMethod(methods, cfg);
 inspection.reference = struct( ...
   'ocv_method', cfg.reference_ocv_method, ...
   'soc', [], ...
@@ -81,6 +82,11 @@ cfg.max_v = 3.75;
 cfg.desired_temperatures = [];
 cfg.reference_ocv_method = 'middleCurve';
 cfg.plot_diag_methods = true;
+cfg.selected_method = '';
+cfg.selected_diag_type = '';
+cfg.save_inspection_figures = false;
+cfg.inspection_figure_format = 'png';
+cfg.report_scenario_id = 'ocv_modelling_inspection';
 end
 
 function methods = methodDefinitions(cfg)
@@ -141,6 +147,7 @@ for idx = 1:numel(files)
 
   entry = src.OCVData;
   entry.temp = temp_degC;
+  entry.source_file = file_path;
   entries{idx} = entry;
   temps_degC(idx) = temp_degC;
 end
@@ -191,5 +198,48 @@ end
 temp_degC = str2double(tokens{2});
 if strcmpi(tokens{1}, 'N')
   temp_degC = -temp_degC;
+end
+end
+
+function selected = resolveSelectedMethod(methods, cfg)
+selected_method = char(fieldOr(cfg, 'selected_method', ''));
+selected_diag_type = char(fieldOr(cfg, 'selected_diag_type', ''));
+
+if isempty(selected_method)
+  selected = struct( ...
+    'display_name', 'Middle curve', ...
+    'engine', 'middleCurve', ...
+    'diag_type', '', ...
+    'selection_source', 'default', ...
+    'rationale', ['No explicit OCV method preference or visual-inspection ' ...
+      'choice was provided; defaulted to middleCurve.']);
+  return;
+end
+
+selected_key = regexprep(lower(selected_method), '[^a-z0-9]', '');
+selected = struct();
+for idx = 1:numel(methods)
+  display_key = regexprep(lower(methods(idx).display_name), '[^a-z0-9]', '');
+  engine_key = regexprep(lower(methods(idx).engine), '[^a-z0-9]', '');
+  diag_match = isempty(selected_diag_type) || strcmpi(methods(idx).diag_type, selected_diag_type);
+  if diag_match && (strcmp(display_key, selected_key) || strcmp(engine_key, selected_key))
+    selected.display_name = methods(idx).display_name;
+    selected.engine = methods(idx).engine;
+    selected.diag_type = methods(idx).diag_type;
+    selected.selection_source = 'config_preference';
+    selected.rationale = 'Selected from the inspection config.';
+    return;
+  end
+end
+
+error('buildOcvInspectionInput:UnknownSelectedMethod', ...
+  'Selected OCV method "%s" was not found in the inspection method list.', selected_method);
+end
+
+function value = fieldOr(s, field_name, default_value)
+if isfield(s, field_name) && ~isempty(s.(field_name))
+  value = s.(field_name);
+else
+  value = default_value;
 end
 end

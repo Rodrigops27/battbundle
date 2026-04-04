@@ -10,16 +10,18 @@ Store released model artifacts in `models/`, estimator implementations in `estim
 
 The repository is organized as a layered workflow:
 
-1. Build OCV and dynamic identification inputs and reusable modelling artifacts in `ESC_Id/` and `data/modelling/...`.
-2. Produce released ESC or ROM model artifacts in `models/`.
-3. Build or curate canonical evaluation datasets in `data/evaluation/...`.
-4. Tune estimator covariances in `autotuning/` against a versioned evaluation suite.
-5. Run benchmark and robustness studies in `Evaluation/`.
-6. Promote lightweight summaries and selected figures into `results/...`.
+1. Build reusable OCV modelling artifacts in `ocv_id/` and `data/modelling/...`.
+2. Build ESC-specific dynamic-identification artifacts in `ESC_Id/`.
+3. Produce released ESC or ROM model artifacts in `models/`.
+4. Build or curate canonical evaluation datasets in `data/evaluation/...`.
+5. Tune estimator covariances in `autotuning/` against a versioned evaluation suite.
+6. Run benchmark and robustness studies in `Evaluation/`.
+7. Promote lightweight summaries and selected figures into `results/...`.
 
 Stable configurable entry points are:
 
-- [`../ESC_Id/runOcvIdentification.m`](../ESC_Id/runOcvIdentification.m)
+- [`../ocv_id/runOcvIdentification.m`](../ocv_id/runOcvIdentification.m)
+- [`../ocv_id/stdy/runOcvModellingInspection.m`](../ocv_id/stdy/runOcvModellingInspection.m)
 - [`../ESC_Id/runDynamicIdentification.m`](../ESC_Id/runDynamicIdentification.m)
 - [`../Evaluation/runBenchmark.m`](../Evaluation/runBenchmark.m)
 - [`../Evaluation/Injection/runInjectionStudy.m`](../Evaluation/Injection/runInjectionStudy.m)
@@ -123,6 +125,7 @@ Trackable summary outputs belong under:
 
 - `results/evaluation/...`
 - `results/autotuning/...`
+- `results/ocv/...`
 - `results/figures/...`
 
 Promoted summary filenames should use stable stems:
@@ -131,6 +134,8 @@ Promoted summary filenames should use stable stems:
 - `autotuning__<suite_version>__<scenario_or_model_id>__summary.json`
 - `evaluation__<suite_version>__<scenario_or_model_id>__summary.md`
 - `evaluation__<suite_version>__<scenario_or_model_id>__summary.json`
+- `ocv__<suite_version>__<scenario_or_model_id>__summary.md`
+- `ocv__<suite_version>__<scenario_or_model_id>__summary.json`
 
 Heavy local-only outputs stay in workflow-local artifact locations such as:
 

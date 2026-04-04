@@ -1,7 +1,7 @@
 % script runProcessOCV.m
-%   Loads data from OCV lab tests done for several cells at several 
-%   different temperatures, then calls processOCV.m to create the OCV
-%   relationship, then saves the model to a model file.
+%   Loads data from OCV lab tests done for several cells at several
+%   different temperatures, then calls the generic ocv_id OCV processors
+%   to create the OCV relationship, then saves the model to a model file.
 
 % Copyright (c) 2015 by Gregory L. Plett of the University of Colorado 
 % Colorado Springs (UCCS). This work is licensed under a Creative Commons 
@@ -13,6 +13,11 @@
 % Management Systems, Volume I, Battery Modeling," Artech House, 2015.
 
 clear all
+repo_root = fileparts(fileparts(mfilename('fullpath')));
+addpath(repo_root);
+addpath(genpath(fullfile(repo_root, 'utility')));
+addpath(genpath(fullfile(repo_root, 'ocv_id')));
+
 ocvMethod = 'resistanceBlend'; % Alternatives: 'resistanceBlend', 'diagAverage'
 cellIDs = {'A123','ATL','E1','E2','P14','SAM'}; % Identifiers for each cell
 % data files for each cell available at these temperatures

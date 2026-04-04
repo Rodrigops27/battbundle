@@ -40,7 +40,7 @@
 %         collected from each script.  The sub-fields of these script 
 %         structures that are used by PROCESSDYNAMIC are the vectors: 
 %         current, voltage, chgAh, and disAh
-% - model: The output from processOCV, comprising the OCV model
+% - model: An ESC-compatible OCV model, typically built by ocv_id
 % - numpoles: The number of R-C pairs in the model
 % - doHyst: 0 if no hysteresis model desired; 1 if hysteresis desired
 %

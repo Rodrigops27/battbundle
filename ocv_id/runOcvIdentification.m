@@ -1,24 +1,24 @@
 function identification_results = runOcvIdentification(cfg)
-% runOcvIdentification Configurable ESC OCV-identification entry point.
+% runOcvIdentification Configurable OCV-identification entry point.
 %
-% This function is the API-style wrapper around the OCV engines in ESC_Id.
-% It loads OCV test data, chooses one engine, optionally restricts the
-% output to one selected temperature, computes OCV-fit metrics, and saves
-% the intermediate OCV model under data/modelling/derived/ocv_models.
+% This function is the API-style wrapper around the generic OCV engines in
+% ocv_id. It loads OCV test data, chooses one engine, optionally restricts
+% the output to one selected temperature, computes OCV-fit metrics, and
+% saves the intermediate OCV model under data/modelling/derived/ocv_models.
 % All OCV engines use the shared smoothdiff-based branch preprocessing in
 % prepareOcvBranches.m before estimator-specific processing.
 %
 % TODO:
-%   The current ESC OCV temperature model is still the legacy linear form
+%   The current OCV temperature model is still the legacy linear form
 %   OCV(SOC,T) = OCV0(SOC) + T*OCVrel(SOC). This may require a better
 %   expression, preferably using Kelvin to avoid sign handling and to make
 %   the temperature offset explicit, for example:
 %     OCV(SOC,T) = OCV(SOC) + (T - 298.15)*dOCV/dT(SOC)
 %
 % Supported engines:
-%   - voltageAverage   -> VavgProcessOCV (default)
+%   - middleCurve      -> middleOCV (default)
+%   - voltageAverage   -> VavgProcessOCV
 %   - socAverage       -> SOCavgOCV
-%   - middleCurve      -> middleOCV
 %   - diagAverage      -> DiagProcessOCV
 %   - resistanceBlend  -> processOCV
 %
@@ -28,11 +28,11 @@ function identification_results = runOcvIdentification(cfg)
 %   cfg.ocv_data_input = fullfile('data', 'modelling', 'processed', 'ocv', 'atl20');
 %   cfg.data_prefix = 'ATL';
 %   cfg.cell_id = 'ATL20';
-%   cfg.engine = 'voltageAverage';
+%   cfg.engine = 'middleCurve';
 %   cfg.temperature_scope = 'single';
 %   cfg.desired_temperature = 25;
 %   cfg.reference_ocv_method = 'middleCurve';
-%   cfg.output.model_output_file = fullfile('data', 'modelling', 'derived', 'ocv_models', 'atl20', 'ATL20model-ocv-vavgFT.mat');
+%   cfg.output.model_output_file = fullfile('data', 'modelling', 'derived', 'ocv_models', 'atl20', 'ATL20model-ocv-middleCurve.mat');
 %   results = runOcvIdentification(cfg);
 
 if nargin < 1 || isempty(cfg)
@@ -126,11 +126,11 @@ end
 
 function defaults = defaultOcvIdentificationConfig()
 defaults = struct();
-defaults.run_name = 'ESC OCV identification';
+defaults.run_name = 'OCV identification';
 defaults.ocv_data_input = '';
 defaults.data_prefix = 'ATL';
 defaults.cell_id = 'ATL';
-defaults.engine = 'voltageAverage';
+defaults.engine = 'middleCurve';
 defaults.diag_type = 'useAvg';
 defaults.reference_ocv_method = 'middleCurve';
 defaults.temperature_scope = 'all';
@@ -147,7 +147,7 @@ defaults.output = struct( ...
     'results_file', fullfile('data', 'modelling', 'derived', 'identification_results', 'misc', 'OCV_identification_results.mat'));
 end
 
-function [cfg, paths] = normalizeConfig(cfg, esc_root, repo_root)
+function [cfg, paths] = normalizeConfig(cfg, ocv_root, repo_root)
 defaults = defaultOcvIdentificationConfig();
 cfg = mergeStructDefaults(cfg, defaults);
 cfg.output = mergeStructDefaults(fieldOr(cfg, 'output', struct()), defaults.output);
@@ -166,7 +166,7 @@ if ischar(cfg.ocv_data_input) || (isstring(cfg.ocv_data_input) && isscalar(cfg.o
 end
 
 paths = struct();
-paths.esc_root = esc_root;
+paths.ocv_root = ocv_root;
 paths.repo_root = repo_root;
 paths.model_output_file_abs = resolveModellingDatasetPath( ...
     resolveOutputPath(cfg.output.model_output_file, repo_root), repo_root, 'must_exist', false);
@@ -273,6 +273,7 @@ for idx = 1:numel(files)
 
     entry = struct();
     entry.temp = temp_degC;
+    entry.source_file = file_path;
     entry.script1 = src.OCVData.script1;
     entry.script2 = src.OCVData.script2;
     entry.script3 = src.OCVData.script3;

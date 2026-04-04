@@ -21,7 +21,9 @@ classification.reusable = false;
 classification.target_path = '';
 classification.reason = 'No automatic classification rule matched.';
 
-if contains(path_norm, '/esc_id/results/ocv/') || strcmpi(ext, '.fig') || strcmpi(ext, '.png') || strcmpi(ext, '.md')
+if contains(path_norm, '/esc_id/results/ocv/') || contains(path_norm, '/results/ocv/') || ...
+        contains(path_norm, '/results/figures/ocv/') || strcmpi(ext, '.fig') || ...
+        strcmpi(ext, '.png') || strcmpi(ext, '.md')
     classification.classification = 'reporting_artifact';
     classification.reason = 'User-facing plotting, figure, or reporting artifact kept outside data/.';
     return;

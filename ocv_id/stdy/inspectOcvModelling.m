@@ -10,12 +10,12 @@ clearvars -except ocvInspectionInput
 
 script_dir = fileparts(mfilename('fullpath'));
 study_root = script_dir;
-esc_root = fileparts(study_root);
-repo_root = fileparts(esc_root);
+ocv_root = fileparts(study_root);
+repo_root = fileparts(ocv_root);
 
 addpath(repo_root);
 addpath(genpath(fullfile(repo_root, 'utility')));
-addpath(genpath(esc_root));
+addpath(genpath(ocv_root));
 
 if ~exist('ocvInspectionInput', 'var') || isempty(ocvInspectionInput)
   cfg = struct();
@@ -35,6 +35,15 @@ methods = inspection.methods;
 soc = (0:0.005:1).';
 plotStyle = defaultInspectionPlotStyle();
 reference = resolveReferenceData(inspection);
+save_figures = fieldOr(inspection.config, 'save_inspection_figures', fieldOr(inspection.config, 'save_figures', false));
+figure_format = char(fieldOr(inspection.config, 'inspection_figure_format', 'png'));
+paths = resolveOcvInspectionPaths(inspection.config);
+inspection.visual_inspection = struct( ...
+  'save_figures', logical(save_figures), ...
+  'figure_format', figure_format, ...
+  'figure_root', BundleEvalHelpers.normalizeStoredPath(paths.figure_root_abs), ...
+  'figure_outputs', struct([]));
+figure_outputs = struct([]);
 
 for idx = 1:numel(temps_degC)
   tc = temps_degC(idx);
@@ -81,7 +90,19 @@ for idx = 1:numel(temps_degC)
   ylim(ax, [inspection.config.min_v - 0.1, inspection.config.max_v + 0.1]);
   title(ax, sprintf('%s OCV methods @ %.0f degC', inspection.config.cell_id, tc));
   legend(ax, 'Location', 'southeast');
+
+  if save_figures
+    output_file = fullfile(paths.figure_root_abs, sprintf('%s_ocv_methods_%s.%s', ...
+      BundleEvalHelpers.sanitizeToken(lower(inspection.config.cell_id)), ...
+      formatTemperatureToken(tc), figure_format));
+    BundleEvalHelpers.exportSingleFigure(gcf, output_file, figure_format);
+    figure_outputs(end + 1).temp_degC = tc; %#ok<AGROW>
+    figure_outputs(end).absolute_path = output_file; %#ok<AGROW>
+    figure_outputs(end).relative_path = BundleEvalHelpers.normalizeStoredPath(output_file); %#ok<AGROW>
+  end
 end
+inspection.visual_inspection.figure_outputs = figure_outputs;
+ocvInspectionResults = inspection; %#ok<NASGU>
 assignin('base', 'ocvInspectionResults', inspection);
 
 function datum = selectDatum(data, tc)
@@ -192,5 +213,21 @@ end
 if strcmp(display_name, 'Middle curve')
   style.color = plotStyle.colors.Middle_curve;
   style.line_width = plotStyle.middle_curve_width;
+end
+end
+
+function token = formatTemperatureToken(temp_degC)
+if temp_degC < 0
+  token = sprintf('N%02d', abs(temp_degC));
+else
+  token = sprintf('P%02d', temp_degC);
+end
+end
+
+function value = fieldOr(s, field_name, default_value)
+if isfield(s, field_name) && ~isempty(s.(field_name))
+  value = s.(field_name);
+else
+  value = default_value;
 end
 end

@@ -37,6 +37,7 @@ end
 repo_root = fileparts(here);
 addpath(repo_root);
 addpath(genpath(fullfile(repo_root, 'utility')));
+addpath(genpath(fullfile(repo_root, 'ocv_id')));
 addpath(genpath(here));
 
 [cfg, paths] = normalizeConfig(cfg, here, repo_root);
