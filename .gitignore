@@ -77,3 +77,6 @@ data/evaluation/derived/**
 !data/evaluation/derived/**/manifest.json
 data/evaluation/derived/**/dataset.mat
 data/evaluation/derived/**/manifest.mat
+
+# Local-only injection naming test
+Evaluation/Injection/testInjectionScenarioNaming.m
