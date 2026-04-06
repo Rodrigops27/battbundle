@@ -79,7 +79,7 @@ Generated derived evaluation datasets also save:
 
 Example derived case:
 
-`data/evaluation/derived/desktop_atl20_bss_v1/stochastic_sensor/case_001/`
+`data/evaluation/derived/desktop_atl20_bss_v1/additive_measurement_noise/case_001/`
 
 Helpers added for this registry:
 

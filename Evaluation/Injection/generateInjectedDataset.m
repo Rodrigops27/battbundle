@@ -1,5 +1,5 @@
 function [dataset, metadata] = generateInjectedDataset(sourceInput, save_file, cfg)
-% generateInjectedDataset Create and optionally save a noise or perturbance dataset.
+% generateInjectedDataset Create and optionally save a canonical injection dataset.
 
 if nargin < 1 || isempty(sourceInput)
     error('generateInjectedDataset:MissingSource', ...
@@ -54,7 +54,7 @@ if isfield(source_dataset, 'temperature_c') && ~isempty(source_dataset.temperatu
 end
 
 switch cfg.mode
-    case 'noise'
+    case 'additive_measurement_noise'
         sigma_v = cfg.voltage_std_mv / 1000;
         voltage_half_range = sqrt(3) * sigma_v;
         voltage_noise = voltage_half_range * (2 * rand(size(dataset.voltage_v_true)) - 1);
@@ -66,7 +66,7 @@ switch cfg.mode
         dataset.injected_current_scale = current_scale;
         dataset.injected_voltage_std_mv = cfg.voltage_std_mv;
         dataset.injected_current_error_percent = cfg.current_error_percent;
-        dataset.voltage_name = sprintf('Noise Inj (%.0f mV, %.1f%% I)', ...
+        dataset.voltage_name = sprintf('Additive Measurement Noise (%.0f mV, %.1f%% I)', ...
             cfg.voltage_std_mv, cfg.current_error_percent);
 
         metadata = struct( ...
@@ -76,7 +76,7 @@ switch cfg.mode
             'current_error_percent', cfg.current_error_percent, ...
             'random_seed', cfg.random_seed);
 
-    case 'perturbance'
+    case 'sensor_gain_bias_fault'
         voltage_gain = sampleScalarOrRange(cfg.voltage_gain_fault);
         voltage_offset_mv = sampleScalarOrRange(cfg.voltage_offset_mv);
         voltage_offset_v = voltage_offset_mv / 1000;
@@ -88,7 +88,7 @@ switch cfg.mode
         dataset.injected_voltage_gain_fault = voltage_gain;
         dataset.injected_voltage_offset_v = voltage_offset_v;
         dataset.injected_voltage_offset_mv = voltage_offset_mv;
-        dataset.voltage_name = sprintf('Perturbance Inj (Ig=%.3g, Io=%.3g A, Vg=%.4g, Vo=%.2f mV)', ...
+        dataset.voltage_name = sprintf('Sensor Gain/Bias Fault (Ig=%.3g, Io=%.3g A, Vg=%.4g, Vo=%.2f mV)', ...
             cfg.current_gain, cfg.current_offset_a, voltage_gain, voltage_offset_mv);
 
         metadata = struct( ...
@@ -102,7 +102,8 @@ switch cfg.mode
 
     otherwise
         error('generateInjectedDataset:BadMode', ...
-            'cfg.mode must be "noise" or "perturbance".');
+            ['cfg.mode must be "additive_measurement_noise" or ' ...
+             '"sensor_gain_bias_fault".']);
 end
 
 metadata.source_dataset = source_label;
@@ -117,8 +118,7 @@ end
 end
 
 function cfg = normalizeConfig(cfg)
-cfg.name = getCfg(cfg, 'name', getCfg(cfg, 'mode', 'noise'));
-cfg.mode = lower(getCfg(cfg, 'mode', 'noise'));
+cfg = normalizeInjectionCaseConfig(cfg);
 cfg.random_seed = getCfg(cfg, 'random_seed', []);
 cfg.overwrite = getCfg(cfg, 'overwrite', true);
 

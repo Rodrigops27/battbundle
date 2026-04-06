@@ -150,6 +150,8 @@ See [`docs/architecture.md`](docs/architecture.md) for the full registry and art
 - [`docs/ocv-id-migration-note.md`](docs/ocv-id-migration-note.md)
   - concise migration note for the new `ocv_id` layer
 - [`docs/data-layout-migration-report.md`](docs/data-layout-migration-report.md) migration record
+- [`docs/injection-scenario-migration-note.md`](docs/injection-scenario-migration-note.md)
+  - canonical injection-scenario renames and upgrade note
 
 ## Repository Notes
 

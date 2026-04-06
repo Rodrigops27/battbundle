@@ -84,19 +84,19 @@ end
 function cases = defaultCases()
 cases = repmat(struct(), 2, 1);
 
-cases(1).name = 'noise';
-cases(1).mode = 'noise';
-cases(1).dataset_family = 'stochastic_sensor';
-cases(1).augmentation_type = 'noise';
+cases(1).name = 'additive_measurement_noise';
+cases(1).mode = 'additive_measurement_noise';
+cases(1).dataset_family = 'additive_measurement_noise';
+cases(1).augmentation_type = 'additive_measurement_noise';
 cases(1).voltage_std_mv = 15;
 cases(1).current_error_percent = 5;
 cases(1).random_seed = 7;
 cases(1).overwrite = true;
 
-cases(2).name = 'perturbance';
-cases(2).mode = 'perturbance';
-cases(2).dataset_family = 'perturbance';
-cases(2).augmentation_type = 'perturbance';
+cases(2).name = 'sensor_gain_bias_fault';
+cases(2).mode = 'sensor_gain_bias_fault';
+cases(2).dataset_family = 'sensor_gain_bias_fault';
+cases(2).augmentation_type = 'sensor_gain_bias_fault';
 cases(2).current_gain = 1.1;
 cases(2).current_offset_a = 0.1;
 cases(2).voltage_gain_fault = 6e-4;

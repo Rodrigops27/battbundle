@@ -420,7 +420,7 @@ if step6_save_summary_artifacts
         step6_suite_version, step6_bundle_name);
 end
 
-%% 7) Injection study on canonical derived perturbance and stochastic-sensor cases
+%% 7) Injection study on canonical derived sensor-gain-bias-fault and additive-measurement-noise cases
 % This section is self-contained. If you run only this section after
 % editing xKFeval.m or runBenchmark.m, use the optional reload block at the
 % top of the script first.
@@ -451,10 +451,10 @@ step7_tuning_spec = BundleEvalHelpers.resolveStep4TuningSpec( ...
     step7_autotuning_profile_file, step7_tuned_params_file, 'atl20_p25_bss_esc');
 step7_noise_manifest_file = fullfile( ...
     step7_repo_root, 'data', 'evaluation', 'derived', 'desktop_atl20_bss_v1', ...
-    'stochastic_sensor', 'case_001', 'manifest.json');
+    'additive_measurement_noise', 'case_001', 'manifest.json');
 step7_pert_manifest_file = fullfile( ...
     step7_repo_root, 'data', 'evaluation', 'derived', 'desktop_atl20_bss_v1', ...
-    'perturbance', 'case_002', 'manifest.json');
+    'sensor_gain_bias_fault', 'case_002', 'manifest.json');
 step7_noise_case = BundleEvalHelpers.loadInjectionCaseFromManifest(step7_noise_manifest_file);
 step7_pert_case = BundleEvalHelpers.loadInjectionCaseFromManifest(step7_pert_manifest_file);
 step7_injection_cases = BundleEvalHelpers.combineInjectionCases(step7_noise_case, step7_pert_case);
@@ -518,4 +518,3 @@ if step7_save_summary_artifacts
         step7_aggregate_results_file, step7_summary_json_file, ...
         step7_summary_md_file, step7_suite_version, step7_bundle_name);
 end
-

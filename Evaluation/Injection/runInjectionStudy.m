@@ -1,5 +1,5 @@
 function injection_results = runInjectionStudy(cfg)
-% runInjectionStudy Run configurable noise and perturbance injection studies.
+% runInjectionStudy Run configurable canonical injection studies.
 
 if nargin < 1 || isempty(cfg)
     cfg = defaultInjectionConfig();
@@ -106,10 +106,10 @@ for scenario_idx = 1:numel(cfg.scenarios)
     scenario = cfg.scenarios(scenario_idx);
     [source_dataset, source_dataset_file] = loadOrBuildSourceDataset(scenario, paths.repo_root);
     for case_idx = 1:numel(scenario.injection_cases)
-        case_cfg = scenario.injection_cases(case_idx);
+        case_cfg = normalizeInjectionCaseConfig(scenario.injection_cases(case_idx));
         case_id = fieldOr(case_cfg, 'case_id', sprintf('case_%03d', case_idx));
-        dataset_family = fieldOr(case_cfg, 'dataset_family', fieldOr(case_cfg, 'mode', 'derived'));
-        augmentation_type = fieldOr(case_cfg, 'augmentation_type', fieldOr(case_cfg, 'mode', 'derived'));
+        dataset_family = case_cfg.dataset_family;
+        augmentation_type = case_cfg.augmentation_type;
         case_root = buildInjectedDatasetRoot(paths.repo_root, scenario.suite_version, dataset_family, case_id);
         plan_idx = plan_idx + 1;
         plan(plan_idx, 1).scenario_name = scenario.name; %#ok<AGROW>

@@ -1,4 +1,4 @@
-# Perturbance And Noise Injection Results With Shared ESC Covariances
+﻿# Canonical Injection Scenario Results With Shared ESC Covariances
 
 ## Description of the scenario
 
@@ -12,7 +12,7 @@ This summary reports the ATL desktop-evaluation injection study. The source data
 | Source dataset | `data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat` |
 | ESC model | `models/ATLmodel.mat` |
 | ROM model | `models/ROM_ATL20_beta.mat` |
-| Injection cases reported here | `noise`, `perturbance` |
+| Injection cases reported here | `additive_measurement_noise`, `sensor_gain_bias_fault` |
 | Estimators reported here | `ROM-EKF`, `ESC-SPKF`, `ESC-EKF`, `EaEKF`, `EacrSPKF`, `EnacrSPKF`, `EDUKF`, `EsSPKF`, `EbSPKF`, `EBiSPKF`, `Em7SPKF` |
 
 ### Tuned Covariances
@@ -38,8 +38,8 @@ The benchmark uses the shared tuning values:
 So this document is the correct untuned or shared-covariance injection reference for the ATL bundle.
 
 The injected cases in this saved run are:
-- `noise`: `15 mV` voltage noise standard deviation and `+-5%` samplewise current scaling
-- `perturbance`: current gain `1.1`, current offset `0.1 A`, voltage gain fault `6e-4`, and voltage offset `2 mV`
+- `additive_measurement_noise`: `15 mV` voltage noise standard deviation and `+-5%` samplewise current scaling
+- `sensor_gain_bias_fault`: current gain `1.1`, current offset `0.1 A`, voltage gain fault `6e-4`, and voltage offset `2 mV`
 
 ## Results
 
@@ -47,10 +47,10 @@ The injected cases in this saved run are:
 
 | Injection case | Current RMSE [A] | Current ME [A] | Voltage RMSE [mV] | Voltage ME [mV] | Interpretation |
 | --- | ---: | ---: | ---: | ---: | --- |
-| `noise` | 0.0824 | 0.0000 | 14.9961 | 0.0277 | Moderate random sensor corruption with visible voltage noise |
-| `perturbance` | 0.3023 | -0.1006 | 3.9880 | -3.9879 | Deterministic sensor fault with stronger current-channel distortion |
+| `additive_measurement_noise` | 0.0824 | 0.0000 | 14.9961 | 0.0277 | Moderate random sensor corruption with visible voltage noise |
+| `sensor_gain_bias_fault` | 0.3023 | -0.1006 | 3.9880 | -3.9879 | Deterministic sensor fault with stronger current-channel distortion |
 
-### Noise case
+### Additive-Measurement-Noise Case
 
 | Estimator | SOC RMSE [%] | SOC ME [%] | Voltage RMSE [mV] | Voltage ME [mV] |
 | --- | ---: | ---: | ---: | ---: |
@@ -66,7 +66,7 @@ The injected cases in this saved run are:
 | `EnacrSPKF` | 22.3838 | 19.5720 | 15.7156 | -7.0706 |
 | `ROM-EKF` | 22.9668 | -2.4010 | 70.1983 | -0.5503 |
 
-### Perturbance case
+### Sensor-Gain-Bias-Fault Case
 
 | Estimator | SOC RMSE [%] | SOC ME [%] | Voltage RMSE [mV] | Voltage ME [mV] |
 | --- | ---: | ---: | ---: | ---: |
@@ -86,18 +86,18 @@ The injected cases in this saved run are:
 
 | Case | Rank | Best on SOC RMSE | Value | Best on Voltage RMSE | Value |
 | --- | ---: | --- | ---: | --- | ---: |
-| `noise` | 1 | `EacrSPKF` | 0.6475 | `ESC-SPKF` / `EBiSPKF` | 0.3999 |
-| `noise` | 2 | `EbSPKF` | 0.6592 | `EDUKF` / `EsSPKF` / `Em7SPKF` | 0.4078 |
-| `noise` | 3 | `ESC-SPKF` / `EBiSPKF` | 0.6767 | `EbSPKF` | 0.4404 |
-| `perturbance` | 1 | `EbSPKF` | 8.1612 | `EacrSPKF` | 3.9461 |
-| `perturbance` | 2 | `EsSPKF` / `Em7SPKF` | 8.5478 | `EbSPKF` | 5.5456 |
-| `perturbance` | 3 | `EDUKF` | 8.5532 | `EsSPKF` / `Em7SPKF` | 5.7821 |
+| `additive_measurement_noise` | 1 | `EacrSPKF` | 0.6475 | `ESC-SPKF` / `EBiSPKF` | 0.3999 |
+| `additive_measurement_noise` | 2 | `EbSPKF` | 0.6592 | `EDUKF` / `EsSPKF` / `Em7SPKF` | 0.4078 |
+| `additive_measurement_noise` | 3 | `ESC-SPKF` / `EBiSPKF` | 0.6767 | `EbSPKF` | 0.4404 |
+| `sensor_gain_bias_fault` | 1 | `EbSPKF` | 8.1612 | `EacrSPKF` | 3.9461 |
+| `sensor_gain_bias_fault` | 2 | `EsSPKF` / `Em7SPKF` | 8.5478 | `EbSPKF` | 5.5456 |
+| `sensor_gain_bias_fault` | 3 | `EDUKF` | 8.5532 | `EsSPKF` / `Em7SPKF` | 5.7821 |
 
 ## Observations
 
 - This is the correct shared-covariance reference run for the ATL injection study. Unlike the tuned-profile injection report, all estimators here use the same baseline covariance settings.
-- In the `noise` case, `EacrSPKF` is best on SOC RMSE, while `ESC-SPKF` and `EBiSPKF` are best on voltage RMSE.
-- In the `perturbance` case, `EbSPKF` is best on SOC RMSE, but `EacrSPKF` is best on voltage RMSE.
+- In the `additive_measurement_noise` case, `EacrSPKF` is best on SOC RMSE, while `ESC-SPKF` and `EBiSPKF` are best on voltage RMSE.
+- In the `sensor_gain_bias_fault` case, `EbSPKF` is best on SOC RMSE, but `EacrSPKF` is best on voltage RMSE.
 - `EDUKF`, `EsSPKF`, and `Em7SPKF` remain nearly identical in both cases.
 - `EnacrSPKF` performs poorly in both injected cases under this shared-covariance setup.
 - `EaEKF` and `ROM-EKF` remain weak under these untuned/shared covariance conditions, especially in voltage fit.
@@ -125,3 +125,4 @@ results = runInjectionStudy(cfg);
 printInjectionSummary(results);
 plotInjectionResults(results);
 ```
+

@@ -1,4 +1,4 @@
-{
+﻿{
   "artifact_class": "summary",
   "kind": "injection_summary",
   "layer": "evaluation",
@@ -13,8 +13,8 @@
   "summary_table": [
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "noise",
-      "InjectionMode": "noise",
+      "InjectionCase": "additive_measurement_noise",
+      "InjectionMode": "additive_measurement_noise",
       "Estimator": "ROM-EKF",
       "SocRmsePct": 9.5043461385505346,
       "SocMePct": 0.065986706743153573,
@@ -27,8 +27,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "noise",
-      "InjectionMode": "noise",
+      "InjectionCase": "additive_measurement_noise",
+      "InjectionMode": "additive_measurement_noise",
       "Estimator": "ESC-SPKF",
       "SocRmsePct": 7.682369401761874,
       "SocMePct": 7.03348822728426,
@@ -41,8 +41,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "noise",
-      "InjectionMode": "noise",
+      "InjectionCase": "additive_measurement_noise",
+      "InjectionMode": "additive_measurement_noise",
       "Estimator": "ESC-EKF",
       "SocRmsePct": 8.646630733248255,
       "SocMePct": 7.7071275959530174,
@@ -55,8 +55,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "noise",
-      "InjectionMode": "noise",
+      "InjectionCase": "additive_measurement_noise",
+      "InjectionMode": "additive_measurement_noise",
       "Estimator": "EaEKF",
       "SocRmsePct": 27.524174796963869,
       "SocMePct": 17.693565910121031,
@@ -69,8 +69,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "noise",
-      "InjectionMode": "noise",
+      "InjectionCase": "additive_measurement_noise",
+      "InjectionMode": "additive_measurement_noise",
       "Estimator": "EacrSPKF",
       "SocRmsePct": 20.375501679746485,
       "SocMePct": 4.7666006198219879,
@@ -83,8 +83,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "noise",
-      "InjectionMode": "noise",
+      "InjectionCase": "additive_measurement_noise",
+      "InjectionMode": "additive_measurement_noise",
       "Estimator": "EnacrSPKF",
       "SocRmsePct": 13.425969491242856,
       "SocMePct": 9.2340393498332656,
@@ -97,8 +97,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "noise",
-      "InjectionMode": "noise",
+      "InjectionCase": "additive_measurement_noise",
+      "InjectionMode": "additive_measurement_noise",
       "Estimator": "EDUKF",
       "SocRmsePct": 27.447306193007481,
       "SocMePct": -22.803340383717391,
@@ -111,8 +111,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "noise",
-      "InjectionMode": "noise",
+      "InjectionCase": "additive_measurement_noise",
+      "InjectionMode": "additive_measurement_noise",
       "Estimator": "EsSPKF",
       "SocRmsePct": 8.2926902910665525,
       "SocMePct": 7.9153105517851419,
@@ -125,8 +125,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "noise",
-      "InjectionMode": "noise",
+      "InjectionCase": "additive_measurement_noise",
+      "InjectionMode": "additive_measurement_noise",
       "Estimator": "EbSPKF",
       "SocRmsePct": 8.4563993714289509,
       "SocMePct": 7.6636499423875151,
@@ -139,8 +139,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "noise",
-      "InjectionMode": "noise",
+      "InjectionCase": "additive_measurement_noise",
+      "InjectionMode": "additive_measurement_noise",
       "Estimator": "EBiSPKF",
       "SocRmsePct": 7.8500564381187115,
       "SocMePct": 7.4115218189872847,
@@ -153,8 +153,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "noise",
-      "InjectionMode": "noise",
+      "InjectionCase": "additive_measurement_noise",
+      "InjectionMode": "additive_measurement_noise",
       "Estimator": "Em7SPKF",
       "SocRmsePct": 7.6195028520633148,
       "SocMePct": 7.1551629498778659,
@@ -167,8 +167,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "perturbance",
-      "InjectionMode": "perturbance",
+      "InjectionCase": "sensor_gain_bias_fault",
+      "InjectionMode": "sensor_gain_bias_fault",
       "Estimator": "ROM-EKF",
       "SocRmsePct": 14.491501681677633,
       "SocMePct": 5.9588507566962328,
@@ -181,8 +181,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "perturbance",
-      "InjectionMode": "perturbance",
+      "InjectionCase": "sensor_gain_bias_fault",
+      "InjectionMode": "sensor_gain_bias_fault",
       "Estimator": "ESC-SPKF",
       "SocRmsePct": 7.249422441404116,
       "SocMePct": 5.87255157368353,
@@ -195,8 +195,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "perturbance",
-      "InjectionMode": "perturbance",
+      "InjectionCase": "sensor_gain_bias_fault",
+      "InjectionMode": "sensor_gain_bias_fault",
       "Estimator": "ESC-EKF",
       "SocRmsePct": 10.379530494553487,
       "SocMePct": 8.1646113051924178,
@@ -209,8 +209,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "perturbance",
-      "InjectionMode": "perturbance",
+      "InjectionCase": "sensor_gain_bias_fault",
+      "InjectionMode": "sensor_gain_bias_fault",
       "Estimator": "EaEKF",
       "SocRmsePct": 9.9637527261742243,
       "SocMePct": 4.4182562053179169,
@@ -223,8 +223,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "perturbance",
-      "InjectionMode": "perturbance",
+      "InjectionCase": "sensor_gain_bias_fault",
+      "InjectionMode": "sensor_gain_bias_fault",
       "Estimator": "EacrSPKF",
       "SocRmsePct": 11.565013635413674,
       "SocMePct": 8.537091280143855,
@@ -237,8 +237,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "perturbance",
-      "InjectionMode": "perturbance",
+      "InjectionCase": "sensor_gain_bias_fault",
+      "InjectionMode": "sensor_gain_bias_fault",
       "Estimator": "EnacrSPKF",
       "SocRmsePct": 13.701315356355007,
       "SocMePct": 9.6573005121534123,
@@ -251,8 +251,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "perturbance",
-      "InjectionMode": "perturbance",
+      "InjectionCase": "sensor_gain_bias_fault",
+      "InjectionMode": "sensor_gain_bias_fault",
       "Estimator": "EDUKF",
       "SocRmsePct": 11.588674120123413,
       "SocMePct": 5.2925297965476137,
@@ -265,8 +265,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "perturbance",
-      "InjectionMode": "perturbance",
+      "InjectionCase": "sensor_gain_bias_fault",
+      "InjectionMode": "sensor_gain_bias_fault",
       "Estimator": "EsSPKF",
       "SocRmsePct": 6.9159737306291271,
       "SocMePct": 5.6312263315939788,
@@ -279,8 +279,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "perturbance",
-      "InjectionMode": "perturbance",
+      "InjectionCase": "sensor_gain_bias_fault",
+      "InjectionMode": "sensor_gain_bias_fault",
       "Estimator": "EbSPKF",
       "SocRmsePct": 6.1293116866114543,
       "SocMePct": 4.9394666391070023,
@@ -293,8 +293,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "perturbance",
-      "InjectionMode": "perturbance",
+      "InjectionCase": "sensor_gain_bias_fault",
+      "InjectionMode": "sensor_gain_bias_fault",
       "Estimator": "EBiSPKF",
       "SocRmsePct": 8.02514103188157,
       "SocMePct": 6.4665070661932136,
@@ -307,8 +307,8 @@
     },
     {
       "Scenario": "atl20_p25_injection",
-      "InjectionCase": "perturbance",
-      "InjectionMode": "perturbance",
+      "InjectionCase": "sensor_gain_bias_fault",
+      "InjectionMode": "sensor_gain_bias_fault",
       "Estimator": "Em7SPKF",
       "SocRmsePct": 7.5548452068886425,
       "SocMePct": 6.3208585224010942,
@@ -323,24 +323,24 @@
   "runs": [
     {
       "scenario_name": "atl20_p25_injection",
-      "case_name": "noise",
-      "injection_mode": "noise",
+      "case_name": "additive_measurement_noise",
+      "injection_mode": "additive_measurement_noise",
       "case_id": "case_001",
-      "dataset_id": "desktop_atl20_bss_v1__stochastic_sensor__case_001",
+      "dataset_id": "desktop_atl20_bss_v1__additive_measurement_noise__case_001",
       "parent_dataset_id": "esc_bus_coreBattery_dataset",
-      "injected_dataset_file": "data/evaluation/derived/desktop_atl20_bss_v1/stochastic_sensor/case_001/dataset.mat",
-      "benchmark_results_file": "Evaluation/Injection/results/atl20_p25_bundle_injection_study/atl20_p25_injection/noise_benchmark_results.mat",
+      "injected_dataset_file": "data/evaluation/derived/desktop_atl20_bss_v1/additive_measurement_noise/case_001/dataset.mat",
+      "benchmark_results_file": "Evaluation/Injection/results/atl20_p25_bundle_injection_study/atl20_p25_injection/additive_measurement_noise_benchmark_results.mat",
       "validation_voltage_rmse_mv": null
     },
     {
       "scenario_name": "atl20_p25_injection",
-      "case_name": "perturbance",
-      "injection_mode": "perturbance",
+      "case_name": "sensor_gain_bias_fault",
+      "injection_mode": "sensor_gain_bias_fault",
       "case_id": "case_002",
-      "dataset_id": "desktop_atl20_bss_v1__perturbance__case_002",
+      "dataset_id": "desktop_atl20_bss_v1__sensor_gain_bias_fault__case_002",
       "parent_dataset_id": "esc_bus_coreBattery_dataset",
-      "injected_dataset_file": "data/evaluation/derived/desktop_atl20_bss_v1/perturbance/case_002/dataset.mat",
-      "benchmark_results_file": "Evaluation/Injection/results/atl20_p25_bundle_injection_study/atl20_p25_injection/perturbance_benchmark_results.mat",
+      "injected_dataset_file": "data/evaluation/derived/desktop_atl20_bss_v1/sensor_gain_bias_fault/case_002/dataset.mat",
+      "benchmark_results_file": "Evaluation/Injection/results/atl20_p25_bundle_injection_study/atl20_p25_injection/sensor_gain_bias_fault_benchmark_results.mat",
       "validation_voltage_rmse_mv": null
     }
   ]

@@ -1,4 +1,4 @@
-# Estimator Selection For The ATL Desktop Evaluation Bundle
+﻿# Estimator Selection For The ATL Desktop Evaluation Bundle
 
 ## Purpose
 
@@ -9,7 +9,7 @@ This note defines a practical criterion to decide which ESC-based Kalman filter 
 
 The intent is to balance:
 - best tuned desktop-evaluation performance
-- robustness to untuned injected disturbance/noise
+- robustness to untuned injected `sensor_gain_bias_fault`/`additive_measurement_noise`
 - sensitivity to wrong initial SOC
 - robustness after deploying tuned covariances
 
@@ -20,10 +20,10 @@ The initial weighting ranking is set as:
 - `40%` from  the results at the Noise Covariance Sweep.
 - `30%` from  the results at the bayes optimization (autotuning).
 
-- `4.2%` from the Noise injection results with shared Covariances
-- `9.8%` from the Disturbance injection results with shared Covariances 
-- `1.8%` from the Noise injection results with Bayes fitted (autotuning) filters.
-- `4.2%` from the Disturbance injection results Bayes fitted (autotuning) filters.
+- `4.2%` from the shared-covariance `additive_measurement_noise` injection results
+- `9.8%` from the shared-covariance `sensor_gain_bias_fault` injection results
+- `1.8%` from the tuned `additive_measurement_noise` injection results
+- `4.2%` from the tuned `sensor_gain_bias_fault` injection results
 
 - `7%` from the sweep SOC initialization results with shared Covariances.
 - `3%` from the sweep SOC initialization results with the bayes fitted filters.
@@ -34,10 +34,10 @@ The initial weighting ranking is set as:
 | --- | --- | --- |
 | Noise covariance sweep robustness (`40%`) | `results/estimatorsInitNoiseSweep.md` | Present, complete, and used in the score |
 | Bayes-tuned desktop benchmark (`30%`) | `results/estimatorsBayesTuning.md` | Present, complete, and used in the score |
-| Shared-covariance injected `noise` (`4.2%`) | `results/PerturbanceInjectionTestWsameESCsCovs.md` | Present, complete, and used in the score |
-| Shared-covariance injected `perturbance` (`9.8%`) | `results/PerturbanceInjectionTestWsameESCsCovs.md` | Present, complete, and used in the score |
-| Tuned-covariance injected `noise` (`1.8%`) | `results/PerturbanceInjectionTestBayesFitted.md` | Present, complete, and used in the score |
-| Tuned-covariance injected `perturbance` (`4.2%`) | `results/PerturbanceInjectionTestBayesFitted.md` | Present, complete, and used in the score |
+| Shared-covariance injected `additive_measurement_noise` (`4.2%`) | `results/InjectionScenariosWsameESCsCovs.md` | Present, complete, and used in the score |
+| Shared-covariance injected `sensor_gain_bias_fault` (`9.8%`) | `results/InjectionScenariosWsameESCsCovs.md` | Present, complete, and used in the score |
+| Tuned-covariance injected `additive_measurement_noise` (`1.8%`) | `results/InjectionScenariosBayesFitted.md` | Present, complete, and used in the score |
+| Tuned-covariance injected `sensor_gain_bias_fault` (`4.2%`) | `results/InjectionScenariosBayesFitted.md` | Present, complete, and used in the score |
 | Shared-covariance init-SOC sweep (`7%`) | `results/estimatorsSOCInitSweepSameESCsCovs.md` | Present, complete, and used in the score |
 | Tuned-covariance init-SOC sweep (`3%`) | `results/estimatorsSOCInitSweepBayesFitted.md` | Present, complete, and used in the score |
 
@@ -51,10 +51,10 @@ The overall score is:
 score(estimator) =
 0.40 * rank_noise_sweep_mean_soc_rmse +
 0.30 * rank_bayes_soc_rmse +
-0.042 * rank_shared_noise_soc_rmse +
-0.098 * rank_shared_perturbance_soc_rmse +
-0.018 * rank_tuned_noise_soc_rmse +
-0.042 * rank_tuned_perturbance_soc_rmse +
+0.042 * rank_shared_additive_measurement_noise_soc_rmse +
+0.098 * rank_shared_sensor_gain_bias_fault_soc_rmse +
+0.018 * rank_tuned_additive_measurement_noise_soc_rmse +
+0.042 * rank_tuned_sensor_gain_bias_fault_soc_rmse +
 0.07 * rank_shared_init_soc_mean_soc_rmse +
 0.03 * rank_tuned_init_soc_mean_soc_rmse
 ```
@@ -70,11 +70,11 @@ Rules used in the computation:
 
 - Noise covariance sweep: mean SOC RMSE rank across the full covariance grid
 - Bayes tuning: SOC RMSE rank from the tuned desktop-evaluation benchmark
-- Injection with same ESC covariances, `noise`: SOC RMSE rank in the `noise` case
-- Injection with same ESC covariances, `perturbance`: SOC RMSE rank in the `perturbance` case
+- Injection with same ESC covariances, `additive_measurement_noise`: SOC RMSE rank in the `additive_measurement_noise` case
+- Injection with same ESC covariances, `sensor_gain_bias_fault`: SOC RMSE rank in the `sensor_gain_bias_fault` case
 - Initial-SOC sweep with shared covariances: mean SOC RMSE rank across the full sweep
-- Injection with tuned covariances, `noise`: SOC RMSE rank in the `noise` case
-- Injection with tuned covariances, `perturbance`: SOC RMSE rank in the `perturbance` case
+- Injection with tuned covariances, `additive_measurement_noise`: SOC RMSE rank in the `additive_measurement_noise` case
+- Injection with tuned covariances, `sensor_gain_bias_fault`: SOC RMSE rank in the `sensor_gain_bias_fault` case
 - Initial-SOC sweep with tuned covariances: mean SOC RMSE rank across the full sweep
 
 Voltage RMSE remains a supporting diagnostic and tie-break context, not the primary selection metric.
@@ -88,7 +88,7 @@ The comparable set is the estimator intersection that appears in all eight weigh
 
 ## Source ranks used in the calculation
 
-| Estimator | Noise sweep rank | Bayes tuning rank | Shared-noise rank | Shared-perturbance rank | Tuned-noise rank | Tuned-perturbance rank | Shared init-SOC rank | Tuned init-SOC rank |
+| Estimator | Noise sweep rank | Bayes tuning rank | Shared-additive-measurement-noise rank | Shared-sensor-gain-bias-fault rank | Tuned-additive-measurement-noise rank | Tuned-sensor-gain-bias-fault rank | Shared init-SOC rank | Tuned init-SOC rank |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `ROM-EKF` | 10.0 | 10.0 | 11.0 | 11.0 | 3.0 | 9.0 | 11.0 | 7.0 |
 | `ESC-SPKF` | 4.5 | 4.0 | 3.5 | 6.5 | 4.0 | 5.0 | 3.5 | 1.5 |
@@ -131,8 +131,8 @@ Under the updated weighting, the best ESC-based Kalman filter for the ATL BSS de
 ## Interpretation of the top candidates
 
 - `EsSPKF` wins because the weighting is dominated by the `40%` covariance-sweep robustness term, where it ties for the best mean SOC RMSE, and it also places second in the `30%` Bayes-tuned benchmark.
-- `Em7SPKF` finishes second for nearly the same reason: it ties `EsSPKF` in the covariance sweep and stays strong in the shared-covariance perturbance study, but it loses ground in the Bayes benchmark.
-- `EbSPKF` is the best robustness challenger. It wins the shared-covariance perturbance case, is third in Bayes tuning, and is strong in both init-SOC studies, but its weaker covariance-sweep rank keeps it behind `EsSPKF`.
+- `Em7SPKF` finishes second for nearly the same reason: it ties `EsSPKF` in the covariance sweep and stays strong in the shared-covariance `sensor_gain_bias_fault` study, but it loses ground in the Bayes benchmark.
+- `EbSPKF` is the best robustness challenger. It wins the shared-covariance sensor_gain_bias_fault case, is third in Bayes tuning, and is strong in both init-SOC studies, but its weaker covariance-sweep rank keeps it behind `EsSPKF`.
 - `ESC-SPKF` and `EBiSPKF` are the most balanced all-round alternatives. They avoid major failure modes across the bundle, but neither is dominant enough in the heavily weighted studies to take first place.
 - `ESC-EKF` is the best estimator on the Bayes-tuned desktop benchmark and the tuned injection study, but the present weighting penalizes its weaker covariance-sweep robustness and its poor tuned init-SOC robustness.
 

@@ -1,4 +1,4 @@
-# Perturbance And Noise Injection Results
+﻿# Canonical Injection Scenario Results
 
 ## Description of the scenario
 
@@ -16,7 +16,7 @@ Scenario:
 | Source dataset | `data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat` |
 | ESC model | `models/ATLmodel.mat` |
 | ROM model | `models/ROM_ATL20_beta.mat` |
-| Injection cases reported here | `noise`, `perturbance` |
+| Injection cases reported here | `additive_measurement_noise`, `sensor_gain_bias_fault` |
 | Estimators reported here | `ROM-EKF`, `ESC-SPKF`, `ESC-EKF`, `EaEKF`, `EacrSPKF`, `EnacrSPKF`, `EDUKF`, `EsSPKF`, `EbSPKF`, `EBiSPKF`, `Em7SPKF` |
 | Tuning source | `autotuning_profile` |
 
@@ -37,8 +37,8 @@ Scenario:
 | `EnacrSPKF` | `sigma_w_esc` | 1.0309e-06 | `sigma_v_esc` | 1.0226e-08 | 10.4370 |
 
 The two injected cases represented here are:
-- `noise`: `15 mV` voltage noise target standard deviation and `+-5%` samplewise current scaling
-- `perturbance`: current gain `1.1`, current offset `0.1 A`, voltage gain fault `6e-4`, and voltage offset `2 mV`
+- `additive_measurement_noise`: `15 mV` voltage noise target standard deviation and `+-5%` samplewise current scaling
+- `sensor_gain_bias_fault`: current gain `1.1`, current offset `0.1 A`, voltage gain fault `6e-4`, and voltage offset `2 mV`
 
 
 ## Results
@@ -47,10 +47,10 @@ The two injected cases represented here are:
 
 | Injection case | Current RMSE [A] | Voltage RMSE [mV] | Interpretation |
 | --- | ---: | ---: | --- |
-| `noise` | 0.0824 | 14.9961 | Moderate random sensor corruption with small current distortion and visible voltage noise |
-| `perturbance` | 0.3023 | 3.9880 | Stronger current-channel distortion with smaller direct voltage mismatch |
+| `additive_measurement_noise` | 0.0824 | 14.9961 | Moderate random sensor corruption with small current distortion and visible voltage noise |
+| `sensor_gain_bias_fault` | 0.3023 | 3.9880 | Stronger current-channel distortion with smaller direct voltage mismatch |
 
-### Noise case
+### Additive-Measurement-Noise Case
 
 | Estimator | SOC RMSE [%] | SOC ME [%] | Voltage RMSE [mV] | Voltage ME [mV] |
 | --- | ---: | ---: | ---: | ---: |
@@ -66,7 +66,7 @@ The two injected cases represented here are:
 | `EsSPKF` | 38.2149 | 10.2927 | 56.8663 | -1.3345 |
 | `EDUKF` | 40.6825 | 9.6847 | 123.1506 | -6.7658 |
 
-### Perturbance case
+### Sensor-Gain-Bias-Fault Case
 
 | Estimator | SOC RMSE [%] | SOC ME [%] | Voltage RMSE [mV] | Voltage ME [mV] |
 | --- | ---: | ---: | ---: | ---: |
@@ -86,19 +86,19 @@ The two injected cases represented here are:
 
 | Case | Rank | Best on SOC RMSE | Value | Best on Voltage RMSE | Value |
 | --- | ---: | --- | ---: | --- | ---: |
-| `noise` | 1 | `ESC-EKF` | 0.5856 | `ESC-EKF` | 6.2933 |
-| `noise` | 2 | `EacrSPKF` | 0.6501 | `EacrSPKF` | 10.0576 |
-| `noise` | 3 | `ROM-EKF` | 9.1433 | `EbSPKF` | 15.5173 |
-| `perturbance` | 1 | `ESC-EKF` | 3.5536 | `EacrSPKF` | 3.9459 |
-| `perturbance` | 2 | `Em7SPKF` | 9.4621 | `ESC-SPKF` | 4.1639 |
-| `perturbance` | 3 | `EsSPKF` | 9.6963 | `Em7SPKF` | 4.4637 |
+| `additive_measurement_noise` | 1 | `ESC-EKF` | 0.5856 | `ESC-EKF` | 6.2933 |
+| `additive_measurement_noise` | 2 | `EacrSPKF` | 0.6501 | `EacrSPKF` | 10.0576 |
+| `additive_measurement_noise` | 3 | `ROM-EKF` | 9.1433 | `EbSPKF` | 15.5173 |
+| `sensor_gain_bias_fault` | 1 | `ESC-EKF` | 3.5536 | `EacrSPKF` | 3.9459 |
+| `sensor_gain_bias_fault` | 2 | `Em7SPKF` | 9.4621 | `ESC-SPKF` | 4.1639 |
+| `sensor_gain_bias_fault` | 3 | `EsSPKF` | 9.6963 | `Em7SPKF` | 4.4637 |
 
 ## Observations
 
-- `ESC-EKF` is the strongest overall estimator in this saved study. It is best on SOC RMSE in both `noise` and `perturbance`, and it is also best on voltage RMSE in the `noise` case.
-- `EacrSPKF` becomes a strong tuned alternative here. It is second-best on SOC RMSE in the `noise` case and best on voltage RMSE in the `perturbance` case.
-- `ROM-EKF` is no longer the worst estimator in the tuned `noise` case, but it is still clearly behind the best ESC estimators and remains unusable on voltage RMSE in the `perturbance` case.
-- Several SPKF-family estimators that were previously top performers in the untuned ATL injection study now degrade badly under this tuned-profile run, especially `EDUKF`, `EsSPKF`, and `Em7SPKF` in the `noise` case.
+- `ESC-EKF` is the strongest overall estimator in this saved study. It is best on SOC RMSE in both `additive_measurement_noise` and `sensor_gain_bias_fault`, and it is also best on voltage RMSE in the `additive_measurement_noise` case.
+- `EacrSPKF` becomes a strong tuned alternative here. It is second-best on SOC RMSE in the `additive_measurement_noise` case and best on voltage RMSE in the `sensor_gain_bias_fault` case.
+- `ROM-EKF` is no longer the worst estimator in the tuned `additive_measurement_noise` case, but it is still clearly behind the best ESC estimators and remains unusable on voltage RMSE in the `sensor_gain_bias_fault` case.
+- Several SPKF-family estimators that were previously top performers in the untuned ATL injection study now degrade badly under this tuned-profile run, especially `EDUKF`, `EsSPKF`, and `Em7SPKF` in the `additive_measurement_noise` case.
 - `EaEKF` remains unstable in both injected cases for this saved run, with very large voltage RMSE.
 
 ## How to regenerate them
@@ -127,3 +127,4 @@ results = runInjectionStudy(cfg);
 printInjectionSummary(results);
 plotInjectionResults(results);
 ```
+

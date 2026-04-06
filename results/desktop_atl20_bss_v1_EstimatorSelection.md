@@ -1,4 +1,4 @@
-# Estimator Selection For The ATL20 P25 Bundle
+﻿# Estimator Selection For The ATL20 P25 Bundle
 
 ## Purpose
 
@@ -14,7 +14,7 @@ The intent is to follow the same selection logic used in `results/EstimatorSelec
 - tuned nominal benchmark
 - full covariance robustness sweep
 - tuned initial-SOC sweep
-- tuned injection robustness (`noise` and `perturbance`)
+- tuned injection robustness (`additive_measurement_noise` and `sensor_gain_bias_fault`)
 
 ## Weighting used
 
@@ -24,8 +24,8 @@ Original weights retained from the parent criterion:
 
 - `40%` from the noise covariance sweep
 - `30%` from the Bayes-tuned nominal benchmark
-- `1.8%` from the tuned `noise` injection case
-- `4.2%` from the tuned `perturbance` injection case
+- `1.8%` from the tuned `additive_measurement_noise` injection case
+- `4.2%` from the tuned `sensor_gain_bias_fault` injection case
 - `3%` from the tuned initial-SOC sweep
 
 Available-weight total: `79%`
@@ -34,8 +34,8 @@ Renormalized bundle-only weights:
 
 - `50.63%` noise covariance sweep robustness
 - `37.97%` tuned nominal benchmark
-- `2.28%` tuned `noise` injection
-- `5.32%` tuned `perturbance` injection
+- `2.28%` tuned `additive_measurement_noise` injection
+- `5.32%` tuned `sensor_gain_bias_fault` injection
 - `3.80%` tuned initial-SOC sweep
 
 ## Source provenance and status
@@ -44,8 +44,8 @@ Renormalized bundle-only weights:
 | --- | --- | --- |
 | Noise covariance sweep robustness | `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_noise_cov_study__summary.md` | Present, complete, and used |
 | Bayes-tuned nominal benchmark | `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle__summary.md` | Present, complete, and used |
-| Tuned injection `noise` case | `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_injection_study__summary.md` | Present, complete, and used |
-| Tuned injection `perturbance` case | `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_injection_study__summary.md` | Present, complete, and used |
+| Tuned injection `additive_measurement_noise` case | `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_injection_study__summary.md` | Present, complete, and used |
+| Tuned injection `sensor_gain_bias_fault` case | `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_injection_study__summary.md` | Present, complete, and used |
 | Tuned initial-SOC sweep | `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_init_soc_sweep__summary.md` | Present, complete, and used |
 
 ## Scoring rule
@@ -56,8 +56,8 @@ The overall bundle score is:
 score(estimator) =
 0.5063 * rank_noise_sweep_mean_soc_rmse +
 0.3797 * rank_nominal_soc_rmse +
-0.0228 * rank_tuned_noise_soc_rmse +
-0.0532 * rank_tuned_perturbance_soc_rmse +
+0.0228 * rank_tuned_additive_measurement_noise_soc_rmse +
+0.0532 * rank_tuned_sensor_gain_bias_fault_soc_rmse +
 0.0380 * rank_tuned_init_soc_mean_soc_rmse
 ```
 
@@ -72,8 +72,8 @@ Rules used in the computation:
 
 - Noise covariance sweep: mean SOC RMSE rank across the full covariance grid
 - Nominal benchmark: SOC RMSE rank from the final tuned bundle benchmark
-- Injection `noise`: SOC RMSE rank in the `noise` case
-- Injection `perturbance`: SOC RMSE rank in the `perturbance` case
+- Injection `additive_measurement_noise`: SOC RMSE rank in the `additive_measurement_noise` case
+- Injection `sensor_gain_bias_fault`: SOC RMSE rank in the `sensor_gain_bias_fault` case
 - Initial-SOC sweep: mean SOC RMSE rank across the full sweep
 
 Voltage RMSE remains supporting context, not the primary selection metric.
@@ -86,7 +86,7 @@ The comparable set is the estimator intersection that appears in all bundle stud
 
 ## Source ranks used in the calculation
 
-| Estimator | Noise sweep rank | Nominal benchmark rank | Tuned-noise rank | Tuned-perturbance rank | Tuned init-SOC rank |
+| Estimator | Noise sweep rank | Nominal benchmark rank | Tuned-additive-measurement-noise rank | Tuned-sensor-gain-bias-fault rank | Tuned init-SOC rank |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `ROM-EKF` | 11.0 | 9.0 | 7.0 | 11.0 | 8.0 |
 | `ESC-SPKF` | 6.5 | 4.0 | 2.0 | 3.0 | 4.0 |

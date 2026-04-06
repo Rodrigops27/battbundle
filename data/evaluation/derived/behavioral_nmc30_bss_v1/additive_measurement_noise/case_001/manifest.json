@@ -1,0 +1,5 @@
+﻿{"dataset_id":"behavioral_nmc30_bss_v1__additive_measurement_noise__case_001","parent_dataset_id":"behavioral_nmc30_bss_v1__nominal__rom_bus_coreBattery_dataset","suite_version":"behavioral_nmc30_bss_v1","dataset_family":"additive_measurement_noise","augmentation_type":"additive_measurement_noise","case_id":"case_001","source_dataset_path":"data/evaluation/processed/behavioral_nmc30_bss_v1/nominal/rom_bus_coreBattery_dataset.mat","resolved_output_path":"data/evaluation/derived/behavioral_nmc30_bss_v1/additive_measurement_noise/case_001/dataset.mat","random_seed":7,"generated_by":"legacy_injection_dataset_migration","generated_at":"2026-04-01 00:00:00","benchmark_contract_version":"benchmark_dataset_struct_v1","injection_config":{"name":"additive_measurement_noise","mode":"additive_measurement_noise","dataset_family":"additive_measurement_noise","augmentation_type":"additive_measurement_noise","voltage_std_mv":15,"current_error_percent":5,"random_seed":7},"notes":"Migrated from a legacy NMC30 behavior-test injection dataset during the data-layout upgrade."}
+
+
+
+

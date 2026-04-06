@@ -18,13 +18,13 @@ The default desktop scenario uses:
 - ROM model: [`models/ROM_ATL20_beta.mat`](../../models/ROM_ATL20_beta.mat)
 - default estimator set:
   `EsSPKF`, `ESC-SPKF`, `EaEKF`, `EbSPKF`, `EBiSPKF`, `EDUKF`, `Em7SPKF`, `ESC-EKF`
-- default cases: `noise` and `perturbance`
+- default cases: `additive_measurement_noise` and `sensor_gain_bias_fault`
 
 ## Canonical Output Layout
 
 Generated evaluation cases save under:
 
-`data/evaluation/derived/<suite_version>/<dataset_family>/<case_id>/`
+`data/evaluation/derived/<suite_version>/<canonical_scenario_name>/<case_id>/`
 
 Each case directory contains:
 
@@ -34,7 +34,7 @@ Each case directory contains:
 
 Example:
 
-`data/evaluation/derived/desktop_atl20_bss_v1/stochastic_sensor/case_001/`
+`data/evaluation/derived/desktop_atl20_bss_v1/additive_measurement_noise/case_001/`
 
 ## Main Files
 
@@ -43,7 +43,7 @@ Example:
 - [`defaultInjectionConfig.m`](defaultInjectionConfig.m)
   Default ATL desktop scenario and default injection cases.
 - [`generateInjectedDataset.m`](generateInjectedDataset.m)
-  Dataset-generation helper for noise and perturbance cases.
+  Dataset-generation helper for canonical injection cases.
 - [`validateInjectedDataset.m`](validateInjectedDataset.m)
   Validation helper for clean-vs-injected traces.
 - `printInjectionSummary.m`
@@ -76,11 +76,12 @@ When parallel execution is unavailable, the layer falls back to serial mode and 
 
 ## Custom Settings
 
-For a custom `noise` case, the main configurable inputs are:
+For a custom `additive_measurement_noise` case, the main configurable inputs are:
 
-- `name`
-- `mode = 'noise'`
-- `dataset_family = 'stochastic_sensor'`
+- `name = 'additive_measurement_noise'`
+- `mode = 'additive_measurement_noise'`
+- `dataset_family = 'additive_measurement_noise'`
+- `augmentation_type = 'additive_measurement_noise'`
 - `voltage_std_mv`
 - `current_error_percent`
 - `random_seed`
@@ -91,10 +92,10 @@ Example:
 ```matlab
 cfg = defaultInjectionConfig();
 cfg.scenarios(1).injection_cases = struct( ...
-    'name', 'noise_special', ...
-    'mode', 'noise', ...
-    'dataset_family', 'stochastic_sensor', ...
-    'augmentation_type', 'noise', ...
+    'name', 'additive_measurement_noise', ...
+    'mode', 'additive_measurement_noise', ...
+    'dataset_family', 'additive_measurement_noise', ...
+    'augmentation_type', 'additive_measurement_noise', ...
     'voltage_std_mv', 8, ...
     'current_error_percent', 2.5, ...
     'random_seed', 21, ...
@@ -103,11 +104,12 @@ cfg.scenarios(1).injection_cases = struct( ...
 results = runInjectionStudy(cfg);
 ```
 
-For a custom `perturbance` case, the main configurable inputs are:
+For a custom `sensor_gain_bias_fault` case, the main configurable inputs are:
 
-- `name`
-- `mode = 'perturbance'`
-- `dataset_family = 'perturbance'`
+- `name = 'sensor_gain_bias_fault'`
+- `mode = 'sensor_gain_bias_fault'`
+- `dataset_family = 'sensor_gain_bias_fault'`
+- `augmentation_type = 'sensor_gain_bias_fault'`
 - `current_gain`
 - `current_offset_a`
 - `voltage_gain_fault`
@@ -120,10 +122,10 @@ Example:
 ```matlab
 cfg = defaultInjectionConfig();
 cfg.scenarios(1).injection_cases = struct( ...
-    'name', 'perturbance_special', ...
-    'mode', 'perturbance', ...
-    'dataset_family', 'perturbance', ...
-    'augmentation_type', 'perturbance', ...
+    'name', 'sensor_gain_bias_fault', ...
+    'mode', 'sensor_gain_bias_fault', ...
+    'dataset_family', 'sensor_gain_bias_fault', ...
+    'augmentation_type', 'sensor_gain_bias_fault', ...
     'current_gain', 1.05, ...
     'current_offset_a', 0.05, ...
     'voltage_gain_fault', 4e-4, ...
@@ -166,7 +168,7 @@ results = runInjectionStudy(cfg);
 
 Example dataset id:
 
-`desktop_atl20_bss_v1__stochastic_sensor__case_001`
+`desktop_atl20_bss_v1__additive_measurement_noise__case_001`
 
 ## Notes
 
@@ -174,3 +176,5 @@ Example dataset id:
 - Dataset validation runs before the benchmark by default.
 - The default metric-voltage comparison uses the clean voltage trace stored as `voltage_v_true`.
 - Derived `dataset.mat` files are reproducible workflow artifacts and are Git-ignored by default; lightweight manifests remain trackable.
+- Only `additive_measurement_noise` and `sensor_gain_bias_fault` are accepted in executable configuration fields such as `name`, `mode`, `dataset_family`, and `augmentation_type`.
+- See [`../../docs/injection-scenario-migration-note.md`](../../docs/injection-scenario-migration-note.md) for the explicit rename and upgrade note.

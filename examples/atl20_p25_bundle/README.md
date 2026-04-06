@@ -34,7 +34,7 @@ Main entrypoint:
   - tuned benchmark validation
   - full-grid noise-covariance sweep
   - initial-SOC sweep
-  - injection study on canonical derived perturbance and stochastic-sensor cases
+  - injection study on canonical derived sensor-gain-bias-fault and additive-measurement-noise cases
 
 ## What The Script Runs
 
@@ -48,8 +48,8 @@ Main entrypoint:
 6. Full-grid noise-covariance sweep, split into group 1 and group 2 for hardware reasons.
 7. Initial-SOC sweep with the tuned covariances.
 8. Injection study using:
-   - `data/evaluation/derived/desktop_atl20_bss_v1/stochastic_sensor/case_001/dataset.mat`
-   - `data/evaluation/derived/desktop_atl20_bss_v1/perturbance/case_002/dataset.mat`
+   - `data/evaluation/derived/desktop_atl20_bss_v1/additive_measurement_noise/case_001/dataset.mat`
+   - `data/evaluation/derived/desktop_atl20_bss_v1/sensor_gain_bias_fault/case_002/dataset.mat`
 
 ## Where Outputs Go
 
