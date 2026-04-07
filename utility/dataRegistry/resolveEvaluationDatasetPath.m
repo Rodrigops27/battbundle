@@ -30,6 +30,7 @@ rejectLegacyRoot(input_norm, path_norm, legacy_roots, path_in);
 allowed_roots = { ...
     normalizePath(paths.evaluation.processed), ...
     normalizePath(paths.evaluation.derived)};
+allowed_segments = {'/data/evaluation/processed/', '/data/evaluation/derived/'};
 
 switch lower(char(opts.access))
     case {'benchmark', 'runtime'}
@@ -41,7 +42,7 @@ switch lower(char(opts.access))
             'Unsupported access mode "%s".', char(opts.access));
 end
 
-if ~isUnderAnyRoot(path_norm, allowed_roots)
+if ~isUnderAnyRoot(path_norm, allowed_roots) && ~containsAnySegment(path_norm, allowed_segments)
     error('resolveEvaluationDatasetPath:NonCanonicalPath', ...
         ['Benchmark/runtime evaluation dataset reads must resolve only under ', ...
          'data/evaluation/processed or data/evaluation/derived.\n', ...
@@ -74,6 +75,16 @@ tf = false;
 for idx = 1:numel(roots)
     root_norm = normalizePath(roots{idx});
     if strcmp(path_norm, root_norm) || startsWith(path_norm, [root_norm '/'])
+        tf = true;
+        return;
+    end
+end
+end
+
+function tf = containsAnySegment(path_norm, segments)
+tf = false;
+for idx = 1:numel(segments)
+    if contains(path_norm, segments{idx})
         tf = true;
         return;
     end

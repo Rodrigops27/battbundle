@@ -58,7 +58,7 @@ for idx = 1:numel(suite_versions)
     suite_version = suite_versions{idx};
     ensureDir(fullfile(paths.evaluation.processed, suite_version, 'nominal'));
     ensureDir(fullfile(paths.evaluation.derived, suite_version, 'nominal'));
-    ensureDir(fullfile(paths.evaluation.derived, suite_version, 'stochastic_sensor'));
+    ensureDir(fullfile(paths.evaluation.derived, suite_version, 'composite_measurement_error'));
     ensureDir(fullfile(paths.evaluation.derived, suite_version, 'dropout'));
 end
 end

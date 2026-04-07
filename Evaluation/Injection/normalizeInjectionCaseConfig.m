@@ -17,9 +17,17 @@ end
 
 assertCanonicalScenarioName(scenario_name, 'mode');
 case_cfg.mode = scenario_name;
-case_cfg.name = resolveCanonicalField(case_cfg, 'name', scenario_name);
+case_cfg.name = resolveCaseName(case_name, scenario_name);
 case_cfg.dataset_family = resolveCanonicalField(case_cfg, 'dataset_family', scenario_name);
 case_cfg.augmentation_type = resolveCanonicalField(case_cfg, 'augmentation_type', scenario_name);
+end
+
+function value = resolveCaseName(case_name, scenario_name)
+if isempty(case_name)
+    value = scenario_name;
+else
+    value = case_name;
+end
 end
 
 function value = resolveCanonicalField(case_cfg, field_name, scenario_name)
@@ -35,7 +43,7 @@ end
 end
 
 function assertCanonicalScenarioName(value, field_name)
-allowed_names = {'sensor_gain_bias_fault', 'additive_measurement_noise'};
+allowed_names = {'sensor_gain_bias_fault', 'additive_measurement_noise', 'composite_measurement_error'};
 if any(strcmp(value, allowed_names))
     return;
 end

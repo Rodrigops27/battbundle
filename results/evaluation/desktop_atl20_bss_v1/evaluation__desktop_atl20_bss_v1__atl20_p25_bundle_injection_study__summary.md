@@ -1,13 +1,13 @@
-﻿# Promoted Injection Study Summary
+# Promoted Injection Study Summary
 
 - layer: `evaluation`
 - suite: `desktop_atl20_bss_v1`
 - scenario: `atl20_p25_bundle_injection_study`
-- generated: `2026-03-31T20:08:40+02:00`
+- generated: `2026-04-06T18:27:13+02:00`
 - promoted JSON: `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_injection_study__summary.json`
 - heavy MAT: `Evaluation/Injection/results/atl20_p25_bundle_injection_study.mat`
 - saved MAT: `Evaluation/Injection/results/atl20_p25_bundle_injection_study.mat`
-- runs: `2`
+- runs: `3`
 
 ## Run Summary
 
@@ -15,6 +15,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | atl20_p25_injection | additive_measurement_noise | additive_measurement_noise | case_001 | desktop_atl20_bss_v1__additive_measurement_noise__case_001 | esc_bus_coreBattery_dataset | data/evaluation/derived/desktop_atl20_bss_v1/additive_measurement_noise/case_001/dataset.mat | Evaluation/Injection/results/atl20_p25_bundle_injection_study/atl20_p25_injection/additive_measurement_noise_benchmark_results.mat | NaN |
 | atl20_p25_injection | sensor_gain_bias_fault | sensor_gain_bias_fault | case_002 | desktop_atl20_bss_v1__sensor_gain_bias_fault__case_002 | esc_bus_coreBattery_dataset | data/evaluation/derived/desktop_atl20_bss_v1/sensor_gain_bias_fault/case_002/dataset.mat | Evaluation/Injection/results/atl20_p25_bundle_injection_study/atl20_p25_injection/sensor_gain_bias_fault_benchmark_results.mat | NaN |
+| atl20_p25_injection | hall_bias | composite_measurement_error | case_003 | desktop_atl20_bss_v1__composite_measurement_error__case_003 | esc_bus_coreBattery_dataset | data/evaluation/derived/desktop_atl20_bss_v1/composite_measurement_error/case_003/dataset.mat | Evaluation/Injection/results/atl20_p25_bundle_injection_study/atl20_p25_injection/hall_bias_benchmark_results.mat | NaN |
 
 ## Per-Estimator Metrics
 
@@ -42,29 +43,14 @@
 | atl20_p25_injection | sensor_gain_bias_fault | sensor_gain_bias_fault | EbSPKF | 6.12931 | 4.93947 | 2.21726e-06 | 19.2307 | -3.35967 | 0.130962 | 0.302283 | 3.98796 |
 | atl20_p25_injection | sensor_gain_bias_fault | sensor_gain_bias_fault | EBiSPKF | 8.02514 | 6.46651 | 1.908e-06 | 11.7153 | -1.0825 | 0.131731 | 0.302283 | 3.98796 |
 | atl20_p25_injection | sensor_gain_bias_fault | sensor_gain_bias_fault | Em7SPKF | 7.55485 | 6.32086 | 1.93201e-06 | 15.7608 | -1.20926 | 0.273956 | 0.302283 | 3.98796 |
-
-### Practical ranking for this study
-
-This ranking combines both injected cases and prioritizes estimators that remain usable under the harsher additive-measurement-noise corruption without collapsing on the sensor-gain-bias-fault case:
-
-1. `EbSPKF`
-2. `ESC-SPKF`
-3. `Em7SPKF`
-4. `EsSPKF`
-5. `EBiSPKF`
-6. `ESC-EKF`
-7. `ROM-EKF`
-8. `EnacrSPKF`
-9. `EacrSPKF`
-10. `EaEKF`
-11. `EDUKF`
-
-## Observations
-
-- This study is the main transfer-robustness check for the tuned bundle because it evaluates the estimators on explicitly corrupted datasets rather than only on the nominal scenario.
-- `EbSPKF`, `ESC-SPKF`, `Em7SPKF`, `EsSPKF`, and `EBiSPKF` form the strongest practical group here. None of them wins every metric, but all remain usable under both injected cases.
-- The `additive_measurement_noise` case is the harsher test. It is what separates the practically robust estimators from those that only look strong on the nominal benchmark.
-- `EacrSPKF` is the clearest example of nominal strength not transferring cleanly to corrupted data. It dominates the nominal benchmark but degrades badly under `additive_measurement_noise`.
-- `EaEKF` and `EDUKF` also fail the transfer test in practical terms because their `additive_measurement_noise` behavior becomes severe despite their strengths in other studies.
-- `ROM-EKF` is not competitive on the nominal benchmark, but it avoids the catastrophic breakdown seen in some tuned filters under injection, which makes it less fragile than its nominal ranking alone suggests.
-- `EnacrSPKF` remains poor, but it is still preferable to the clearly unstable injected behavior of `EaEKF`, `EacrSPKF`, and `EDUKF` in this study.
+| atl20_p25_injection | hall_bias | composite_measurement_error | ROM-EKF | 18.7086 | -16.8201 | 7.12911e-06 | 61.1908 | -29.4393 | 0.0927623 | 0.43 | 0 |
+| atl20_p25_injection | hall_bias | composite_measurement_error | ESC-SPKF | 9.14527 | -8.10328 | 1.90668e-06 | 31.628 | -17.1249 | 0.11452 | 0.43 | 0 |
+| atl20_p25_injection | hall_bias | composite_measurement_error | ESC-EKF | 15.1991 | -11.9712 | 1.47681e-06 | 145.52 | -84.0657 | 0.105291 | 0.43 | 0 |
+| atl20_p25_injection | hall_bias | composite_measurement_error | EaEKF | 6.28176 | 4.70326 | 0.0255974 | 8.45777 | -0.177033 | 18.5479 | 0.43 | 0 |
+| atl20_p25_injection | hall_bias | composite_measurement_error | EacrSPKF | 22.5791 | -21.2522 | 9.43028e-05 | 7.93383 | 1.22645 | 0.159062 | 0.43 | 0 |
+| atl20_p25_injection | hall_bias | composite_measurement_error | EnacrSPKF | 13.491 | 9.45291 | 5.06602 | 26.2907 | 17.8804 | 1.84263 | 0.43 | 0 |
+| atl20_p25_injection | hall_bias | composite_measurement_error | EDUKF | 18.9736 | -17.2299 | 0.000198921 | 483.924 | -0.69127 | 90558.5 | 0.43 | 0 |
+| atl20_p25_injection | hall_bias | composite_measurement_error | EsSPKF | 6.95796 | -5.17498 | 1.7536e-06 | 22.3329 | -13.4006 | 0.225587 | 0.43 | 0 |
+| atl20_p25_injection | hall_bias | composite_measurement_error | EbSPKF | 4.95597 | -2.80131 | 1.98912e-06 | 25.8852 | -5.26941 | 0.113522 | 0.43 | 0 |
+| atl20_p25_injection | hall_bias | composite_measurement_error | EBiSPKF | 11.3291 | -9.12221 | 1.68701e-06 | 31.5754 | -22.3746 | 0.11469 | 0.43 | 0 |
+| atl20_p25_injection | hall_bias | composite_measurement_error | Em7SPKF | 10.2815 | -8.86046 | 1.66119e-06 | 31.5939 | -20.4307 | 0.23942 | 0.43 | 0 |

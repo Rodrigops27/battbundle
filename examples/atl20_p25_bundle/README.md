@@ -34,7 +34,7 @@ Main entrypoint:
   - tuned benchmark validation
   - full-grid noise-covariance sweep
   - initial-SOC sweep
-  - injection study on canonical derived sensor-gain-bias-fault and additive-measurement-noise cases
+  - injection study on canonical additive, fault, and hall-bias cases
 
 ## What The Script Runs
 
@@ -47,9 +47,12 @@ Main entrypoint:
 5. Final tuned benchmark validation.
 6. Full-grid noise-covariance sweep, split into group 1 and group 2 for hardware reasons.
 7. Initial-SOC sweep with the tuned covariances.
-8. Injection study using:
-   - `data/evaluation/derived/desktop_atl20_bss_v1/additive_measurement_noise/case_001/dataset.mat`
-   - `data/evaluation/derived/desktop_atl20_bss_v1/sensor_gain_bias_fault/case_002/dataset.mat`
+8. Injection study using inline canonical case definitions for:
+   - `additive_measurement_noise`
+   - `sensor_gain_bias_fault`
+   - `hall_bias` with `mode = 'composite_measurement_error'`
+
+Step 8 still passes `models/ROM_ATL20_beta.mat` into `runBenchmark` because the benchmark estimator bundle includes `ROM-EKF`. The ROM file is only used by that estimator path; the injected datasets themselves are still generated from the ESC dataset plus the Injection-layer case config.
 
 ## Where Outputs Go
 

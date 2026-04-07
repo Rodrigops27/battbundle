@@ -45,6 +45,7 @@ dataset.injection_mode = cfg.mode;
 dataset.injection_random_seed = cfg.random_seed;
 dataset.metric_voltage_name = 'Clean voltage';
 dataset.dataset_soc_name = 'Clean SOC';
+dataset.metric_soc_name = 'Clean SOC';
 
 if isfield(source_dataset, 'soc_true') && ~isempty(source_dataset.soc_true)
     dataset.source_soc_ref = source_dataset.soc_true(:);
@@ -100,11 +101,46 @@ switch cfg.mode
             'voltage_offset_mv', voltage_offset_mv, ...
             'random_seed', cfg.random_seed);
 
+    case 'composite_measurement_error'
+        resolved_cfg = resolveCompositeMeasurementErrorConfig(cfg, dataset);
+        current_bias_a = buildCurrentBiasTrace(resolved_cfg, numel(dataset.current_a_true));
+        current_analog_noise_a = resolved_cfg.current_noise_std_a * randn(size(dataset.current_a_true));
+        current_prequant_a = (1 + resolved_cfg.current_gain_error) * dataset.current_a_true + ...
+            current_bias_a + current_analog_noise_a;
+        [current_measured_a, current_quantization_a] = quantizeCurrentTrace( ...
+            current_prequant_a, resolved_cfg.current_quant_lsb_a);
+
+        dataset.current_a = current_measured_a;
+        dataset.voltage_v = dataset.voltage_v_true;
+        dataset.injected_current_gain_error = resolved_cfg.current_gain_error;
+        dataset.injected_current_bias_a = current_bias_a;
+        dataset.injected_current_analog_noise_a = current_analog_noise_a;
+        dataset.injected_current_quantization_a = current_quantization_a;
+        dataset.injected_current_prequant_a = current_prequant_a;
+        dataset.injected_current_measured_a = current_measured_a;
+        dataset.injection_config_resolved = resolved_cfg;
+        dataset.voltage_name = 'Composite measurement error (clean voltage)';
+
+        metadata = struct( ...
+            'mode', cfg.mode, ...
+            'name', cfg.name, ...
+            'current_gain_error', resolved_cfg.current_gain_error, ...
+            'current_bias_mode', resolved_cfg.current_bias_mode, ...
+            'current_bias_spec', resolved_cfg.current_bias_spec, ...
+            'current_bias_a', resolved_cfg.current_bias_a, ...
+            'current_bias_rw_std_a', resolved_cfg.current_bias_rw_std_a, ...
+            'current_noise_std_a', resolved_cfg.current_noise_std_a, ...
+            'current_quant_lsb_a', resolved_cfg.current_quant_lsb_a, ...
+            'random_seed', cfg.random_seed, ...
+            'injection_config_resolved', resolved_cfg);
+
     otherwise
         error('generateInjectedDataset:BadMode', ...
-            ['cfg.mode must be "additive_measurement_noise" or ' ...
-             '"sensor_gain_bias_fault".']);
+            ['cfg.mode must be "additive_measurement_noise", ' ...
+             '"sensor_gain_bias_fault", or "composite_measurement_error".']);
 end
+
+dataset = assignDegradedSocTrace(dataset);
 
 metadata.source_dataset = source_label;
 metadata.generated_at = datestr(now, 'yyyy-mm-dd HH:MM:SS');
@@ -129,6 +165,181 @@ cfg.current_gain = getCfg(cfg, 'current_gain', 1.1);
 cfg.current_offset_a = getCfg(cfg, 'current_offset_a', 0.1);
 cfg.voltage_gain_fault = getCfg(cfg, 'voltage_gain_fault', 6e-4);
 cfg.voltage_offset_mv = getCfg(cfg, 'voltage_offset_mv', 2);
+
+cfg.current_gain_error = getCfg(cfg, 'current_gain_error', 0);
+cfg.current_bias_mode = getCfg(cfg, 'current_bias_mode', 'constant');
+cfg.current_bias_spec = getCfg(cfg, 'current_bias_spec', 'absolute_a');
+cfg.current_bias_a = getCfg(cfg, 'current_bias_a', []);
+cfg.current_bias_c_rate = getCfg(cfg, 'current_bias_c_rate', []);
+cfg.capacity_ah = getCfg(cfg, 'capacity_ah', []);
+cfg.current_bias_rw_std_a = getCfg(cfg, 'current_bias_rw_std_a', 0);
+cfg.current_noise_std_a = getCfg(cfg, 'current_noise_std_a', 0);
+cfg.current_quant_lsb_a = getCfg(cfg, 'current_quant_lsb_a', 0);
+end
+
+function resolved_cfg = resolveCompositeMeasurementErrorConfig(cfg, dataset)
+resolved_cfg = struct();
+resolved_cfg.current_gain_error = cfg.current_gain_error;
+resolved_cfg.current_bias_mode = validateTextOption( ...
+    cfg.current_bias_mode, {'constant', 'random_walk'}, ...
+    'generateInjectedDataset:BadCurrentBiasMode', ...
+    'cfg.current_bias_mode must be "constant" or "random_walk".');
+resolved_cfg.current_bias_spec = validateTextOption( ...
+    cfg.current_bias_spec, {'absolute_a', 'c_rate_scaled'}, ...
+    'generateInjectedDataset:BadCurrentBiasSpec', ...
+    'cfg.current_bias_spec must be "absolute_a" or "c_rate_scaled".');
+resolved_cfg.current_bias_c_rate = cfg.current_bias_c_rate;
+[resolved_cfg.capacity_ah, resolved_cfg.capacity_ah_source] = ...
+    resolveCompositeMeasurementCapacity(cfg, dataset, resolved_cfg.current_bias_spec);
+resolved_cfg.current_bias_a = resolveCurrentBiasScalar(cfg, resolved_cfg);
+resolved_cfg.current_bias_rw_std_a = cfg.current_bias_rw_std_a;
+resolved_cfg.current_noise_std_a = cfg.current_noise_std_a;
+resolved_cfg.current_quant_lsb_a = cfg.current_quant_lsb_a;
+end
+
+function [capacity_ah, capacity_source] = resolveCompositeMeasurementCapacity(cfg, dataset, current_bias_spec)
+capacity_ah = [];
+capacity_source = '';
+if ~strcmp(current_bias_spec, 'c_rate_scaled')
+    return;
+end
+
+if isfield(cfg, 'capacity_ah') && ~isempty(cfg.capacity_ah)
+    capacity_ah = cfg.capacity_ah;
+    capacity_source = 'cfg.capacity_ah';
+    return;
+end
+
+if isfield(dataset, 'capacity_ah') && ~isempty(dataset.capacity_ah) && ...
+        isnumeric(dataset.capacity_ah) && isscalar(dataset.capacity_ah) && ...
+        isfinite(dataset.capacity_ah) && dataset.capacity_ah > 0
+    capacity_ah = dataset.capacity_ah;
+    capacity_source = 'dataset.capacity_ah';
+end
+end
+
+function current_bias_a = resolveCurrentBiasScalar(cfg, resolved_cfg)
+switch resolved_cfg.current_bias_spec
+    case 'absolute_a'
+        if ~isfield(cfg, 'current_bias_a') || isempty(cfg.current_bias_a)
+            error('generateInjectedDataset:MissingCurrentBiasA', ...
+                ['cfg.current_bias_a is required when cfg.mode is ' ...
+                 '"composite_measurement_error" and cfg.current_bias_spec is "absolute_a".']);
+        end
+        current_bias_a = cfg.current_bias_a;
+
+    case 'c_rate_scaled'
+        if ~isfield(cfg, 'current_bias_c_rate') || isempty(cfg.current_bias_c_rate)
+            error('generateInjectedDataset:MissingCurrentBiasCRate', ...
+                ['cfg.current_bias_c_rate is required when cfg.mode is ' ...
+                 '"composite_measurement_error" and cfg.current_bias_spec is "c_rate_scaled".']);
+        end
+        if isempty(resolved_cfg.capacity_ah)
+            error('generateInjectedDataset:MissingCapacityAh', ...
+                ['capacity_ah is required when cfg.mode is ' ...
+                 '"composite_measurement_error" and cfg.current_bias_spec is "c_rate_scaled". ', ...
+                 'Provide cfg.capacity_ah or a source dataset with dataset.capacity_ah.']);
+        end
+        current_bias_a = cfg.current_bias_c_rate * resolved_cfg.capacity_ah;
+
+    otherwise
+        error('generateInjectedDataset:BadCurrentBiasSpec', ...
+            'Unsupported current bias specification "%s".', resolved_cfg.current_bias_spec);
+end
+end
+
+function current_bias_a = buildCurrentBiasTrace(resolved_cfg, n_samples)
+switch resolved_cfg.current_bias_mode
+    case 'constant'
+        current_bias_a = resolved_cfg.current_bias_a * ones(n_samples, 1);
+
+    case 'random_walk'
+        current_bias_a = zeros(n_samples, 1);
+        current_bias_a(1) = resolved_cfg.current_bias_a;
+        if n_samples > 1
+            current_bias_a(2:end) = current_bias_a(1) + cumsum( ...
+                resolved_cfg.current_bias_rw_std_a * randn(n_samples - 1, 1));
+        end
+
+    otherwise
+        error('generateInjectedDataset:BadCurrentBiasMode', ...
+            'Unsupported current bias mode "%s".', resolved_cfg.current_bias_mode);
+end
+end
+
+function [current_measured_a, current_quantization_a] = quantizeCurrentTrace(current_prequant_a, current_quant_lsb_a)
+if current_quant_lsb_a > 0
+    current_measured_a = current_quant_lsb_a * round(current_prequant_a ./ current_quant_lsb_a);
+else
+    current_measured_a = current_prequant_a;
+end
+current_quantization_a = current_measured_a - current_prequant_a;
+end
+
+function dataset = assignDegradedSocTrace(dataset)
+if ~isfield(dataset, 'capacity_ah') || isempty(dataset.capacity_ah) || ~isfinite(dataset.capacity_ah) || dataset.capacity_ah <= 0
+    return;
+end
+
+soc0 = resolveSocInitFraction(dataset);
+if ~isfinite(soc0)
+    return;
+end
+
+time_s = dataset.time_s(:);
+current_a = dataset.current_a(:);
+n_samples = numel(time_s);
+degraded_soc = NaN(n_samples, 1);
+degraded_soc(1) = clamp01(soc0);
+for idx = 2:n_samples
+    dt_s = time_s(idx) - time_s(idx - 1);
+    degraded_soc(idx) = clamp01(degraded_soc(idx - 1) - ...
+        (current_a(idx - 1) * dt_s) / (3600 * dataset.capacity_ah));
+end
+
+dataset.degraded_soc = degraded_soc;
+dataset.reference_soc = degraded_soc;
+dataset.reference_name = 'Degraded SOC';
+if isfield(dataset, 'soc_esc')
+    dataset = rmfield(dataset, 'soc_esc');
+end
+end
+
+function soc0 = resolveSocInitFraction(dataset)
+soc0 = NaN;
+candidate_fields = {'source_soc_ref', 'soc_true', 'reference_soc', 'degraded_soc'};
+for idx = 1:numel(candidate_fields)
+    field_name = candidate_fields{idx};
+    if isfield(dataset, field_name) && ~isempty(dataset.(field_name))
+        value = dataset.(field_name);
+        value = value(1);
+        if isfinite(value)
+            soc0 = value;
+            return;
+        end
+    end
+end
+end
+
+function value = clamp01(value)
+value = min(max(value, 0), 1);
+end
+
+function value = validateTextOption(raw_value, allowed_values, error_id, error_message)
+if isstring(raw_value)
+    if ~isscalar(raw_value)
+        error(error_id, '%s', error_message);
+    end
+    value = char(raw_value);
+elseif ischar(raw_value)
+    value = raw_value;
+else
+    error(error_id, '%s', error_message);
+end
+
+if ~any(strcmp(value, allowed_values))
+    error(error_id, '%s', error_message);
+end
 end
 
 function [dataset, source_label] = loadSourceDataset(sourceInput)

@@ -133,7 +133,7 @@ end
 end
 
 function run_output = executePlan(plan_item, validation_cfg)
-[dataset, metadata] = generateInjectedDataset(plan_item.source_dataset, plan_item.dataset_file, plan_item.case_cfg); %#ok<ASGLU>
+[dataset, metadata] = generateInjectedDataset(plan_item.source_dataset, plan_item.dataset_file, plan_item.case_cfg);
 
 source_dataset_id = inferSourceDatasetId(plan_item.source_dataset, plan_item.source_dataset_file);
 dataset_id = sprintf('%s__%s__%s', plan_item.suite_version, plan_item.dataset_family, plan_item.case_id);
@@ -151,6 +151,7 @@ manifest = struct( ...
     'generated_at', datestr(now, 'yyyy-mm-dd HH:MM:SS'), ...
     'benchmark_contract_version', 'benchmark_dataset_struct_v1', ...
     'injection_config', plan_item.case_cfg, ...
+    'injection_config_resolved', fieldOr(metadata, 'injection_config_resolved', struct()), ...
     'notes', fieldOr(plan_item.case_cfg, 'notes', ''));
 writeDerivedDatasetManifest(plan_item.dataset_root, manifest, 'write_mat_metadata', true);
 
@@ -182,6 +183,7 @@ run_output.parent_dataset_id = source_dataset_id;
 run_output.manifest_file = plan_item.manifest_file;
 run_output.injected_dataset_file = plan_item.dataset_file;
 run_output.benchmark_results_file = results.metadata.saved_results_file;
+run_output.injection_metadata = metadata;
 run_output.validation = validation;
 run_output.metrics_table = results.metadata.metrics_table;
 run_output.results = results;

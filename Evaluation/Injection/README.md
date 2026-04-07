@@ -1,6 +1,6 @@
 # Injection Study Layer
 
-This layer generates derived evaluation datasets from a nominal benchmark dataset, validates the generated case, and runs [`runBenchmark.m`](../runBenchmark.m) on the derived output.
+This layer generates derived evaluation datasets from a nominal benchmark dataset, validates each injected case, and runs [`runBenchmark.m`](../runBenchmark.m) on the derived output.
 
 ## Purpose
 
@@ -11,6 +11,43 @@ Use this layer when you want to:
 - benchmark one or more estimators on the injected dataset
 - summarize saved injection-study results later
 
+## Injection Modes
+
+Each injection case selects one mode. Modes are mutually exclusive within a case, but multiple cases can be combined in a study.
+
+### additive_measurement_noise
+
+Applies zero-mean additive voltage noise plus bounded multiplicative current error.
+Use this mode for generic measurement-noise sensitivity studies.
+
+### sensor_gain_bias_fault
+
+Applies deterministic current gain/offset and voltage gain/offset faults.
+Use this mode for simple calibration or offset fault studies.
+
+### composite_measurement_error
+
+Applies a stochastic current-sensor model and leaves voltage unchanged unless future configuration adds explicit voltage handling.
+
+For this mode:
+
+- `i_true = dataset.current_a_true`
+- `i_pre_q = (1 + g) * i_true + b(k) + v(k)`
+- `i_meas = quantize(i_pre_q, current_quant_lsb_a)`
+- `n_q = i_meas - i_pre_q`
+- `dataset.current_a = i_meas`
+- `dataset.voltage_v = dataset.voltage_v_true`
+
+Supported current-bias modes:
+
+- `constant`
+- `random_walk`
+
+The current implementation uses `random_walk` for drifting bias:
+
+- `b(1) = b0`
+- `b(k) = b(k-1) + sigma_b * randn`
+
 The default desktop scenario uses:
 
 - source dataset: [`data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat`](../../data/evaluation/processed/desktop_atl20_bss_v1/nominal/esc_bus_coreBattery_dataset.mat)
@@ -18,13 +55,20 @@ The default desktop scenario uses:
 - ROM model: [`models/ROM_ATL20_beta.mat`](../../models/ROM_ATL20_beta.mat)
 - default estimator set:
   `EsSPKF`, `ESC-SPKF`, `EaEKF`, `EbSPKF`, `EBiSPKF`, `EDUKF`, `Em7SPKF`, `ESC-EKF`
-- default cases: `additive_measurement_noise` and `sensor_gain_bias_fault`
+- default cases:
+  `additive_measurement_noise`, `sensor_gain_bias_fault`, `hall_bias`
+
+The default `hall_bias` case uses a capacity-scaled constant bias:
+
+- `current_bias_spec = 'c_rate_scaled'`
+- `current_bias_c_rate = -0.1`
+- if `capacity_ah` is not set in the case config, the Injection layer uses `dataset.capacity_ah` from the source dataset
 
 ## Canonical Output Layout
 
 Generated evaluation cases save under:
 
-`data/evaluation/derived/<suite_version>/<canonical_scenario_name>/<case_id>/`
+`data/evaluation/derived/<suite_version>/<canonical_mode>/<case_id>/`
 
 Each case directory contains:
 
@@ -34,7 +78,7 @@ Each case directory contains:
 
 Example:
 
-`data/evaluation/derived/desktop_atl20_bss_v1/additive_measurement_noise/case_001/`
+`data/evaluation/derived/desktop_atl20_bss_v1/composite_measurement_error/case_003/`
 
 ## Main Files
 
@@ -46,8 +90,8 @@ Example:
   Dataset-generation helper for canonical injection cases.
 - [`validateInjectedDataset.m`](validateInjectedDataset.m)
   Validation helper for clean-vs-injected traces.
-- `printInjectionSummary.m`
-  Console summary helper.
+- [`normalizeInjectionCaseConfig.m`](normalizeInjectionCaseConfig.m)
+  Canonical case-identifier validation for executable config fields.
 
 ## Quick Start
 
@@ -78,7 +122,7 @@ When parallel execution is unavailable, the layer falls back to serial mode and 
 
 For a custom `additive_measurement_noise` case, the main configurable inputs are:
 
-- `name = 'additive_measurement_noise'`
+- `name`
 - `mode = 'additive_measurement_noise'`
 - `dataset_family = 'additive_measurement_noise'`
 - `augmentation_type = 'additive_measurement_noise'`
@@ -87,26 +131,9 @@ For a custom `additive_measurement_noise` case, the main configurable inputs are
 - `random_seed`
 - `overwrite`
 
-Example:
-
-```matlab
-cfg = defaultInjectionConfig();
-cfg.scenarios(1).injection_cases = struct( ...
-    'name', 'additive_measurement_noise', ...
-    'mode', 'additive_measurement_noise', ...
-    'dataset_family', 'additive_measurement_noise', ...
-    'augmentation_type', 'additive_measurement_noise', ...
-    'voltage_std_mv', 8, ...
-    'current_error_percent', 2.5, ...
-    'random_seed', 21, ...
-    'overwrite', true);
-
-results = runInjectionStudy(cfg);
-```
-
 For a custom `sensor_gain_bias_fault` case, the main configurable inputs are:
 
-- `name = 'sensor_gain_bias_fault'`
+- `name`
 - `mode = 'sensor_gain_bias_fault'`
 - `dataset_family = 'sensor_gain_bias_fault'`
 - `augmentation_type = 'sensor_gain_bias_fault'`
@@ -117,38 +144,115 @@ For a custom `sensor_gain_bias_fault` case, the main configurable inputs are:
 - `random_seed`
 - `overwrite`
 
-Example:
+For a custom `composite_measurement_error` case, the main configurable inputs are:
+
+- `name`
+- `mode = 'composite_measurement_error'`
+- `dataset_family = 'composite_measurement_error'`
+- `augmentation_type = 'composite_measurement_error'`
+- `current_gain_error`
+- `current_bias_mode`
+- `current_bias_spec`
+- `current_bias_a`
+- `current_bias_c_rate`
+- `capacity_ah`
+- `current_bias_rw_std_a`
+- `current_noise_std_a`
+- `current_quant_lsb_a`
+- `random_seed`
+- `overwrite`
+
+### composite_measurement_error Parameter Definitions
+
+- `current_gain_error`
+  Scalar fractional gain error `g` applied once per run.
+- `current_bias_mode`
+  Bias time-series model. Supported values: `constant`, `random_walk`.
+- `current_bias_spec`
+  Bias configuration style. Supported values: `absolute_a`, `c_rate_scaled`.
+- `current_bias_a`
+  Absolute current bias in amperes. Required when `current_bias_spec = 'absolute_a'`.
+- `current_bias_c_rate`
+  Bias expressed as a C-rate fraction. Required when `current_bias_spec = 'c_rate_scaled'`.
+- `capacity_ah`
+  Nominal cell or pack capacity in ampere-hours. Required for `c_rate_scaled` unless the source dataset already provides `dataset.capacity_ah`.
+- `current_bias_rw_std_a`
+  Random-walk step standard deviation in amperes per sample.
+- `current_noise_std_a`
+  Zero-mean Gaussian analog noise standard deviation in amperes.
+- `current_quant_lsb_a`
+  Current quantizer LSB in amperes. If `<= 0`, quantization is skipped.
+- `random_seed`
+  Optional RNG seed for deterministic replay.
+
+### Bias-Spec Resolution
+
+The implementation resolves one scalar bias value in amperes before building the bias trace.
+
+If `current_bias_spec = 'absolute_a'`:
+
+- require `current_bias_a`
+- resolve `b0 = current_bias_a`
+
+If `current_bias_spec = 'c_rate_scaled'`:
+
+- require `current_bias_c_rate`
+- resolve `capacity_ah` from `cfg.capacity_ah` when provided, otherwise from `dataset.capacity_ah`
+- resolve `b0 = current_bias_c_rate * capacity_ah`
+
+The resolved scalar is then used consistently for:
+
+- the full constant-bias trace
+- the initial condition of the random-walk bias trace
+
+The resolved value is stored in:
+
+- `dataset.injection_config_resolved.current_bias_a`
+- `metadata.injection_config_resolved.current_bias_a`
+- the written case manifest under `injection_config_resolved.current_bias_a`
+
+### Traceability Fields Added by composite_measurement_error
+
+Generated datasets store the current-sensor components explicitly:
+
+- `injected_current_gain_error`
+- `injected_current_bias_a`
+- `injected_current_analog_noise_a`
+- `injected_current_quantization_a`
+- `injected_current_prequant_a`
+- `injected_current_measured_a`
+- `injection_config_resolved`
+
+### Example composite_measurement_error Config
 
 ```matlab
 cfg = defaultInjectionConfig();
 cfg.scenarios(1).injection_cases = struct( ...
-    'name', 'sensor_gain_bias_fault', ...
-    'mode', 'sensor_gain_bias_fault', ...
-    'dataset_family', 'sensor_gain_bias_fault', ...
-    'augmentation_type', 'sensor_gain_bias_fault', ...
-    'current_gain', 1.05, ...
-    'current_offset_a', 0.05, ...
-    'voltage_gain_fault', 4e-4, ...
-    'voltage_offset_mv', 1.5, ...
-    'random_seed', 22, ...
+    'name', 'hall_bias', ...
+    'mode', 'composite_measurement_error', ...
+    'dataset_family', 'composite_measurement_error', ...
+    'augmentation_type', 'composite_measurement_error', ...
+    'current_gain_error', 0.01, ...
+    'current_bias_mode', 'random_walk', ...
+    'current_bias_spec', 'c_rate_scaled', ...
+    'current_bias_c_rate', -0.02, ...
+    'capacity_ah', 20, ...
+    'current_bias_rw_std_a', 0.002, ...
+    'current_noise_std_a', 0.01, ...
+    'current_quant_lsb_a', 0.05, ...
+    'random_seed', 23, ...
     'overwrite', true);
 
 results = runInjectionStudy(cfg);
 ```
 
-To benchmark injected cases with tuned covariances resolved from an autotuning MAT file:
+## How It Differs From the Existing Modes
 
-```matlab
-cfg = defaultInjectionConfig();
-cfg.scenarios(1).estimatorSetSpec.tuning = struct( ...
-    'kind', 'autotuning_profile', ...
-    'param_file', fullfile('autotuning', 'results', 'autotuning_20260324_000225.mat'), ...
-    'scenario_name', 'atl_bss_esc', ...
-    'selection_policy', 'best_objective', ...
-    'fallback_to_default', true);
+`composite_measurement_error` differs from the two simpler runtime modes as follows:
 
-results = runInjectionStudy(cfg);
-```
+- Compared with `additive_measurement_noise`, it explicitly models current gain error, resolved bias, analog noise, and quantization instead of only bounded noise-style perturbations.
+- Compared with `sensor_gain_bias_fault`, it supports stochastic bias evolution and explicit quantization while keeping the gain term scalar per run.
+- In legacy discussion, this is the richer current-sensor model relative to the older "noise" and "perturbance" style studies, but executable config now uses only the canonical mode names above.
 
 ## Manifest Semantics
 
@@ -165,16 +269,19 @@ results = runInjectionStudy(cfg);
 - `random_seed`
 - `benchmark_contract_version`
 - `injection_config`
+- `injection_config_resolved`
 
 Example dataset id:
 
-`desktop_atl20_bss_v1__additive_measurement_noise__case_001`
+`desktop_atl20_bss_v1__composite_measurement_error__case_003`
 
 ## Notes
 
 - The benchmark engine is still `runBenchmark` / `xKFeval`.
 - Dataset validation runs before the benchmark by default.
+- Validation now reports current RMSE, MAE, mean error, standard deviation, max-abs error, and optional pre-quantization / quantization summaries when those fields exist.
 - The default metric-voltage comparison uses the clean voltage trace stored as `voltage_v_true`.
 - Derived `dataset.mat` files are reproducible workflow artifacts and are Git-ignored by default; lightweight manifests remain trackable.
-- Only `additive_measurement_noise` and `sensor_gain_bias_fault` are accepted in executable configuration fields such as `name`, `mode`, `dataset_family`, and `augmentation_type`.
+- `mode`, `dataset_family`, and `augmentation_type` must be canonical runtime identifiers: `additive_measurement_noise`, `sensor_gain_bias_fault`, or `composite_measurement_error`.
+- `name` is a free-form case label and does not need to match `mode`.
 - See [`../../docs/injection-scenario-migration-note.md`](../../docs/injection-scenario-migration-note.md) for the explicit rename and upgrade note.

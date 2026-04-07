@@ -271,7 +271,7 @@ end
 end
 
 function soc_data = selectSocSignal(dataset)
-candidate_fields = {'soc_true', 'reference_soc', 'dataset_soc', 'source_soc_ref', 'soc_cc'};
+candidate_fields = {'degraded_soc', 'soc_true', 'reference_soc', 'dataset_soc', 'source_soc_ref', 'soc_cc'};
 for idx = 1:numel(candidate_fields)
     field_name = candidate_fields{idx};
     if isfield(dataset, field_name) && ~isempty(dataset.(field_name))

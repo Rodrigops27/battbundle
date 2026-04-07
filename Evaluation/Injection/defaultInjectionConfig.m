@@ -41,7 +41,7 @@ scenario.benchmark_dataset_template = struct( ...
     'dataset_soc_field', 'soc_true', ...
     'metric_soc_field', 'soc_true', ...
     'metric_voltage_field', 'voltage_v_true', ...
-    'reference_name', 'ESC reference', ...
+    'reference_name', 'Degraded SOC', ...
     'voltage_name', 'Injected voltage', ...
     'title_prefix', 'ATL BSS Injection');
 
@@ -82,7 +82,7 @@ scenarios = scenario;
 end
 
 function cases = defaultCases()
-cases = repmat(struct(), 2, 1);
+cases = repmat(struct(), 3, 1);
 
 cases(1).name = 'additive_measurement_noise';
 cases(1).mode = 'additive_measurement_noise';
@@ -103,4 +103,17 @@ cases(2).voltage_gain_fault = 6e-4;
 cases(2).voltage_offset_mv = 2;
 cases(2).random_seed = 11;
 cases(2).overwrite = true;
+
+cases(3).name = 'hall_bias';
+cases(3).mode = 'composite_measurement_error';
+cases(3).dataset_family = 'composite_measurement_error';
+cases(3).augmentation_type = 'composite_measurement_error';
+cases(3).current_gain_error = 0;
+cases(3).current_bias_mode = 'constant';
+cases(3).current_bias_spec = 'c_rate_scaled';
+cases(3).current_bias_c_rate = -0.1;
+cases(3).current_noise_std_a = 0;
+cases(3).current_quant_lsb_a = 0;
+cases(3).random_seed = [];
+cases(3).overwrite = true;
 end

@@ -33,11 +33,31 @@ validation.duration_s = dataset.time_s(end) - dataset.time_s(1);
 validation.current_error_a = source_current(:) - dataset.current_a(:);
 validation.voltage_error_v = source_voltage(:) - dataset.voltage_v(:);
 validation.current_rmse_a = calcRmse(validation.current_error_a);
+validation.current_mae_a = mean(abs(validation.current_error_a), 'omitnan');
 validation.current_me_a = mean(validation.current_error_a, 'omitnan');
+validation.current_std_a = std(validation.current_error_a, 'omitnan');
 validation.current_max_abs_a = max(abs(validation.current_error_a), [], 'omitnan');
 validation.voltage_rmse_mv = 1000 * calcRmse(validation.voltage_error_v);
 validation.voltage_me_mv = 1000 * mean(validation.voltage_error_v, 'omitnan');
 validation.voltage_max_abs_mv = 1000 * max(abs(validation.voltage_error_v), [], 'omitnan');
+validation.has_current_prequant = isfield(dataset, 'injected_current_prequant_a') && ...
+    ~isempty(dataset.injected_current_prequant_a);
+validation.has_current_quantization = isfield(dataset, 'injected_current_quantization_a') && ...
+    ~isempty(dataset.injected_current_quantization_a);
+if validation.has_current_prequant
+    validation.current_prequant_error_a = source_current(:) - dataset.injected_current_prequant_a(:);
+    validation.current_prequant_rmse_a = calcRmse(validation.current_prequant_error_a);
+else
+    validation.current_prequant_error_a = [];
+    validation.current_prequant_rmse_a = NaN;
+end
+if validation.has_current_quantization
+    validation.current_quantization_rmse_a = calcRmse(dataset.injected_current_quantization_a(:));
+    validation.current_quantization_max_abs_a = max(abs(dataset.injected_current_quantization_a(:)), [], 'omitnan');
+else
+    validation.current_quantization_rmse_a = NaN;
+    validation.current_quantization_max_abs_a = NaN;
+end
 validation.has_soc = ~isempty(source_soc) && isfield(dataset, 'soc_true') && ~isempty(dataset.soc_true);
 if validation.has_soc
     validation.soc_rmse_pct = 100 * calcRmse(source_soc(:) - dataset.soc_true(:));
@@ -96,10 +116,18 @@ end
 function printSummary(validation)
 fprintf('\nInjection dataset validation: %s\n', validation.validation_name);
 fprintf('  Samples: %d | Duration: %.1f s\n', validation.n_samples, validation.duration_s);
-fprintf('  Current RMSE: %.4f A | ME: %.4f A | Max abs: %.4f A\n', ...
-    validation.current_rmse_a, validation.current_me_a, validation.current_max_abs_a);
+fprintf('  Current RMSE: %.4f A | MAE: %.4f A | ME: %.4f A | Std: %.4f A | Max abs: %.4f A\n', ...
+    validation.current_rmse_a, validation.current_mae_a, validation.current_me_a, ...
+    validation.current_std_a, validation.current_max_abs_a);
 fprintf('  Voltage RMSE: %.2f mV | ME: %.2f mV | Max abs: %.2f mV\n', ...
     validation.voltage_rmse_mv, validation.voltage_me_mv, validation.voltage_max_abs_mv);
+if validation.has_current_prequant
+    fprintf('  Current prequant RMSE: %.4f A\n', validation.current_prequant_rmse_a);
+end
+if validation.has_current_quantization
+    fprintf('  Current quantization RMSE: %.4f A | Max abs: %.4f A\n', ...
+        validation.current_quantization_rmse_a, validation.current_quantization_max_abs_a);
+end
 if validation.has_soc
     fprintf('  SOC preservation RMSE: %.4f %%\n', validation.soc_rmse_pct);
 end
