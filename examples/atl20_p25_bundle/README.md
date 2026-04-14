@@ -33,8 +33,10 @@ Main entrypoint:
   - Bayesian autotuning
   - tuned benchmark validation
   - full-grid noise-covariance sweep
-  - initial-SOC sweep
-  - injection study on canonical additive, fault, and hall-bias cases
+  - tuned-profile initial-SOC sweep
+  - tuned-profile injection study on canonical additive, fault, and hall-bias cases
+  - shared-covariance initial-SOC sweep
+  - shared-covariance injection study on canonical additive, fault, and hall-bias cases
 
 ## What The Script Runs
 
@@ -42,17 +44,19 @@ Main entrypoint:
 
 1. OCV identification at 25 degC only.
 2. Dynamic ESC identification at 25 degC.
-3. Application-side ESC validation on the processed desktop ESC dataset.
-4. Bayesian autotuning for all bundle estimators.
-5. Final tuned benchmark validation.
-6. Full-grid noise-covariance sweep, split into group 1 and group 2 for hardware reasons.
-7. Initial-SOC sweep with the tuned covariances.
-8. Injection study using inline canonical case definitions for:
+2B. Application-side ESC validation on the processed desktop ESC dataset.
+3. Bayesian autotuning for all bundle estimators.
+4. Final tuned benchmark validation.
+5A/5B. Full-grid noise-covariance sweep, split into group 1 and group 2 for hardware reasons.
+6. Initial-SOC sweep with the tuned-profile covariances resolved from the autotuning artifact.
+7. Injection study with the tuned-profile covariances using inline canonical case definitions for:
    - `additive_measurement_noise`
    - `sensor_gain_bias_fault`
    - `hall_bias` with `mode = 'composite_measurement_error'`
+8. Initial-SOC sweep with shared/default covariances, without the autotuning profile.
+9. Injection study with shared/default covariances using the same three canonical cases.
 
-Step 8 still passes `models/ROM_ATL20_beta.mat` into `runBenchmark` because the benchmark estimator bundle includes `ROM-EKF`. The ROM file is only used by that estimator path; the injected datasets themselves are still generated from the ESC dataset plus the Injection-layer case config.
+Steps 7 and 9 still pass `models/ROM_ATL20_beta.mat` into `runBenchmark` because the benchmark estimator bundle includes `ROM-EKF`. The ROM file is only used by that estimator path; the injected datasets themselves are still generated from the ESC dataset plus the Injection-layer case config.
 
 ## Where Outputs Go
 
@@ -78,9 +82,15 @@ These are the Git-trackable outputs. They are written under `results/...`.
 - init-SOC sweep summary:
   - `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_init_soc_sweep__summary.json`
   - `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_init_soc_sweep__summary.md`
-- injection summary:
+- tuned-profile injection summary:
   - `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_injection_study__summary.json`
   - `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_injection_study__summary.md`
+- shared-covariance init-SOC sweep summary:
+  - `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_init_soc_sweep_shared_cov__summary.json`
+  - `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_init_soc_sweep_shared_cov__summary.md`
+- shared-covariance injection summary:
+  - `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_injection_study_shared_cov__summary.json`
+  - `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_injection_study_shared_cov__summary.md`
 - model validation report block:
   - `results/models.md`
 
@@ -118,9 +128,15 @@ These are the large MAT files and per-run outputs that are intentionally local-o
 - init-SOC:
   - `Evaluation/initSOCs/results/atl20_p25_bundle_init_soc_sweep.mat`
   - `Evaluation/initSOCs/results/atl20_p25_bundle_init_soc_sweep_summary.mat`
-- injection:
+- shared-covariance init-SOC:
+  - `Evaluation/initSOCs/results/atl20_p25_bundle_init_soc_sweep_shared_cov.mat`
+  - `Evaluation/initSOCs/results/atl20_p25_bundle_init_soc_sweep_shared_cov_summary.mat`
+- tuned-profile injection:
   - `Evaluation/Injection/results/atl20_p25_bundle_injection_study.mat`
   - per-case benchmark MATs under `Evaluation/Injection/results/atl20_p25_bundle_injection_study/`
+- shared-covariance injection:
+  - `Evaluation/Injection/results/atl20_p25_bundle_injection_study_shared_cov.mat`
+  - per-case benchmark MATs under `Evaluation/Injection/results/atl20_p25_bundle_injection_study_shared_cov/`
   - canonical derived injected datasets and manifests under `data/evaluation/derived/desktop_atl20_bss_v1/...`
 
 ## Low-Storage Mode
@@ -130,7 +146,7 @@ The example is not currently a cache-aware or storage-minimizing pipeline. By de
 For low storage:
 
 - keep `save_optional_figures = false`
-- if you only want the build steps, skip sections 4 to 7
+- if you only want the build steps, skip sections 4 to 9
 - if you only want promoted summaries from already-saved heavy MATs, use the recovery helpers instead of rerunning the studies
 
 Per-step heavy save controls exist, but disabling them has consequences:
@@ -144,10 +160,13 @@ Per-step heavy save controls exist, but disabling them has consequences:
 - step 6: `step6_cfg.SaveResults`
 - step 7: `step7_cfg.output.save_results`
   and `step7_cfg.scenarios.benchmarkFlags.SaveResults`
+- step 8: `step8_cfg.SaveResults`
+- step 9: `step9_cfg.output.save_results`
+  and `step9_cfg.scenarios.benchmarkFlags.SaveResults`
 
 Important:
 
-- steps 4 to 7 currently write promoted summaries from heavy MAT results
+- steps 4 to 9 currently write promoted summaries from heavy MAT results
 - if you disable heavy MAT saving for those steps, also disable the promoted-summary write for that step or adapt the script to summarize from in-memory results
 - steps 1 and 2 should normally keep saving enabled because later sections read the saved model files
 
@@ -197,10 +216,16 @@ This example does not emit one single `estimator_selection` artifact. In practic
   - `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_noise_cov_study*`
 - initial-SOC sweep summary:
   - `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_init_soc_sweep__summary.*`
-- injection study summary:
+- tuned-profile injection study summary:
   - `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_injection_study__summary.*`
+- shared-covariance init-SOC sweep summary:
+  - `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_init_soc_sweep_shared_cov__summary.*`
+- shared-covariance injection study summary:
+  - `results/evaluation/desktop_atl20_bss_v1/evaluation__desktop_atl20_bss_v1__atl20_p25_bundle_injection_study_shared_cov__summary.*`
 
-### Initial-SOC sweep
+The current bundle selection note in `results/desktop_atl20_bss_v1_EstimatorSelection.md` uses the full bundle surface: tuned nominal benchmark, full covariance sweep, shared and tuned init-SOC sweeps, and shared and tuned injection studies including `hall_bias`.
+
+### Tuned-profile initial-SOC sweep
 
 ```matlab
 S = load(fullfile('Evaluation', 'initSOCs', 'results', ...
@@ -208,11 +233,28 @@ S = load(fullfile('Evaluation', 'initSOCs', 'results', ...
 printInitSocSweepSummary(S.summary)
 ```
 
-### Injection outputs
+### Shared-covariance initial-SOC sweep
+
+```matlab
+S = load(fullfile('Evaluation', 'initSOCs', 'results', ...
+    'atl20_p25_bundle_init_soc_sweep_shared_cov_summary.mat'));
+printInitSocSweepSummary(S.summary)
+```
+
+### Tuned-profile injection outputs
 
 ```matlab
 S = load(fullfile('Evaluation', 'Injection', 'results', ...
     'atl20_p25_bundle_injection_study.mat'));
+printInjectionSummary(S.injection_results)
+S.injection_results.summary_table
+```
+
+### Shared-covariance injection outputs
+
+```matlab
+S = load(fullfile('Evaluation', 'Injection', 'results', ...
+    'atl20_p25_bundle_injection_study_shared_cov.mat'));
 printInjectionSummary(S.injection_results)
 S.injection_results.summary_table
 ```
@@ -231,4 +273,4 @@ This example is a rerunnable workflow, not an incremental cached pipeline.
 
 - rerunning the full script recomputes the sections and overwrites the same named output files
 - the script includes recovery comments for several steps so you can regenerate promoted summaries from saved heavy MAT files without rerunning the study
-- step 7 is the only section that intentionally reuses existing injected datasets by setting `overwrite = false` for the canonical derived cases
+- steps 7 and 9 intentionally reuse existing injected datasets by setting `overwrite = false` for the canonical derived cases
