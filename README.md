@@ -38,6 +38,13 @@ Shared simulation, plotting, profile, data registries and utility helpers live i
 
 See [`docs/architecture.md`](docs/architecture.md) for the repository purpose, top-level workflow, and canonical storage policy.
 
+## Canonical Workflows
+
+- [`docs/workflows/desktop_atl20_bss_v1.md`](docs/workflows/desktop_atl20_bss_v1.md)
+  - canonical ATL desktop workflow guide, DAG, stage map, and artifact paths
+- [`workflows/desktop_atl20_bss_v1.m`](workflows/desktop_atl20_bss_v1.m)
+  - editable orchestration skeleton over the current stable entry points
+
 ## Current Suites
 
 The current canonical evaluation suites are:
