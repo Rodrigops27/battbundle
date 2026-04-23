@@ -2,7 +2,7 @@
   "artifact_class": "summary",
   "kind": "ocv_inspection_summary",
   "layer": "ocv",
-  "created_on": "2026-04-04T15:54:37+02:00",
+  "created_on": "2026-04-07T12:49:43+02:00",
   "suite_version": "atl20",
   "scenario_id": "ocv_modelling_inspection",
   "summary_json_file": "results/ocv/atl20/ocv__atl20__ocv_modelling_inspection__summary.json",
